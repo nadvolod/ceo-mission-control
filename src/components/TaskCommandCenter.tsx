@@ -238,6 +238,8 @@ function TaskRow({ task, onUpdate, showBlocker }: TaskRowProps) {
     return `$${amount.toLocaleString()}`;
   };
 
+  // formatDate moved to bottom of file as helper function
+
   return (
     <div className="flex items-center justify-between py-3 px-4 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow">
       <div className="flex items-center space-x-3 flex-1">
@@ -372,4 +374,12 @@ function getUrgencyLevel(deadline?: string) {
   if (daysUntil <= 3) return { level: 'urgent', color: 'text-red-600 bg-red-50', text: `${daysUntil} days left` };
   if (daysUntil <= 7) return { level: 'soon', color: 'text-orange-600 bg-orange-50', text: `${daysUntil} days left` };
   return { level: 'future', color: 'text-gray-600', text: `${daysUntil} days left` };
+}
+
+function formatDate(dateStr: string) {
+  return new Date(dateStr).toLocaleDateString('en-US', { 
+    month: 'short', 
+    day: 'numeric',
+    year: new Date(dateStr).getFullYear() !== new Date().getFullYear() ? 'numeric' : undefined
+  });
 }
