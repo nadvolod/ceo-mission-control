@@ -91,3 +91,17 @@ export interface ConversationExtraction {
   statusUpdates: { taskId: string; status: TaskStatus; note?: string; }[];
   blockers: { taskId: string; reason: string; }[];
 }
+
+export interface TemporalSession {
+  id: string;
+  startTime: string;
+  endTime?: string;
+  duration: number;
+  description: string;
+  date: string;
+}
+
+export interface TemporalData {
+  sessions: TemporalSession[];
+  dailyTotals: Record<string, number>;
+}

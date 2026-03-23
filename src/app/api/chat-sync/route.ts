@@ -20,7 +20,8 @@ export async function POST(request: NextRequest) {
       success: true,
       updated: result.updated,
       created: result.created,
-      message: `Updated ${result.updated.length} tasks, created ${result.created.length} tasks`
+      financial: result.financial,
+      message: `Updated ${result.updated.length} tasks, created ${result.created.length} tasks${result.financial?.added?.length ? `, tracked ${result.financial.added.length} financial entries` : ''}`
     });
     
   } catch (error) {

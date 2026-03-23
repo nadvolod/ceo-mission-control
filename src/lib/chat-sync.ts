@@ -1,15 +1,21 @@
 import { TaskManager } from './task-manager';
+import { FinancialTracker } from './financial-tracker';
 
 export class ChatSyncManager {
   private taskManager: TaskManager;
+  private financialTracker: FinancialTracker;
 
   constructor() {
     this.taskManager = new TaskManager();
+    this.financialTracker = new FinancialTracker();
   }
 
   // Process conversational updates from main chat and sync to Mission Control
-  async syncChatUpdate(message: string): Promise<{ updated: any[]; created: any[] }> {
+  async syncChatUpdate(message: string): Promise<{ updated: any[]; created: any[]; financial?: any }> {
     console.log('Syncing chat update:', message);
+    
+    // Process financial metrics first
+    const financialResult = this.financialTracker.processConversationalUpdate(message);
     
     // Enhanced pattern matching for status updates
     const patterns = {
@@ -73,7 +79,11 @@ export class ChatSyncManager {
     // Extract any new tasks mentioned
     const created = this.taskManager.processNaturalLanguageUpdate(message);
     
-    return { updated: updates, created: created.created };
+    return { 
+      updated: updates, 
+      created: created.created,
+      financial: financialResult
+    };
   }
 
   // Enhanced task matching with fuzzy logic
