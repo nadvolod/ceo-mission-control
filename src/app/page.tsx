@@ -1,11 +1,121 @@
-import { PriorityDashboard } from '@/components/PriorityDashboard';
+'use client';
+
+import { TaskCommandCenter } from '@/components/TaskCommandCenter';
+import { ConversationTaskInput } from '@/components/ConversationTaskInput';
 import { FinancialCommandCenter } from '@/components/FinancialCommandCenter';
 import { FocusOptimization } from '@/components/FocusOptimization';
 import { readInitiatives, readDailyScorecard } from '@/lib/workspace-reader';
+import { Task, TaskStatus, ConversationExtraction } from '@/lib/types';
+import { useState, useEffect } from 'react';
 
 export default function HomePage() {
-  const initiatives = readInitiatives();
-  const scorecard = readDailyScorecard();
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+
+  // Load initial data
+  useEffect(() => {
+    loadTasks();
+  }, []);
+
+  const loadTasks = async () => {
+    try {
+      const response = await fetch('/api/tasks');
+      const data = await response.json();
+      setTasks(data.tasks || []);
+      setLastRefresh(new Date());
+    } catch (error) {
+      console.error('Error loading tasks:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
+    try {
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'update',
+          taskId,
+          updates
+        })
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        setTasks(prev => prev.map(t => t.id === taskId ? data.task : t));
+      }
+    } catch (error) {
+      console.error('Error updating task:', error);
+    }
+  };
+
+  const handleConversationMessage = async (message: string): Promise<{ tasks: Task[]; extraction: ConversationExtraction; }> => {
+    try {
+      const response = await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'processConversation',
+          message
+        })
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Refresh tasks to include new ones
+        await loadTasks();
+        
+        return {
+          tasks: data.created || [],
+          extraction: data.extraction || { tasks: [], deadlines: [], statusUpdates: [], blockers: [] }
+        };
+      }
+      
+      throw new Error('Failed to process message');
+    } catch (error) {
+      console.error('Error processing conversation:', error);
+      throw error;
+    }
+  };
+
+  const seedTasksFromInitiatives = async () => {
+    try {
+      await fetch('/api/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'seedFromInitiatives' })
+      });
+      loadTasks();
+    } catch (error) {
+      console.error('Error seeding tasks:', error);
+    }
+  };
+
+  // Load workspace data
+  let initiatives, scorecard;
+  try {
+    initiatives = readInitiatives();
+    scorecard = readDailyScorecard();
+  } catch (error) {
+    console.error('Error reading workspace files:', error);
+    initiatives = [];
+    scorecard = null;
+  }
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading Mission Control...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!scorecard) {
     return (
@@ -27,6 +137,17 @@ export default function HomePage() {
     );
   }
 
+  const completedToday = tasks.filter(t => 
+    t.status === 'Done' && 
+    new Date(t.updatedAt).toDateString() === new Date().toDateString()
+  ).length;
+
+  const urgentTasks = tasks.filter(t => {
+    if (!t.deadline) return false;
+    const daysUntil = Math.ceil((new Date(t.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
+    return daysUntil <= 3 && t.status !== 'Done';
+  }).length;
+
   return (
     <div className="min-h-screen bg-gray-100">
       {/* Header */}
@@ -35,19 +156,28 @@ export default function HomePage() {
           <div className="flex items-center justify-between">
             <div>
               <h1 className="text-3xl font-bold text-gray-900">CEO Mission Control</h1>
-              <p className="text-gray-600 mt-1">Portfolio command center for {scorecard.date}</p>
+              <p className="text-gray-600 mt-1">
+                Conversational task command center for {scorecard.date}
+              </p>
             </div>
-            <div className="flex items-center space-x-4">
-              <div className="text-right">
-                <div className="text-sm text-gray-500">Temporal Target</div>
-                <div className="text-xl font-bold text-gray-900">
-                  {scorecard.temporalActual || 0}/{scorecard.temporalTarget} hrs
-                </div>
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
+              <div>
+                <div className="text-2xl font-bold text-blue-600">{tasks.length}</div>
+                <div className="text-xs text-gray-500">Total Tasks</div>
               </div>
-              <div className="w-px h-8 bg-gray-300"></div>
-              <div className="text-right">
-                <div className="text-sm text-gray-500">Active Initiatives</div>
-                <div className="text-xl font-bold text-gray-900">{initiatives.length}</div>
+              <div>
+                <div className="text-2xl font-bold text-green-600">{completedToday}</div>
+                <div className="text-xs text-gray-500">Done Today</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-red-600">{urgentTasks}</div>
+                <div className="text-xs text-gray-500">Urgent</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-gray-900">
+                  {scorecard.temporalActual || 0}/{scorecard.temporalTarget}
+                </div>
+                <div className="text-xs text-gray-500">Temporal Hours</div>
               </div>
             </div>
           </div>
@@ -56,43 +186,78 @@ export default function HomePage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-8 py-8">
-        {/* Top Row - Priority Dashboard */}
-        <div className="mb-8">
-          <PriorityDashboard initiatives={initiatives} />
-        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          {/* Left Column - Task Management */}
+          <div className="lg:col-span-2 space-y-8">
+            {/* Conversational Input */}
+            <ConversationTaskInput 
+              onProcessMessage={handleConversationMessage}
+            />
 
-        {/* Second Row - Financial and Focus */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Financial Command Center</h2>
-            <FinancialCommandCenter />
-          </div>
-          <div>
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Focus Optimization</h2>
-            <FocusOptimization scorecard={scorecard} />
-          </div>
-        </div>
+            {/* Task Command Center */}
+            <TaskCommandCenter
+              initiatives={initiatives}
+              tasks={tasks}
+              onTaskUpdate={handleTaskUpdate}
+            />
 
-        {/* Footer Stats */}
-        <div className="bg-white rounded-lg shadow-lg p-6">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">{initiatives.slice(0, 3).reduce((sum, init) => sum + init.total, 0)}</div>
-              <div className="text-sm text-gray-600">Top 3 Total Score</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">$195K</div>
-              <div className="text-sm text-gray-600">Total Opportunity</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-orange-600">{scorecard.focusBlocks.length}</div>
-              <div className="text-sm text-gray-600">Focus Blocks Today</div>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">
-                {Math.round((scorecard.temporalActual || 0) / scorecard.temporalTarget * 100)}%
+            {/* Seed Tasks Button */}
+            {tasks.length === 0 && (
+              <div className="text-center py-8">
+                <button
+                  onClick={seedTasksFromInitiatives}
+                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                >
+                  Import Tasks from Current Initiatives
+                </button>
+                <p className="text-sm text-gray-500 mt-2">
+                  This will create initial tasks based on your INITIATIVES.md file
+                </p>
               </div>
-              <div className="text-sm text-gray-600">Temporal Progress</div>
+            )}
+          </div>
+
+          {/* Right Column - Context & Financial */}
+          <div className="space-y-8">
+            {/* Financial Command Center */}
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Financial Status</h2>
+              <FinancialCommandCenter />
+            </div>
+
+            {/* Focus Optimization */}
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Today's Focus</h2>
+              <FocusOptimization scorecard={scorecard} />
+            </div>
+
+            {/* Quick Stats */}
+            <div className="bg-white rounded-lg shadow-lg p-6">
+              <h3 className="font-semibold text-gray-900 mb-4">System Status</h3>
+              <div className="space-y-3 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Last Refresh</span>
+                  <span className="text-gray-900">{lastRefresh.toLocaleTimeString()}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Active Projects</span>
+                  <span className="text-gray-900">{initiatives.length}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Tasks Created Today</span>
+                  <span className="text-gray-900">
+                    {tasks.filter(t => 
+                      new Date(t.createdAt).toDateString() === new Date().toDateString()
+                    ).length}
+                  </span>
+                </div>
+                <button
+                  onClick={loadTasks}
+                  className="w-full mt-4 px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                >
+                  Refresh Data
+                </button>
+              </div>
             </div>
           </div>
         </div>
