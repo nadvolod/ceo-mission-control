@@ -4,19 +4,42 @@ import { TaskCommandCenter } from '@/components/TaskCommandCenter';
 import { ConversationTaskInput } from '@/components/ConversationTaskInput';
 import { FinancialCommandCenter } from '@/components/FinancialCommandCenter';
 import { FocusOptimization } from '@/components/FocusOptimization';
-import { readInitiatives, readDailyScorecard } from '@/lib/workspace-reader';
+// Removed import - will fetch via API instead
 import { Task, TaskStatus, ConversationExtraction } from '@/lib/types';
 import { useState, useEffect } from 'react';
 
 export default function HomePage() {
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [initiatives, setInitiatives] = useState<any[]>([]);
+  const [scorecard, setScorecard] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
   // Load initial data
   useEffect(() => {
-    loadTasks();
+    loadAllData();
   }, []);
+
+  const loadAllData = async () => {
+    try {
+      // Load tasks
+      const tasksResponse = await fetch('/api/tasks');
+      const tasksData = await tasksResponse.json();
+      setTasks(tasksData.tasks || []);
+
+      // Load workspace data
+      const workspaceResponse = await fetch('/api/workspace');
+      const workspaceData = await workspaceResponse.json();
+      setInitiatives(workspaceData.initiatives || []);
+      setScorecard(workspaceData.scorecard);
+
+      setLastRefresh(new Date());
+    } catch (error) {
+      console.error('Error loading data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const loadTasks = async () => {
     try {
@@ -26,8 +49,6 @@ export default function HomePage() {
       setLastRefresh(new Date());
     } catch (error) {
       console.error('Error loading tasks:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -67,7 +88,7 @@ export default function HomePage() {
         const data = await response.json();
         
         // Refresh tasks to include new ones
-        await loadTasks();
+        await loadAllData();
         
         return {
           tasks: data.created || [],
@@ -89,22 +110,13 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'seedFromInitiatives' })
       });
-      loadTasks();
+      loadAllData();
     } catch (error) {
       console.error('Error seeding tasks:', error);
     }
   };
 
-  // Load workspace data
-  let initiatives, scorecard;
-  try {
-    initiatives = readInitiatives();
-    scorecard = readDailyScorecard();
-  } catch (error) {
-    console.error('Error reading workspace files:', error);
-    initiatives = [];
-    scorecard = null;
-  }
+  // Data is loaded via useEffect and stored in state
 
   if (isLoading) {
     return (
@@ -252,7 +264,7 @@ export default function HomePage() {
                   </span>
                 </div>
                 <button
-                  onClick={loadTasks}
+                  onClick={loadAllData}
                   className="w-full mt-4 px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
                 >
                   Refresh Data
