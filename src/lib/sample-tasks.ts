@@ -10,7 +10,10 @@ export const sampleTasks: Partial<Task>[] = [
     priority: 'Critical',
     projectId: 'Temporal',
     estimatedHours: 8,
-    tags: ['temporal', 'client-work']
+    tags: ['temporal', 'client-work'],
+    missionRelevance: 'Mission Critical',
+    monthlyRevenueImpact: 10000,
+    aiLeverageScore: 8
   },
   {
     title: 'Schedule tomorrow\'s 6:30 AM focus block',
@@ -127,7 +130,10 @@ export const sampleTasks: Partial<Task>[] = [
     priority: 'High',
     projectId: 'Revenue',
     deadline: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 1 week
-    tags: ['revenue', 'tony-robbins']
+    tags: ['revenue', 'tony-robbins'],
+    missionRelevance: 'Mission Critical',
+    monthlyRevenueImpact: 100000,
+    aiLeverageScore: 7
   },
   
   // Miami Move Planning

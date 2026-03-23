@@ -4,6 +4,7 @@ import { TaskCommandCenter } from '@/components/TaskCommandCenter';
 import { ConversationTaskInput } from '@/components/ConversationTaskInput';
 import { FinancialCommandCenter } from '@/components/FinancialCommandCenter';
 import { FocusOptimization } from '@/components/FocusOptimization';
+import { MissionTracker } from '@/components/MissionTracker';
 // Removed import - will fetch via API instead
 import { Task, TaskStatus, ConversationExtraction } from '@/lib/types';
 import { useState, useEffect } from 'react';
@@ -198,6 +199,11 @@ export default function HomePage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-8 py-8">
+        {/* Mission Tracker - Top Priority */}
+        <div className="mb-8">
+          <MissionTracker />
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Left Column - Task Management */}
           <div className="lg:col-span-2 space-y-8">

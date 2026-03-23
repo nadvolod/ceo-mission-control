@@ -1,7 +1,7 @@
 'use client';
 
-import { Task, TaskStatus, Initiative } from '@/lib/types';
-import { Clock, AlertTriangle, CheckCircle, XCircle, Pause, Play, Calendar } from 'lucide-react';
+import { Task, TaskStatus, Initiative, MissionRelevance } from '@/lib/types';
+import { Clock, AlertTriangle, CheckCircle, XCircle, Pause, Play, Calendar, Target, Zap, DollarSign } from 'lucide-react';
 import { useState } from 'react';
 
 interface TaskCommandCenterProps {
@@ -54,6 +54,8 @@ export function TaskCommandCenter({ initiatives, tasks, onTaskUpdate }: TaskComm
     if (daysUntil <= 7) return { level: 'soon', color: 'text-orange-600 bg-orange-50', text: `${daysUntil} days left` };
     return { level: 'future', color: 'text-gray-600', text: `${daysUntil} days left` };
   };
+
+  // Removed duplicate function - using the one at bottom of file
 
   const formatDate = (dateStr: string) => {
     return new Date(dateStr).toLocaleDateString('en-US', { 
@@ -224,14 +226,27 @@ interface TaskRowProps {
 
 function TaskRow({ task, onUpdate, showBlocker }: TaskRowProps) {
   const urgency = getUrgencyLevel(task.deadline);
+  const missionInfo = getMissionRelevanceInfo(task.missionRelevance);
   
   const handleStatusChange = (newStatus: TaskStatus) => {
     onUpdate?.(task.id, { status: newStatus });
   };
 
+  const formatCurrency = (amount: number) => {
+    if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
+    if (amount >= 1000) return `$${(amount / 1000).toFixed(0)}K`;
+    return `$${amount.toLocaleString()}`;
+  };
+
   return (
     <div className="flex items-center justify-between py-3 px-4 bg-white border border-gray-200 rounded-lg hover:shadow-sm transition-shadow">
       <div className="flex items-center space-x-3 flex-1">
+        {/* Mission relevance indicator */}
+        <div className={`flex items-center space-x-1 px-2 py-1 rounded text-xs border ${missionInfo.color}`}>
+          {missionInfo.icon}
+          <span>{missionInfo.label}</span>
+        </div>
+        
         {/* Priority indicator */}
         <div className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)}`}></div>
         
@@ -244,11 +259,28 @@ function TaskRow({ task, onUpdate, showBlocker }: TaskRowProps) {
           {task.description && (
             <div className="text-sm text-gray-500 truncate">{task.description}</div>
           )}
+          
+          {/* Mission metrics */}
+          <div className="flex items-center space-x-3 mt-1">
+            {task.monthlyRevenueImpact && task.monthlyRevenueImpact > 0 && (
+              <div className="flex items-center space-x-1 text-xs text-green-600">
+                <DollarSign className="h-3 w-3" />
+                <span>{formatCurrency(task.monthlyRevenueImpact)}/mo</span>
+              </div>
+            )}
+            {task.aiLeverageScore && task.aiLeverageScore > 5 && (
+              <div className="flex items-center space-x-1 text-xs text-purple-600">
+                <Zap className="h-3 w-3" />
+                <span>AI: {task.aiLeverageScore}/10</span>
+              </div>
+            )}
+            {task.projectId && (
+              <div className="text-xs text-gray-400">{task.projectId}</div>
+            )}
+          </div>
+          
           {showBlocker && task.blockedReason && (
             <div className="text-sm text-red-600 mt-1">🚧 {task.blockedReason}</div>
-          )}
-          {task.projectId && (
-            <div className="text-xs text-gray-400 mt-1">{task.projectId}</div>
           )}
         </div>
         
@@ -278,6 +310,35 @@ function getStatusIcon(status: TaskStatus) {
     case 'Blocked': return <XCircle className="h-4 w-4 text-red-600" />;
     case 'Review': return <Pause className="h-4 w-4 text-yellow-600" />;
     default: return <Clock className="h-4 w-4 text-gray-400" />;
+  }
+}
+
+function getMissionRelevanceInfo(relevance?: MissionRelevance) {
+  switch (relevance) {
+    case 'Mission Critical':
+      return { 
+        icon: <Target className="h-3 w-3 text-purple-600" />, 
+        color: 'bg-purple-100 text-purple-800 border-purple-200',
+        label: 'Mission'
+      };
+    case 'Supporting':
+      return { 
+        icon: <Zap className="h-3 w-3 text-blue-600" />, 
+        color: 'bg-blue-100 text-blue-800 border-blue-200',
+        label: 'Supporting'
+      };
+    case 'Distraction':
+      return { 
+        icon: <AlertTriangle className="h-3 w-3 text-red-600" />, 
+        color: 'bg-red-100 text-red-800 border-red-200',
+        label: 'Distraction'
+      };
+    default:
+      return { 
+        icon: <Clock className="h-3 w-3 text-gray-500" />, 
+        color: 'bg-gray-100 text-gray-600 border-gray-200',
+        label: 'Neutral'
+      };
   }
 }
 

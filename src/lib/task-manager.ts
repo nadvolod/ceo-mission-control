@@ -1,4 +1,5 @@
 import { Task, TaskStatus, Initiative, ConversationExtraction } from './types';
+import { MissionEvaluator } from './mission-evaluator';
 import { writeFileSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 
@@ -58,6 +59,12 @@ export class TaskManager {
       tags: taskData.tags || [],
       assignee: taskData.assignee
     };
+
+    // Auto-evaluate mission relevance
+    const missionEval = MissionEvaluator.evaluateTask(task);
+    task.missionRelevance = missionEval.relevance;
+    task.monthlyRevenueImpact = missionEval.monthlyRevenueImpact;
+    task.aiLeverageScore = missionEval.aiLeverageScore;
 
     this.tasks.push(task);
     this.saveTasks();

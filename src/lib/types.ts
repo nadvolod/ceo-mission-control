@@ -1,5 +1,7 @@
 export type TaskStatus = 'Not Started' | 'In Progress' | 'Blocked' | 'Review' | 'Done';
 
+export type MissionRelevance = 'Mission Critical' | 'Supporting' | 'Neutral' | 'Distraction';
+
 export interface Task {
   id: string;
   title: string;
@@ -16,6 +18,9 @@ export interface Task {
   actualHours?: number;
   tags?: string[];
   assignee?: string;
+  missionRelevance?: MissionRelevance;
+  monthlyRevenueImpact?: number;
+  aiLeverageScore?: number; // 1-10 scale
 }
 
 export interface Initiative {
