@@ -2,10 +2,7 @@ import { Task, TaskStatus, Initiative, ConversationExtraction } from './types';
 import { MissionEvaluator } from './mission-evaluator';
 import { writeFileSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
-
-const WORKSPACE_PATH = process.env.NODE_ENV === 'development' 
-  ? '/Users/nikolay/.openclaw/workspace'
-  : '/app/workspace';
+import { WORKSPACE_PATH, ensureWorkspaceReady } from './workspace-path';
 
 const TASKS_FILE = join(WORKSPACE_PATH, 'tasks.json');
 
@@ -14,6 +11,7 @@ export class TaskManager {
   private initiatives: Initiative[] = [];
 
   constructor() {
+    ensureWorkspaceReady();
     this.loadTasks();
   }
 

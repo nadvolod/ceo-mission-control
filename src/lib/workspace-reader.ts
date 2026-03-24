@@ -2,13 +2,11 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import matter from 'gray-matter';
 import type { Initiative, DailyScorecard } from './types';
-
-const WORKSPACE_PATH = process.env.NODE_ENV === 'development' 
-  ? '/Users/nikolay/.openclaw/workspace'
-  : '/app/workspace';
+import { WORKSPACE_PATH, ensureWorkspaceReady } from './workspace-path';
 
 export function readInitiatives(): Initiative[] {
   try {
+    ensureWorkspaceReady();
     const filePath = join(WORKSPACE_PATH, 'INITIATIVES.md');
     const content = readFileSync(filePath, 'utf8');
     
@@ -80,6 +78,7 @@ export function readInitiatives(): Initiative[] {
 
 export function readDailyScorecard(): DailyScorecard | null {
   try {
+    ensureWorkspaceReady();
     const filePath = join(WORKSPACE_PATH, 'DAILY_SCORECARD.md');
     const content = readFileSync(filePath, 'utf8');
     

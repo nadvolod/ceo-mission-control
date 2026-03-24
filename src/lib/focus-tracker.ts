@@ -2,10 +2,7 @@ import { writeFileSync, readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { startOfWeek, subWeeks, format, subDays } from 'date-fns';
 import type { FocusCategory, FocusSession, DailyFocusMetrics, FocusData } from './types';
-
-const WORKSPACE_PATH = process.env.NODE_ENV === 'development'
-  ? '/Users/nikolay/.openclaw/workspace'
-  : '/app/workspace';
+import { WORKSPACE_PATH, ensureWorkspaceReady } from './workspace-path';
 
 const FOCUS_DATA_FILE = join(WORKSPACE_PATH, 'focus-tracking.json');
 
@@ -58,6 +55,7 @@ export class FocusTracker {
   };
 
   constructor() {
+    ensureWorkspaceReady();
     this.loadData();
   }
 

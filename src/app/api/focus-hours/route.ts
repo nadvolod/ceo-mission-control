@@ -3,10 +3,7 @@ import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
 import { FocusTracker } from '@/lib/focus-tracker';
 import type { FocusCategory, FocusSession } from '@/lib/types';
-
-const WORKSPACE_PATH = process.env.NODE_ENV === 'development'
-  ? '/Users/nikolay/.openclaw/workspace'
-  : '/app/workspace';
+import { WORKSPACE_PATH } from '@/lib/workspace-path';
 
 const VALID_CATEGORIES: FocusCategory[] = [
   'Temporal', 'Finance', 'Revenue', 'Housing',
