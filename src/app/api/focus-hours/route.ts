@@ -1,19 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { join, dirname } from 'path';
 import { FocusTracker } from '@/lib/focus-tracker';
 import type { FocusCategory, FocusSession } from '@/lib/types';
-import { WORKSPACE_PATH } from '@/lib/workspace-path';
+import { appendAuditLog } from '@/lib/storage';
 
 const VALID_CATEGORIES: FocusCategory[] = [
   'Temporal', 'Finance', 'Revenue', 'Housing',
   'Tax', 'Personal', 'Health', 'Admin', 'Learning', 'Other'
 ];
 
-function logToMemory(session: FocusSession): void {
+async function logToMemory(session: FocusSession): Promise<void> {
   try {
-    const memoryPath = join(WORKSPACE_PATH, `memory/${session.date}.md`);
-    mkdirSync(dirname(memoryPath), { recursive: true });
     const timestamp = new Date().toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
@@ -22,13 +18,7 @@ function logToMemory(session: FocusSession): void {
 
     const logEntry = `\n## Focus Session Logged (${timestamp})\n- **Category**: ${session.category}\n- **Duration**: ${session.hours} hours\n- **Description**: ${session.description}\n- **Source**: ${session.source}\n\n`;
 
-    try {
-      const existingContent = readFileSync(memoryPath, 'utf8');
-      writeFileSync(memoryPath, existingContent + logEntry);
-    } catch {
-      const newContent = `# Daily Memory - ${session.date}\n\n## Focus Hours\n${logEntry}`;
-      writeFileSync(memoryPath, newContent);
-    }
+    await appendAuditLog(session.date, 'focus', logEntry);
   } catch (error) {
     console.error('Error updating memory file:', error);
   }
@@ -36,7 +26,7 @@ function logToMemory(session: FocusSession): void {
 
 export async function GET() {
   try {
-    const tracker = new FocusTracker();
+    const tracker = await FocusTracker.create();
 
     const now = new Date();
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
@@ -66,7 +56,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action, ...data } = body;
-    const tracker = new FocusTracker();
+    const tracker = await FocusTracker.create();
 
     switch (action) {
       case 'addSession': {
@@ -86,7 +76,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const session = tracker.addSession(
+        const session = await tracker.addSession(
           category || 'Other',
           hours,
           description || `${hours}h focus block`,
@@ -94,7 +84,7 @@ export async function POST(request: NextRequest) {
           'manual'
         );
 
-        logToMemory(session);
+        await logToMemory(session);
 
         console.log('Focus session added via API:', { category: session.category, hours, date: session.date });
 
@@ -114,10 +104,10 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const result = tracker.processConversationalUpdate(message);
+        const result = await tracker.processConversationalUpdate(message);
 
         for (const session of result.added) {
-          logToMemory(session);
+          await logToMemory(session);
         }
 
         return NextResponse.json({

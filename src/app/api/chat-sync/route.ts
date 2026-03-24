@@ -1,5 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { chatSyncManager } from '@/lib/chat-sync';
+import { ChatSyncManager } from '@/lib/chat-sync';
+
+let chatSyncManagerPromise: Promise<ChatSyncManager> | null = null;
+function getChatSyncManager() {
+  if (!chatSyncManagerPromise) {
+    chatSyncManagerPromise = ChatSyncManager.create();
+  }
+  return chatSyncManagerPromise;
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,7 +22,8 @@ export async function POST(request: NextRequest) {
 
     console.log('Processing chat sync for message:', message);
 
-    const result = await chatSyncManager.syncChatUpdate(message);
+    const manager = await getChatSyncManager();
+    const result = await manager.syncChatUpdate(message);
 
     return NextResponse.json({
       success: true,

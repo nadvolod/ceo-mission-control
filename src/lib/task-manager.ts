@@ -1,45 +1,42 @@
 import { Task, TaskStatus, Initiative, ConversationExtraction } from './types';
 import { MissionEvaluator } from './mission-evaluator';
-import { writeFileSync, readFileSync, existsSync } from 'fs';
-import { join } from 'path';
-import { WORKSPACE_PATH, ensureWorkspaceReady } from './workspace-path';
-
-const TASKS_FILE = join(WORKSPACE_PATH, 'tasks.json');
+import { loadJSON, saveJSON } from './storage';
 
 export class TaskManager {
   private tasks: Task[] = [];
   private initiatives: Initiative[] = [];
 
-  constructor() {
-    ensureWorkspaceReady();
-    this.loadTasks();
+  private constructor() {}
+
+  static async create(): Promise<TaskManager> {
+    const manager = new TaskManager();
+    await manager.loadTasks();
+    return manager;
   }
 
-  private loadTasks(): void {
+  private async loadTasks(): Promise<void> {
     try {
-      if (existsSync(TASKS_FILE)) {
-        const data = JSON.parse(readFileSync(TASKS_FILE, 'utf8'));
-        this.tasks = data.tasks || [];
-        this.initiatives = data.initiatives || [];
-      }
+      const data = await loadJSON('tasks.json', { tasks: [], initiatives: [] });
+      this.tasks = data.tasks || [];
+      this.initiatives = data.initiatives || [];
     } catch (error) {
       console.error('Error loading tasks:', error);
     }
   }
 
-  private saveTasks(): void {
+  private async saveTasks(): Promise<void> {
     try {
-      writeFileSync(TASKS_FILE, JSON.stringify({
+      await saveJSON('tasks.json', {
         tasks: this.tasks,
         initiatives: this.initiatives,
         lastUpdated: new Date().toISOString()
-      }, null, 2));
+      });
     } catch (error) {
       console.error('Error saving tasks:', error);
     }
   }
 
-  createTask(taskData: Partial<Task>): Task {
+  async createTask(taskData: Partial<Task>): Promise<Task> {
     const task: Task = {
       id: `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
       title: taskData.title || 'Untitled Task',
@@ -65,11 +62,11 @@ export class TaskManager {
     task.aiLeverageScore = missionEval.aiLeverageScore;
 
     this.tasks.push(task);
-    this.saveTasks();
+    await this.saveTasks();
     return task;
   }
 
-  updateTask(taskId: string, updates: Partial<Task>): Task | null {
+  async updateTask(taskId: string, updates: Partial<Task>): Promise<Task | null> {
     const taskIndex = this.tasks.findIndex(t => t.id === taskId);
     if (taskIndex === -1) return null;
 
@@ -79,16 +76,16 @@ export class TaskManager {
       updatedAt: new Date().toISOString()
     };
 
-    this.saveTasks();
+    await this.saveTasks();
     return this.tasks[taskIndex];
   }
 
-  updateTaskStatus(taskId: string, status: TaskStatus, note?: string): Task | null {
+  async updateTaskStatus(taskId: string, status: TaskStatus, note?: string): Promise<Task | null> {
     const updates: Partial<Task> = { status };
     if (status === 'Blocked' && note) {
       updates.blockedReason = note;
     }
-    return this.updateTask(taskId, updates);
+    return await this.updateTask(taskId, updates);
   }
 
   getTasks(): Task[] {
@@ -117,25 +114,25 @@ export class TaskManager {
     const upcoming = new Date();
     upcoming.setDate(upcoming.getDate() + 7);
 
-    const overdue = this.tasks.filter(t => 
+    const overdue = this.tasks.filter(t =>
       t.deadline && new Date(t.deadline) < now && t.status !== 'Done'
     );
 
-    const upcomingTasks = this.tasks.filter(t => 
-      t.deadline && 
-      new Date(t.deadline) >= now && 
-      new Date(t.deadline) <= upcoming && 
+    const upcomingTasks = this.tasks.filter(t =>
+      t.deadline &&
+      new Date(t.deadline) >= now &&
+      new Date(t.deadline) <= upcoming &&
       t.status !== 'Done'
     );
 
-    const active = this.tasks.filter(t => 
+    const active = this.tasks.filter(t =>
       t.status === 'In Progress' && !overdue.includes(t) && !upcomingTasks.includes(t)
     );
 
     const blocked = this.tasks.filter(t => t.status === 'Blocked');
 
     const result: any = { overdue, upcoming: upcomingTasks, active, blocked };
-    
+
     if (includeCompleted) {
       result.completed = this.tasks.filter(t => t.status === 'Done');
     }
@@ -180,11 +177,15 @@ export class TaskManager {
       while ((match = pattern.exec(text)) !== null) {
         const title = match[1].trim();
         if (title.length > 3 && !title.includes('?')) {
-          tasks.push(this.createTask({
+          tasks.push({
+            id: `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
             title,
             priority: this.inferPriority(text, title),
-            tags: ['extracted']
-          }));
+            tags: ['extracted'],
+            status: 'Not Started',
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+          } as Task);
         }
       }
     });
@@ -206,9 +207,9 @@ export class TaskManager {
   private inferPriority(context: string, task: string): 'Critical' | 'High' | 'Medium' | 'Low' {
     const criticalWords = ['urgent', 'critical', 'asap', 'immediately', 'emergency'];
     const highWords = ['important', 'priority', 'soon', 'deadline'];
-    
+
     const combined = `${context} ${task}`.toLowerCase();
-    
+
     if (criticalWords.some(word => combined.includes(word))) return 'Critical';
     if (highWords.some(word => combined.includes(word))) return 'High';
     return 'Medium';
@@ -221,7 +222,7 @@ export class TaskManager {
         const currentYear = new Date().getFullYear();
         return new Date(`${dateStr}, ${currentYear}`).toISOString().split('T')[0];
       }
-      
+
       // Handle MM/DD or MM/DD/YY formats
       if (dateStr.match(/\d{1,2}\/\d{1,2}/)) {
         const currentYear = new Date().getFullYear();
@@ -237,46 +238,46 @@ export class TaskManager {
   }
 
   // Process natural language task updates
-  processNaturalLanguageUpdate(text: string): { updated: Task[]; created: Task[]; } {
+  async processNaturalLanguageUpdate(text: string): Promise<{ updated: Task[]; created: Task[]; }> {
     const updated: Task[] = [];
     const created: Task[] = [];
 
     // Extract new tasks and updates from conversation
     const extraction = this.extractFromConversation(text);
-    
+
     // Create new tasks
-    extraction.tasks.forEach(taskData => {
-      const task = this.createTask(taskData);
+    for (const taskData of extraction.tasks) {
+      const task = await this.createTask(taskData);
       created.push(task);
-    });
+    }
 
     // Apply deadline updates
-    extraction.deadlines.forEach(deadline => {
-      const matchingTasks = this.tasks.filter(t => 
+    for (const deadline of extraction.deadlines) {
+      const matchingTasks = this.tasks.filter(t =>
         t.title.toLowerCase().includes(deadline.task.toLowerCase()) ||
         deadline.task.toLowerCase().includes(t.title.toLowerCase())
       );
-      
-      matchingTasks.forEach(task => {
-        const updatedTask = this.updateTask(task.id, { deadline: deadline.date });
+
+      for (const task of matchingTasks) {
+        const updatedTask = await this.updateTask(task.id, { deadline: deadline.date });
         if (updatedTask) updated.push(updatedTask);
-      });
-    });
+      }
+    }
 
     return { updated, created };
   }
 
   // Initialize with current context from INITIATIVES.md
-  seedFromInitiatives(initiatives: any[]): void {
+  async seedFromInitiatives(initiatives: any[]): Promise<void> {
     // First, load sample tasks if no tasks exist
     if (this.tasks.length === 0) {
-      this.seedSampleTasks();
+      await this.seedSampleTasks();
     }
 
     // Then add tasks for initiatives that don't have them
-    initiatives.forEach(init => {
+    for (const init of initiatives) {
       if (!this.tasks.some(t => t.projectId === init.name)) {
-        this.createTask({
+        await this.createTask({
           title: init.nextMove || `Complete ${init.name}`,
           description: init.goal,
           priority: init.urgency >= 4 ? 'Critical' : init.urgency >= 3 ? 'High' : 'Medium',
@@ -285,15 +286,15 @@ export class TaskManager {
           tags: ['initiative']
         });
       }
-    });
+    }
   }
 
   // Load sample tasks for initial setup
-  seedSampleTasks(): void {
+  async seedSampleTasks(): Promise<void> {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { sampleTasks } = require('./sample-tasks');
-    sampleTasks.forEach((taskData: Partial<Task>) => {
-      this.createTask(taskData);
-    });
+    for (const taskData of sampleTasks) {
+      await this.createTask(taskData);
+    }
   }
 }

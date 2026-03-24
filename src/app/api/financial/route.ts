@@ -3,7 +3,7 @@ import { FinancialTracker } from '@/lib/financial-tracker';
 
 export async function GET() {
   try {
-    const financialTracker = new FinancialTracker();
+    const financialTracker = await FinancialTracker.create();
     const todaysMetrics = financialTracker.getTodaysMetrics();
     const weeklyTotals = financialTracker.getWeeklyTotals();
     const monthlyTotals = financialTracker.getMonthlyTotals();
@@ -27,20 +27,20 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const financialTracker = new FinancialTracker();
+    const financialTracker = await FinancialTracker.create();
     const body = await request.json();
     const { action, ...data } = body;
 
     switch (action) {
       case 'addEntry': {
         const { category, amount, description, date } = data;
-        const entry = financialTracker.addEntry(category, amount, description, date);
+        const entry = await financialTracker.addEntry(category, amount, description, date);
         return NextResponse.json({ entry });
       }
 
       case 'processMessage': {
         const { message } = data;
-        const result = financialTracker.processConversationalUpdate(message);
+        const result = await financialTracker.processConversationalUpdate(message);
         return NextResponse.json(result);
       }
 
