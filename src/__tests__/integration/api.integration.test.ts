@@ -27,7 +27,8 @@ beforeAll(() => {
 });
 
 // Use unique test keys to avoid collisions with production data
-const TEST_PREFIX = `__test_${Date.now()}_`;
+// No underscores — _ is a SQL LIKE wildcard
+const TEST_PREFIX = `test${Date.now()}x`;
 
 // --- Storage layer tests ---
 
@@ -41,7 +42,7 @@ describe('Storage layer (real DB)', () => {
     if (db) {
       await db`DELETE FROM data_store WHERE key LIKE ${TEST_PREFIX + '%'}`;
       await db`DELETE FROM text_store WHERE key LIKE ${TEST_PREFIX + '%'}`;
-      await db`DELETE FROM audit_log WHERE entry_type = 'integration-test'`;
+      await db`DELETE FROM audit_log WHERE entry_type = 'integration-test' AND date = '2026-01-01'`;
     }
   });
 
@@ -93,12 +94,25 @@ describe('Storage layer (real DB)', () => {
 // --- Focus Hours API tests ---
 
 describe('/api/focus-hours (real DB)', () => {
+  let savedFocusData: unknown = null;
+
+  beforeAll(async () => {
+    // Snapshot existing data before tests mutate it
+    savedFocusData = await loadJSON('focus-tracking.json', null);
+  });
+
   afterAll(async () => {
     await ensureDbReady();
     const db = getDb();
-    if (db) {
+    // Restore original data (or delete if none existed)
+    if (savedFocusData) {
+      await saveJSON('focus-tracking.json', savedFocusData);
+    } else if (db) {
       await db`DELETE FROM data_store WHERE key = 'focus-tracking.json'`;
-      await db`DELETE FROM audit_log WHERE entry_type = 'focus'`;
+    }
+    // Only delete audit entries created during this test run
+    if (db) {
+      await db`DELETE FROM audit_log WHERE entry_type = 'focus' AND content LIKE ${'%Integration test%'}`;
     }
   });
 
@@ -196,12 +210,22 @@ describe('/api/focus-hours (real DB)', () => {
 // --- Temporal API tests ---
 
 describe('/api/temporal (real DB)', () => {
+  let savedTemporalData: unknown = null;
+
+  beforeAll(async () => {
+    savedTemporalData = await loadJSON('temporal-tracking.json', null);
+  });
+
   afterAll(async () => {
     await ensureDbReady();
     const db = getDb();
-    if (db) {
+    if (savedTemporalData) {
+      await saveJSON('temporal-tracking.json', savedTemporalData);
+    } else if (db) {
       await db`DELETE FROM data_store WHERE key = 'temporal-tracking.json'`;
-      await db`DELETE FROM audit_log WHERE entry_type = 'temporal'`;
+    }
+    if (db) {
+      await db`DELETE FROM audit_log WHERE entry_type = 'temporal' AND content LIKE ${'%Integration test%'}`;
     }
   });
 
