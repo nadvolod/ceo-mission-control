@@ -63,7 +63,7 @@ describe('Storage layer (real DB)', () => {
     await saveJSON(testJsonKey, { version: 1 });
     await saveJSON(testJsonKey, { version: 2 });
 
-    const loaded = await loadJSON(testJsonKey, {});
+    const loaded = await loadJSON<{ version: number }>(testJsonKey, { version: 0 });
     expect(loaded.version).toBe(2);
   });
 
@@ -311,7 +311,7 @@ describe('/api/sync (real DB)', () => {
     expect(data.synced).toContain(`json: ${TEST_PREFIX}data.json`);
 
     // Verify it's readable
-    const loaded = await loadJSON(`${TEST_PREFIX}data.json`, {});
+    const loaded = await loadJSON<{ tasks: { title: string }[] }>(`${TEST_PREFIX}data.json`, { tasks: [] });
     expect(loaded.tasks[0].title).toBe('Test task');
   });
 
