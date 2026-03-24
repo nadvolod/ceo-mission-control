@@ -1,8 +1,8 @@
 'use client';
 
-import { useState } from 'react';
-import { motion } from 'framer-motion';
-import { ArrowRight, Sparkles, Loader2, BarChart3, ListTodo, Clock, DollarSign } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ArrowRight, Sparkles, Loader2, BarChart3, ListTodo, Clock, DollarSign, TrendingUp, Mic, Target } from 'lucide-react';
 
 const EMPLOYEE_OPTIONS = [
   { value: '', label: 'Company size' },
@@ -151,66 +151,274 @@ export function HeroSection() {
           )}
         </motion.div>
 
-        {/* Floating dashboard preview */}
-        <motion.div
-          initial={{ opacity: 0, y: 60 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 1.2, delay: 0.6 }}
-          className="mt-20 float-slow"
-          style={{ perspective: '1200px' }}
-        >
-          <div className="relative mx-auto max-w-3xl rounded-2xl border border-white/[0.08] bg-[#0c0c14]/80 backdrop-blur-xl p-6 shadow-2xl shadow-indigo-500/5"
-            style={{ transform: 'rotateX(8deg) rotateY(-6deg)' }}
-          >
-            {/* Mock dashboard header */}
-            <div className="flex items-center justify-between mb-4">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-red-500/60" />
-                <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
-                <div className="w-3 h-3 rounded-full bg-green-500/60" />
-              </div>
-              <span className="text-[10px] text-zinc-600 tracking-wider uppercase">CEO Mission Control</span>
-            </div>
-
-            {/* Mock stats row */}
-            <div className="grid grid-cols-4 gap-3 mb-4">
-              {[
-                { icon: ListTodo, label: 'Active Tasks', value: '12', color: 'text-blue-400' },
-                { icon: Clock, label: 'Focus Hours', value: '6.5h', color: 'text-emerald-400' },
-                { icon: DollarSign, label: 'Revenue', value: '$47K', color: 'text-amber-400' },
-                { icon: BarChart3, label: 'AI Score', value: '94', color: 'text-purple-400' },
-              ].map((stat) => (
-                <div key={stat.label} className="rounded-lg bg-white/[0.03] border border-white/[0.04] p-3">
-                  <stat.icon className={`w-3.5 h-3.5 ${stat.color} mb-1.5`} />
-                  <div className="text-lg font-semibold text-white">{stat.value}</div>
-                  <div className="text-[10px] text-zinc-500">{stat.label}</div>
-                </div>
-              ))}
-            </div>
-
-            {/* Mock task rows */}
-            <div className="space-y-2">
-              {[
-                { score: 95, title: 'Close Artis WHO contract', tag: 'Revenue', money: '$12K' },
-                { score: 82, title: 'Complete client delivery sprint', tag: 'Temporal', money: '$10K' },
-                { score: 71, title: 'File taxes by April 15', tag: 'Tax', money: '' },
-              ].map((task) => (
-                <div key={task.title} className="flex items-center gap-3 rounded-lg bg-white/[0.02] border border-white/[0.03] px-3 py-2">
-                  <span className={`text-xs font-mono font-bold ${task.score > 90 ? 'text-red-400' : task.score > 75 ? 'text-amber-400' : 'text-zinc-400'}`}>
-                    {task.score}
-                  </span>
-                  <span className="text-sm text-zinc-300 flex-1">{task.title}</span>
-                  {task.money && <span className="text-[10px] text-emerald-400/70">{task.money}</span>}
-                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.05] text-zinc-500">{task.tag}</span>
-                </div>
-              ))}
-            </div>
-
-            {/* Glow effect underneath */}
-            <div className="absolute -bottom-px left-[10%] right-[10%] h-px bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent" />
-          </div>
-        </motion.div>
+        {/* Animated dashboard views */}
+        <DashboardCarousel />
       </div>
     </section>
+  );
+}
+
+/* ===== Animated Dashboard Carousel ===== */
+
+const VIEWS = [
+  { label: 'AI Priorities', icon: Target },
+  { label: 'Focus Hours', icon: Clock },
+  { label: 'Financial', icon: DollarSign },
+];
+
+function DashboardCarousel() {
+  const [activeView, setActiveView] = useState(0);
+
+  useEffect(() => {
+    const timer = setInterval(() => setActiveView(v => (v + 1) % 3), 4000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 60 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 1.2, delay: 0.6 }}
+      className="mt-20"
+    >
+      {/* View selector tabs */}
+      <div className="flex items-center justify-center gap-2 mb-5">
+        {VIEWS.map((view, i) => (
+          <button
+            key={view.label}
+            onClick={() => setActiveView(i)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer ${
+              activeView === i
+                ? 'bg-white/[0.08] text-white border border-white/[0.12]'
+                : 'text-zinc-500 hover:text-zinc-400'
+            }`}
+          >
+            <view.icon className="w-3 h-3" />
+            {view.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Dashboard frame */}
+      <div className="relative mx-auto max-w-3xl rounded-2xl border border-white/[0.08] bg-[#0c0c14]/80 backdrop-blur-xl p-6 shadow-2xl shadow-indigo-500/5 overflow-hidden"
+        style={{ perspective: '1200px' }}
+      >
+        {/* Window chrome */}
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <div className="w-3 h-3 rounded-full bg-red-500/60" />
+            <div className="w-3 h-3 rounded-full bg-yellow-500/60" />
+            <div className="w-3 h-3 rounded-full bg-green-500/60" />
+          </div>
+          <span className="text-[10px] text-zinc-600 tracking-wider uppercase">CEO Mission Control</span>
+        </div>
+
+        {/* Stats row (always visible) */}
+        <div className="grid grid-cols-4 gap-3 mb-4">
+          {[
+            { icon: ListTodo, label: 'Active Tasks', value: '12', color: 'text-blue-400' },
+            { icon: Clock, label: 'Focus Hours', value: '6.5h', color: 'text-emerald-400' },
+            { icon: DollarSign, label: 'Revenue', value: '$47K', color: 'text-amber-400' },
+            { icon: BarChart3, label: 'AI Score', value: '94', color: 'text-purple-400' },
+          ].map((stat) => (
+            <div key={stat.label} className="rounded-lg bg-white/[0.03] border border-white/[0.04] p-3">
+              <stat.icon className={`w-3.5 h-3.5 ${stat.color} mb-1.5`} />
+              <div className="text-lg font-semibold text-white">{stat.value}</div>
+              <div className="text-[10px] text-zinc-500">{stat.label}</div>
+            </div>
+          ))}
+        </div>
+
+        {/* Animated view content */}
+        <div className="relative min-h-[180px]">
+          <AnimatePresence mode="wait">
+            {activeView === 0 && <TaskPriorityView key="tasks" />}
+            {activeView === 1 && <FocusHoursView key="focus" />}
+            {activeView === 2 && <FinancialView key="financial" />}
+          </AnimatePresence>
+        </div>
+
+        {/* Bottom glow */}
+        <div className="absolute -bottom-px left-[10%] right-[10%] h-px bg-gradient-to-r from-transparent via-indigo-500/40 to-transparent" />
+      </div>
+    </motion.div>
+  );
+}
+
+/* ===== Dashboard View: AI Task Priorities ===== */
+
+function TaskPriorityView() {
+  const tasks = [
+    { score: 95, title: 'Close Artis WHO contract', tag: 'Revenue', money: '$12K', status: 'doing' },
+    { score: 82, title: 'Complete client delivery sprint', tag: 'Temporal', money: '$10K', status: 'doing' },
+    { score: 71, title: 'File taxes by April 15', tag: 'Tax', money: '', status: 'todo' },
+    { score: 65, title: 'Devonshire HELOC follow-up', tag: 'Finance', money: '$75K', status: 'todo' },
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 30 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -30 }}
+      transition={{ duration: 0.3 }}
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <Target className="w-3.5 h-3.5 text-indigo-400" />
+        <span className="text-xs font-medium text-zinc-400">AI-Ranked Priorities</span>
+      </div>
+      <div className="space-y-2">
+        {tasks.map((task, i) => (
+          <motion.div
+            key={task.title}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: i * 0.08 }}
+            className="flex items-center gap-3 rounded-lg bg-white/[0.02] border border-white/[0.03] px-3 py-2.5"
+          >
+            <span className={`text-xs font-mono font-bold w-6 text-right ${
+              task.score > 90 ? 'text-red-400' : task.score > 75 ? 'text-amber-400' : 'text-zinc-500'
+            }`}>
+              {task.score}
+            </span>
+            <div className={`w-2 h-2 rounded-full ${
+              task.status === 'doing' ? 'bg-blue-400' : 'bg-zinc-600'
+            }`} />
+            <span className="text-sm text-zinc-300 flex-1 truncate">{task.title}</span>
+            {task.money && <span className="text-[10px] text-emerald-400/70 font-medium">{task.money}</span>}
+            <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/[0.05] text-zinc-500">{task.tag}</span>
+          </motion.div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+/* ===== Dashboard View: Focus Hours ===== */
+
+function FocusHoursView() {
+  const days = [
+    { day: 'Mon', hours: 5.5, categories: { Temporal: 3.5, Revenue: 1.5, Admin: 0.5 } },
+    { day: 'Tue', hours: 7.0, categories: { Temporal: 4.0, Revenue: 2.0, Tax: 1.0 } },
+    { day: 'Wed', hours: 4.5, categories: { Temporal: 3.0, Finance: 1.5 } },
+    { day: 'Thu', hours: 6.5, categories: { Temporal: 4.0, Revenue: 1.5, Housing: 1.0 } },
+    { day: 'Fri', hours: 5.0, categories: { Temporal: 3.5, Tax: 1.5 } },
+    { day: 'Sat', hours: 2.0, categories: { Personal: 2.0 } },
+    { day: 'Sun', hours: 0, categories: {} },
+  ];
+  const maxH = 8;
+  const colors: Record<string, string> = {
+    Temporal: '#3b82f6', Revenue: '#8b5cf6', Tax: '#ef4444',
+    Finance: '#10b981', Admin: '#6b7280', Housing: '#f59e0b', Personal: '#ec4899',
+  };
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 30 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -30 }}
+      transition={{ duration: 0.3 }}
+    >
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Clock className="w-3.5 h-3.5 text-emerald-400" />
+          <span className="text-xs font-medium text-zinc-400">Focus Hours This Week</span>
+        </div>
+        <div className="flex items-center gap-1">
+          <TrendingUp className="w-3 h-3 text-emerald-400" />
+          <span className="text-[10px] text-emerald-400 font-medium">+18% WoW</span>
+        </div>
+      </div>
+
+      {/* Bar chart */}
+      <div className="flex items-end gap-2 h-[120px] px-1">
+        {days.map((day, i) => {
+          const segments = Object.entries(day.categories);
+          return (
+            <div key={day.day} className="flex-1 flex flex-col items-center gap-1">
+              <div className="w-full flex flex-col-reverse rounded-t-md overflow-hidden" style={{ height: `${(day.hours / maxH) * 100}px` }}>
+                {segments.map(([cat, h]) => (
+                  <motion.div
+                    key={cat}
+                    initial={{ height: 0 }}
+                    animate={{ height: `${(h / day.hours) * 100}%` }}
+                    transition={{ delay: i * 0.06 + 0.2, duration: 0.5 }}
+                    style={{ backgroundColor: colors[cat] || '#6b7280' }}
+                    className="w-full min-h-[2px] opacity-80"
+                  />
+                ))}
+              </div>
+              <span className="text-[9px] text-zinc-600">{day.day}</span>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div className="flex items-center justify-center gap-3 mt-3">
+        {['Temporal', 'Revenue', 'Tax'].map(cat => (
+          <div key={cat} className="flex items-center gap-1">
+            <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: colors[cat] }} />
+            <span className="text-[9px] text-zinc-500">{cat}</span>
+          </div>
+        ))}
+      </div>
+    </motion.div>
+  );
+}
+
+/* ===== Dashboard View: Financial ===== */
+
+function FinancialView() {
+  const entries = [
+    { type: 'generated', label: 'Artis WHO contract', amount: '$12,000', icon: TrendingUp, color: 'text-emerald-400' },
+    { type: 'generated', label: 'Tricentis video course', amount: '$6,500', icon: TrendingUp, color: 'text-emerald-400' },
+    { type: 'moved', label: 'Rent payment', amount: '$850', icon: DollarSign, color: 'text-blue-400' },
+    { type: 'cut', label: 'AWS bill reduction', amount: '$340', icon: BarChart3, color: 'text-amber-400' },
+  ];
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, x: 30 }}
+      animate={{ opacity: 1, x: 0 }}
+      exit={{ opacity: 0, x: -30 }}
+      transition={{ duration: 0.3 }}
+    >
+      <div className="flex items-center gap-2 mb-3">
+        <DollarSign className="w-3.5 h-3.5 text-amber-400" />
+        <span className="text-xs font-medium text-zinc-400">Financial Impact This Month</span>
+      </div>
+
+      {/* Summary cards */}
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        {[
+          { label: 'Generated', value: '$39,326', color: 'text-emerald-400', bg: 'bg-emerald-500/5' },
+          { label: 'Moved', value: '$20,150', color: 'text-blue-400', bg: 'bg-blue-500/5' },
+          { label: 'Cut', value: '$2,840', color: 'text-amber-400', bg: 'bg-amber-500/5' },
+        ].map((s) => (
+          <div key={s.label} className={`rounded-lg ${s.bg} border border-white/[0.04] p-2.5 text-center`}>
+            <div className={`text-base font-semibold ${s.color}`}>{s.value}</div>
+            <div className="text-[9px] text-zinc-500 mt-0.5">{s.label}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Recent entries */}
+      <div className="space-y-1.5">
+        {entries.map((entry, i) => (
+          <motion.div
+            key={entry.label}
+            initial={{ opacity: 0, x: 15 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: i * 0.08 }}
+            className="flex items-center gap-2.5 rounded-lg bg-white/[0.02] border border-white/[0.03] px-3 py-2"
+          >
+            <entry.icon className={`w-3 h-3 ${entry.color}`} />
+            <span className="text-sm text-zinc-400 flex-1 truncate">{entry.label}</span>
+            <span className={`text-xs font-medium ${entry.color}`}>{entry.amount}</span>
+            <span className="text-[8px] px-1.5 py-0.5 rounded bg-white/[0.04] text-zinc-600 uppercase tracking-wider">{entry.type}</span>
+          </motion.div>
+        ))}
+      </div>
+    </motion.div>
   );
 }
