@@ -3,22 +3,28 @@ import type { AiTask } from './types';
 const getBaseUrl = () => process.env.AI_TASK_LIST_URL || 'https://tasklistai.vercel.app';
 const getApiKey = () => process.env.AI_TASK_LIST_API_KEY || '';
 
-async function taskApi(path: string, options: RequestInit = {}): Promise<Response> {
+async function taskApi(path: string, options: RequestInit = {}): Promise<Response | null> {
   const url = `${getBaseUrl()}${path}`;
-  return fetch(url, {
-    ...options,
-    headers: {
-      'Authorization': `Bearer ${getApiKey()}`,
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-  });
+  try {
+    return await fetch(url, {
+      ...options,
+      signal: AbortSignal.timeout(10000),
+      headers: {
+        'Authorization': `Bearer ${getApiKey()}`,
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+    });
+  } catch (error) {
+    console.error(`taskApi ${path} failed:`, error);
+    return null;
+  }
 }
 
 export async function fetchTasks(): Promise<AiTask[]> {
   const res = await taskApi('/api/tasks');
-  if (!res.ok) {
-    console.error('Failed to fetch tasks:', res.status, await res.text());
+  if (!res || !res.ok) {
+    console.error('Failed to fetch tasks:', res?.status, res ? await res.text() : 'no response');
     return [];
   }
   return res.json();
@@ -29,8 +35,8 @@ export async function createTask(data: { title: string; description?: string; ca
     method: 'POST',
     body: JSON.stringify(data),
   });
-  if (!res.ok) {
-    console.error('Failed to create task:', res.status, await res.text());
+  if (!res || !res.ok) {
+    console.error('Failed to create task:', res?.status, res ? await res.text() : 'no response');
     return null;
   }
   return res.json();
@@ -41,8 +47,8 @@ export async function updateTask(id: number, data: Partial<{ title: string; stat
     method: 'PATCH',
     body: JSON.stringify(data),
   });
-  if (!res.ok) {
-    console.error('Failed to update task:', res.status, await res.text());
+  if (!res || !res.ok) {
+    console.error('Failed to update task:', res?.status, res ? await res.text() : 'no response');
     return null;
   }
   return res.json();
@@ -50,8 +56,8 @@ export async function updateTask(id: number, data: Partial<{ title: string; stat
 
 export async function deleteTask(id: number): Promise<boolean> {
   const res = await taskApi(`/api/tasks/${id}`, { method: 'DELETE' });
-  if (!res.ok) {
-    console.error('Failed to delete task:', res.status, await res.text());
+  if (!res || !res.ok) {
+    console.error('Failed to delete task:', res?.status, res ? await res.text() : 'no response');
     return false;
   }
   return true;

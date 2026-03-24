@@ -36,12 +36,15 @@ export class ChatSyncManager {
     const updated: any[] = [];
     const created: any[] = [];
 
+    // Fetch tasks once for all pattern matching
+    const tasks = await fetchTasks();
+
     // Detect "Done: TASK_NAME" pattern
     const doneMatches = message.match(/Done\s*:?\s*([^.]+?)(?:\s*[-–]\s*(.+?))?(?:\.|$)/gi);
     if (doneMatches) {
       for (const match of doneMatches) {
         const taskTitle = match.replace(/^Done\s*:?\s*/i, '').split('-')[0].trim();
-        const matched = await this.findTask(taskTitle);
+        const matched = this.findTaskInList(taskTitle, tasks);
         if (matched) {
           const result = await updateTask(matched.id, { status: 'done' });
           if (result) updated.push(result);
@@ -54,7 +57,7 @@ export class ChatSyncManager {
     if (progressMatches) {
       for (const match of progressMatches) {
         const taskTitle = match.replace(/^(?:In progress|Started|Working on)\s*:?\s*/i, '').split('-')[0].trim();
-        const matched = await this.findTask(taskTitle);
+        const matched = this.findTaskInList(taskTitle, tasks);
         if (matched) {
           const result = await updateTask(matched.id, { status: 'doing' });
           if (result) updated.push(result);
@@ -65,9 +68,8 @@ export class ChatSyncManager {
     return { updated, created };
   }
 
-  private async findTask(search: string): Promise<AiTask | null> {
+  private findTaskInList(search: string, tasks: AiTask[]): AiTask | null {
     try {
-      const tasks = await fetchTasks();
       const searchLower = search.toLowerCase().trim();
 
       // Exact match
