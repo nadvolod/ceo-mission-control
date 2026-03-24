@@ -16,8 +16,11 @@ if [ -z "$PR_NUM" ]; then
   exit 0
 fi
 
-# Detect repo
-REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)
+# Detect repo — check for --repo flag first, then fall back to current repo
+REPO=$(echo "$CMD" | grep -oE '\-\-repo\s+[^\s]+' | sed 's/--repo\s*//')
+if [ -z "$REPO" ]; then
+  REPO=$(gh repo view --json nameWithOwner -q .nameWithOwner 2>/dev/null)
+fi
 if [ -z "$REPO" ]; then
   exit 0
 fi
@@ -32,6 +35,8 @@ else
   COMMENT_COUNT=$(gh api "repos/$REPO/pulls/$PR_NUM/comments" --jq 'length' 2>/dev/null || echo 0)
 fi
 
+# Ensure COMMENT_COUNT is a number
+COMMENT_COUNT=$(echo "$COMMENT_COUNT" | grep -oE '^[0-9]+$' || echo 0)
 if [ "$COMMENT_COUNT" -gt 0 ]; then
   SUMMARIES=$(gh api "repos/$REPO/pulls/$PR_NUM/comments" --jq '.[0:5] | .[] | "- " + (.body | split("\n")[0] | .[0:120])' 2>/dev/null)
   REASON="PR #$PR_NUM has $COMMENT_COUNT review comment(s). Address them before merging.\n\nTop comments:\n$SUMMARIES"
