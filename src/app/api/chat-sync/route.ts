@@ -21,7 +21,8 @@ export async function POST(request: NextRequest) {
       updated: result.updated,
       created: result.created,
       financial: result.financial,
-      message: `Updated ${result.updated.length} tasks, created ${result.created.length} tasks${result.financial?.added?.length ? `, tracked ${result.financial.added.length} financial entries` : ''}`
+      focusHours: result.focusHours,
+      message: `Updated ${result.updated.length} tasks, created ${result.created.length} tasks${result.financial?.added?.length ? `, tracked ${result.financial.added.length} financial entries` : ''}${result.focusHours?.added?.length ? `, logged ${result.focusHours.added.length} focus session(s)` : ''}`
     });
 
   } catch (error) {

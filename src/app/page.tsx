@@ -5,9 +5,8 @@ import { ConversationTaskInput } from '@/components/ConversationTaskInput';
 import { FocusOptimization } from '@/components/FocusOptimization';
 import { MissionTracker } from '@/components/MissionTracker';
 import { FinancialMetricsDashboard } from '@/components/FinancialMetricsDashboard';
-import { TemporalTracker } from '@/components/TemporalTracker';
-// Removed import - will fetch via API instead
-import { Task, ConversationExtraction } from '@/lib/types';
+import { FocusHoursTracker } from '@/components/FocusHoursTracker';
+import { Task, ConversationExtraction, FocusCategory } from '@/lib/types';
 import { useState, useEffect } from 'react';
 
 export default function HomePage() {
@@ -15,6 +14,7 @@ export default function HomePage() {
   const [initiatives, setInitiatives] = useState<any[]>([]);
   const [scorecard, setScorecard] = useState<any>(null);
   const [financialData, setFinancialData] = useState<any>(null);
+  const [focusData, setFocusData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
@@ -40,6 +40,11 @@ export default function HomePage() {
       const financialResponse = await fetch('/api/financial');
       const financialData = await financialResponse.json();
       setFinancialData(financialData);
+
+      // Load focus hours data
+      const focusResponse = await fetch('/api/focus-hours');
+      const focusDataResult = await focusResponse.json();
+      setFocusData(focusDataResult);
 
       setLastRefresh(new Date());
     } catch (error) {
@@ -114,9 +119,25 @@ export default function HomePage() {
     }
   };
 
-  const handleUpdateTemporalHours = async (hours: number) => {
-    // Refresh workspace data to get updated temporal actual from scorecard
-    await loadAllData();
+  const handleAddFocusSession = async (category: FocusCategory, hours: number, description: string) => {
+    try {
+      const response = await fetch('/api/focus-hours', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'addSession',
+          category,
+          hours,
+          description: description || `${hours}h ${category} focus block`
+        })
+      });
+
+      if (response.ok) {
+        await loadAllData();
+      }
+    } catch (error) {
+      console.error('Error adding focus session:', error);
+    }
   };
 
   const seedTasksFromInitiatives = async () => {
@@ -203,9 +224,9 @@ export default function HomePage() {
               </div>
               <div>
                 <div className="text-2xl font-bold text-gray-900">
-                  {scorecard.temporalActual || 0}/{scorecard.temporalTarget}
+                  {focusData?.todaysMetrics?.totalHours || 0}h
                 </div>
-                <div className="text-xs text-gray-500">Temporal Hours</div>
+                <div className="text-xs text-gray-500">Focus Hours</div>
               </div>
             </div>
           </div>
@@ -252,12 +273,21 @@ export default function HomePage() {
 
           {/* Right Column - Context & Financial */}
           <div className="space-y-8">
-            {/* Temporal Tracker */}
-            <TemporalTracker
-              temporalTarget={scorecard.temporalTarget || 0}
-              temporalActual={scorecard.temporalActual || 0}
-              onUpdateHours={handleUpdateTemporalHours}
-            />
+            {/* Focus Hours Dashboard */}
+            {focusData && (
+              <FocusHoursTracker
+                todaysMetrics={focusData.todaysMetrics}
+                weeklyTotals={focusData.weeklyTotals}
+                weekOverWeek={focusData.weekOverWeek}
+                dailyTrend={focusData.dailyTrend}
+                rollingAverage={focusData.rollingAverage}
+                categoryDistribution={focusData.categoryDistribution}
+                recentSessions={focusData.recentSessions}
+                temporalTarget={scorecard.temporalTarget || 0}
+                temporalActual={scorecard.temporalActual || 0}
+                onAddSession={handleAddFocusSession}
+              />
+            )}
 
             {/* Financial Metrics Dashboard */}
             {financialData && (

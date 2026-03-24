@@ -35,7 +35,8 @@ export function ConversationTaskInput({ onProcessMessage, className = '' }: Conv
     "Blocked on HELOC - bank needs additional docs",
     "Completed the Temporal client delivery, took 3 hours",
     "Started working on taxes - deadline April 15",
-    "Alton condo move-out is scheduled for March 30"
+    "Logged 2h on Temporal client delivery",
+    "Focused 1.5 hours on tax preparation"
   ];
 
   return (
@@ -135,6 +136,19 @@ export function ConversationTaskInput({ onProcessMessage, className = '' }: Conv
                 <span className="font-medium text-gray-700">Updated {lastResult.extraction.statusUpdates.length} task(s)</span>
               </div>
             )}
+
+            {lastResult.extraction.focusHours && lastResult.extraction.focusHours.added.length > 0 && (
+              <div>
+                <span className="font-medium text-gray-700">Logged {lastResult.extraction.focusHours.added.length} focus session(s):</span>
+                <ul className="ml-2 space-y-1">
+                  {lastResult.extraction.focusHours.added.map((session, index) => (
+                    <li key={index} className="text-gray-600">
+                      • {session.hours}h {session.category} — {session.description}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -147,6 +161,7 @@ export function ConversationTaskInput({ onProcessMessage, className = '' }: Conv
           <li>• Status updates: "completed", "finished", "started", "working on", "blocked on"</li>
           <li>• Priority words: "urgent", "critical", "important" (auto-sets priority)</li>
           <li>• Project linking: Mention "Temporal", "HELOC", "taxes" to auto-categorize</li>
+          <li>• Focus tracking: "logged 2h on Temporal", "spent 1h on taxes", "deep work 3h: Revenue"</li>
         </ul>
       </div>
     </div>

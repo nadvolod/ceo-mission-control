@@ -91,6 +91,42 @@ export interface ConversationExtraction {
   statusUpdates: { taskId: string; status: TaskStatus; note?: string; }[];
   blockers: { taskId: string; reason: string; }[];
   financial?: { added: { id: string; amount: number; description: string; category: string }[]; message: string } | null;
+  focusHours?: { added: FocusSession[]; message: string } | null;
+}
+
+// Focus Hours Tracking
+export type FocusCategory =
+  | 'Temporal'
+  | 'Finance'
+  | 'Revenue'
+  | 'Housing'
+  | 'Tax'
+  | 'Personal'
+  | 'Health'
+  | 'Admin'
+  | 'Learning'
+  | 'Other';
+
+export interface FocusSession {
+  id: string;
+  category: FocusCategory;
+  hours: number;
+  description: string;
+  date: string; // YYYY-MM-DD
+  timestamp: string; // ISO datetime
+  source: 'manual' | 'conversational' | 'temporal-sync';
+}
+
+export interface DailyFocusMetrics {
+  date: string;
+  sessions: FocusSession[];
+  totalHours: number;
+  byCategory: Record<string, number>;
+}
+
+export interface FocusData {
+  dailyMetrics: Record<string, DailyFocusMetrics>;
+  lastUpdated: string;
 }
 
 export interface TemporalSession {
