@@ -1,26 +1,30 @@
-export type TaskStatus = 'Not Started' | 'In Progress' | 'Blocked' | 'Review' | 'Done';
-
-export type MissionRelevance = 'Mission Critical' | 'Supporting' | 'Neutral' | 'Distraction';
-
-export interface Task {
-  id: string;
+// ai-task-list integration types
+export interface AiTask {
+  id: number;
   title: string;
-  description?: string;
-  status: TaskStatus;
-  priority: 'Critical' | 'High' | 'Medium' | 'Low';
-  deadline?: string; // ISO date string
+  description: string | null;
+  status: 'todo' | 'doing' | 'done';
+  priorityScore: number;
+  priorityReason: string | null;
+  monetaryValue: number | null;
+  revenuePotential: number | null;
+  urgency: number | null;
+  strategicValue: number | null;
+  dueDate: string | null;
+  category: string | null;
+  assignee: string | null;
+  parentId: number | null;
+  recurrenceRule: string | null;
   createdAt: string;
   updatedAt: string;
-  projectId?: string; // Links to Initiative or sub-project
-  parentTaskId?: string; // For subtasks
-  blockedReason?: string;
-  estimatedHours?: number;
-  actualHours?: number;
-  tags?: string[];
-  assignee?: string;
-  missionRelevance?: MissionRelevance;
-  monthlyRevenueImpact?: number;
-  aiLeverageScore?: number; // 1-10 scale
+}
+
+export interface TaskStats {
+  total: number;
+  todo: number;
+  doing: number;
+  doneToday: number;
+  overdue: number;
 }
 
 export interface Initiative {
@@ -41,21 +45,10 @@ export interface Initiative {
   payoff: string;
   confidence: string;
   deprioritize: string;
-  status: TaskStatus;
+  status: string;
   deadline?: string;
-  tasks: Task[]; // Sub-tasks for this initiative
+  tasks: unknown[]; // Sub-tasks for this initiative
   subInitiatives?: Initiative[]; // For mega-projects like Temporal
-}
-
-export interface Project {
-  id: string;
-  name: string;
-  description?: string;
-  status: TaskStatus;
-  priority: 'Critical' | 'High' | 'Medium' | 'Low';
-  deadline?: string;
-  initiatives: Initiative[];
-  tasks: Task[];
 }
 
 export interface DailyScorecard {
@@ -74,7 +67,7 @@ export interface DailyScorecard {
   openLoops: string[];
   moneyAdvanced: string;
   completedTasks?: string[];
-  newTasks?: Task[];
+  newTasks?: unknown[];
 }
 
 export interface CashPosition {
@@ -83,15 +76,6 @@ export interface CashPosition {
   runway: number;
   pipelineTotal: number;
   heloc: number;
-}
-
-export interface ConversationExtraction {
-  tasks: Task[];
-  deadlines: { task: string; date: string; }[];
-  statusUpdates: { taskId: string; status: TaskStatus; note?: string; }[];
-  blockers: { taskId: string; reason: string; }[];
-  financial?: { added: { id: string; amount: number; description: string; category: string }[]; message: string } | null;
-  focusHours?: { added: FocusSession[]; message: string } | null;
 }
 
 // Focus Hours Tracking
