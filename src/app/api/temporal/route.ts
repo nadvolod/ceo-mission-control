@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readFileSync, writeFileSync, mkdirSync } from 'fs';
-import { join, dirname } from 'path';
-import { WORKSPACE_PATH, ensureWorkspaceReady } from '@/lib/workspace-path';
+import { loadJSON, saveJSON, loadText, saveText, appendAuditLog } from '@/lib/storage';
 
 interface TemporalSession {
   id: string;
@@ -17,30 +15,21 @@ interface TemporalData {
   dailyTotals: Record<string, number>;
 }
 
-function loadTemporalData(): TemporalData {
-  try {
-    const filePath = join(WORKSPACE_PATH, 'temporal-tracking.json');
-    const content = readFileSync(filePath, 'utf8');
-    return JSON.parse(content);
-  } catch (error) {
-    // Initialize with empty data if file doesn't exist
-    return {
-      sessions: [],
-      dailyTotals: {}
-    };
-  }
+async function loadTemporalData(): Promise<TemporalData> {
+  return await loadJSON('temporal-tracking.json', {
+    sessions: [],
+    dailyTotals: {}
+  });
 }
 
-function saveTemporalData(data: TemporalData): void {
-  const filePath = join(WORKSPACE_PATH, 'temporal-tracking.json');
-  writeFileSync(filePath, JSON.stringify(data, null, 2));
+async function saveTemporalData(data: TemporalData): Promise<void> {
+  await saveJSON('temporal-tracking.json', data);
 }
 
-function updateDailyScorecard(date: string, newTotal: number): void {
+async function updateDailyScorecard(date: string, newTotal: number): Promise<void> {
   try {
-    const scorecardPath = join(WORKSPACE_PATH, 'DAILY_SCORECARD.md');
-    let content = readFileSync(scorecardPath, 'utf8');
-    
+    let content = await loadText('DAILY_SCORECARD.md', '');
+
     // Update the "Actual:" line in the temporal hours section
     const actualRegex = /(-[ \t]*Actual:[ \t]*)([\d.]*)/;
     const match = content.match(actualRegex);
@@ -55,8 +44,8 @@ function updateDailyScorecard(date: string, newTotal: number): void {
         content = content.replace(targetMatch[0], `${targetMatch[0]}\n- Actual: ${newTotal}`);
       }
     }
-    
-    writeFileSync(scorecardPath, content);
+
+    await saveText('DAILY_SCORECARD.md', content);
   } catch (error) {
     console.error('Error updating daily scorecard:', error);
   }
@@ -64,9 +53,8 @@ function updateDailyScorecard(date: string, newTotal: number): void {
 
 export async function GET() {
   try {
-    ensureWorkspaceReady();
-    const data = loadTemporalData();
-    
+    const data = await loadTemporalData();
+
     return NextResponse.json({
       success: true,
       sessions: data.sessions,
@@ -83,7 +71,6 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    ensureWorkspaceReady();
     const body = await request.json();
     const { action, hours, description } = body;
 
@@ -95,10 +82,10 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const data = loadTemporalData();
+      const data = await loadTemporalData();
       const now = new Date();
       const today = now.toISOString().split('T')[0];
-      
+
       // Create new session
       const session: TemporalSession = {
         id: `temporal-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
@@ -111,22 +98,20 @@ export async function POST(request: NextRequest) {
 
       // Add session to data
       data.sessions.push(session);
-      
+
       // Update daily total
       const currentTotal = data.dailyTotals[today] || 0;
       const newTotal = currentTotal + hours;
       data.dailyTotals[today] = newTotal;
-      
+
       // Save temporal data
-      saveTemporalData(data);
-      
+      await saveTemporalData(data);
+
       // Update daily scorecard
-      updateDailyScorecard(today, newTotal);
-      
+      await updateDailyScorecard(today, newTotal);
+
       // Also log to memory file
       try {
-        const memoryPath = join(WORKSPACE_PATH, `memory/${today}.md`);
-        mkdirSync(dirname(memoryPath), { recursive: true });
         const timestamp = now.toLocaleTimeString([], {
           hour: '2-digit',
           minute: '2-digit',
@@ -135,14 +120,7 @@ export async function POST(request: NextRequest) {
 
         const logEntry = `\n## Temporal Session Completed (${timestamp})\n- **Duration**: ${session.duration} hours\n- **Description**: ${session.description}\n- **Daily total**: ${newTotal} hours\n\n`;
 
-        try {
-          const existingContent = readFileSync(memoryPath, 'utf8');
-          writeFileSync(memoryPath, existingContent + logEntry);
-        } catch {
-          // Create new memory file if it doesn't exist
-          const newContent = `# Daily Memory - ${today}\n\n## Temporal Execution\n${logEntry}`;
-          writeFileSync(memoryPath, newContent);
-        }
+        await appendAuditLog(today, 'temporal', logEntry);
       } catch (error) {
         console.error('Error updating memory file:', error);
       }

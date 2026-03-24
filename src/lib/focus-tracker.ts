@@ -1,10 +1,6 @@
-import { writeFileSync, readFileSync, existsSync } from 'fs';
-import { join } from 'path';
 import { startOfWeek, subWeeks, format, subDays } from 'date-fns';
 import type { FocusCategory, FocusSession, DailyFocusMetrics, FocusData } from './types';
-import { WORKSPACE_PATH, ensureWorkspaceReady } from './workspace-path';
-
-const FOCUS_DATA_FILE = join(WORKSPACE_PATH, 'focus-tracking.json');
+import { loadJSON, saveJSON } from './storage';
 
 const VALID_CATEGORIES: FocusCategory[] = [
   'Temporal', 'Finance', 'Revenue', 'Housing',
@@ -54,39 +50,31 @@ export class FocusTracker {
     lastUpdated: new Date().toISOString()
   };
 
-  constructor() {
-    ensureWorkspaceReady();
-    this.loadData();
+  private constructor() {}
+
+  static async create(): Promise<FocusTracker> {
+    const tracker = new FocusTracker();
+    await tracker.loadData();
+    return tracker;
   }
 
-  private loadData(): void {
-    try {
-      if (existsSync(FOCUS_DATA_FILE)) {
-        const rawData = readFileSync(FOCUS_DATA_FILE, 'utf8');
-        this.data = JSON.parse(rawData);
-      }
-    } catch (error) {
-      console.error('Error loading focus data:', error);
-      this.data = { dailyMetrics: {}, lastUpdated: new Date().toISOString() };
-    }
+  private async loadData(): Promise<void> {
+    const defaultData: FocusData = { dailyMetrics: {}, lastUpdated: new Date().toISOString() };
+    this.data = await loadJSON('focus-tracking.json', defaultData);
   }
 
-  private saveData(): void {
-    try {
-      this.data.lastUpdated = new Date().toISOString();
-      writeFileSync(FOCUS_DATA_FILE, JSON.stringify(this.data, null, 2));
-    } catch (error) {
-      console.error('Error saving focus data:', error);
-    }
+  private async saveData(): Promise<void> {
+    this.data.lastUpdated = new Date().toISOString();
+    await saveJSON('focus-tracking.json', this.data);
   }
 
-  addSession(
+  async addSession(
     category: FocusCategory,
     hours: number,
     description: string,
     date?: string,
     source: 'manual' | 'conversational' | 'temporal-sync' = 'manual'
-  ): FocusSession {
+  ): Promise<FocusSession> {
     if (typeof hours !== 'number' || !isFinite(hours) || hours <= 0 || hours > 24) {
       throw new Error('Hours must be a number greater than 0 and at most 24');
     }
@@ -120,7 +108,7 @@ export class FocusTracker {
 
     this.data.dailyMetrics[sessionDate].sessions.push(session);
     this.recalculateDailyMetrics(sessionDate);
-    this.saveData();
+    await this.saveData();
 
     console.log('Focus session logged:', { category, hours, date: sessionDate, source });
 
@@ -263,7 +251,7 @@ export class FocusTracker {
       .slice(0, limit);
   }
 
-  processConversationalUpdate(message: string): { added: FocusSession[]; message: string } {
+  async processConversationalUpdate(message: string): Promise<{ added: FocusSession[]; message: string }> {
     const added: FocusSession[] = [];
 
     // Hours-based patterns
@@ -303,7 +291,7 @@ export class FocusTracker {
         const description = match[3]?.trim() || `${hours}h on ${categoryText}`;
         const category = this.inferCategory(categoryText);
 
-        added.push(this.addSession(category, hours, description, undefined, 'conversational'));
+        added.push(await this.addSession(category, hours, description, undefined, 'conversational'));
         processedRanges.push([match.index, match.index + match[0].length]);
 
         console.log('Focus pattern detected:', { pattern: match[0], hours, category, raw: categoryText });
@@ -323,7 +311,7 @@ export class FocusTracker {
       const description = match[3]?.trim() || `${minutes}min on ${categoryText}`;
       const category = this.inferCategory(categoryText);
 
-      added.push(this.addSession(category, hours, description, undefined, 'conversational'));
+      added.push(await this.addSession(category, hours, description, undefined, 'conversational'));
       processedRanges.push([match.index, match.index + match[0].length]);
 
       console.log('Focus pattern detected (minutes):', { pattern: match[0], minutes, hours, category });

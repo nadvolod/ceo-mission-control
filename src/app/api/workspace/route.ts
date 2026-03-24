@@ -3,8 +3,8 @@ import { readInitiatives, readDailyScorecard } from '@/lib/workspace-reader';
 
 export async function GET() {
   try {
-    const initiatives = readInitiatives();
-    const scorecard = readDailyScorecard();
+    const initiatives = await readInitiatives();
+    const scorecard = await readDailyScorecard();
 
     return NextResponse.json({
       initiatives,
@@ -26,8 +26,8 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'refresh':
-        const initiatives = readInitiatives();
-        const scorecard = readDailyScorecard();
+        const initiatives = await readInitiatives();
+        const scorecard = await readDailyScorecard();
         return NextResponse.json({ initiatives, scorecard });
 
       default:

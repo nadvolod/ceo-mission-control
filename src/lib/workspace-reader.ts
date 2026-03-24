@@ -1,19 +1,16 @@
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import matter from 'gray-matter';
 import type { Initiative, DailyScorecard } from './types';
-import { WORKSPACE_PATH, ensureWorkspaceReady } from './workspace-path';
+import { loadText } from './storage';
 
-export function readInitiatives(): Initiative[] {
+export async function readInitiatives(): Promise<Initiative[]> {
   try {
-    ensureWorkspaceReady();
-    const filePath = join(WORKSPACE_PATH, 'INITIATIVES.md');
-    const content = readFileSync(filePath, 'utf8');
-    
+    const content = await loadText('INITIATIVES.md', '');
+    if (!content) return [];
+
     // Parse markdown table
     const lines = content.split('\n');
     const initiatives: Initiative[] = [];
-    
+
     let inTable = false;
     for (const line of lines) {
       if (line.startsWith('| Rank |')) {
@@ -52,7 +49,7 @@ export function readInitiatives(): Initiative[] {
         inTable = false;
       }
     }
-    
+
     // Parse detailed sections
     for (const initiative of initiatives) {
       const sectionRegex = new RegExp(`## \\d+\\)\\s*${initiative.name}([\\s\\S]*?)(?=## \\d+\\)|$)`, 'i');
@@ -68,7 +65,7 @@ export function readInitiatives(): Initiative[] {
         initiative.deprioritize = extractValue(section, 'What to deprioritize because of it:') || '';
       }
     }
-    
+
     return initiatives;
   } catch (error) {
     console.error('Error reading initiatives:', error);
@@ -76,12 +73,11 @@ export function readInitiatives(): Initiative[] {
   }
 }
 
-export function readDailyScorecard(): DailyScorecard | null {
+export async function readDailyScorecard(): Promise<DailyScorecard | null> {
   try {
-    ensureWorkspaceReady();
-    const filePath = join(WORKSPACE_PATH, 'DAILY_SCORECARD.md');
-    const content = readFileSync(filePath, 'utf8');
-    
+    const content = await loadText('DAILY_SCORECARD.md', '');
+    if (!content) return null;
+
     return {
       date: extractValue(content, 'Date') || new Date().toISOString().split('T')[0],
       priorities: extractListItems(content, 'Top 3 priorities'),
@@ -114,7 +110,7 @@ function extractListItems(text: string, section: string): string[] {
   const lines = text.split('\n');
   const items: string[] = [];
   let inSection = false;
-  
+
   for (const line of lines) {
     if (line.includes(section)) {
       inSection = true;
@@ -130,6 +126,6 @@ function extractListItems(text: string, section: string): string[] {
       }
     }
   }
-  
+
   return items;
 }

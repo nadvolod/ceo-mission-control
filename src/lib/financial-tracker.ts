@@ -1,8 +1,4 @@
-import { writeFileSync, readFileSync, existsSync } from 'fs';
-import { join } from 'path';
-import { WORKSPACE_PATH, ensureWorkspaceReady } from './workspace-path';
-
-const FINANCIAL_DATA_FILE = join(WORKSPACE_PATH, 'financial-metrics.json');
+import { loadJSON, saveJSON } from './storage';
 
 export interface FinancialEntry {
   id: string;
@@ -34,41 +30,25 @@ export class FinancialTracker {
     lastUpdated: new Date().toISOString()
   };
 
-  constructor() {
-    ensureWorkspaceReady();
-    this.loadData();
+  private constructor() {}
+
+  static async create(): Promise<FinancialTracker> {
+    const tracker = new FinancialTracker();
+    await tracker.loadData();
+    return tracker;
   }
 
-  private loadData(): void {
-    try {
-      if (existsSync(FINANCIAL_DATA_FILE)) {
-        const rawData = readFileSync(FINANCIAL_DATA_FILE, 'utf8');
-        this.data = JSON.parse(rawData);
-      } else {
-        this.data = {
-          dailyMetrics: {},
-          lastUpdated: new Date().toISOString()
-        };
-      }
-    } catch (error) {
-      console.error('Error loading financial data:', error);
-      this.data = {
-        dailyMetrics: {},
-        lastUpdated: new Date().toISOString()
-      };
-    }
+  private async loadData(): Promise<void> {
+    const defaultData: FinancialData = { dailyMetrics: {}, lastUpdated: new Date().toISOString() };
+    this.data = await loadJSON('financial-metrics.json', defaultData);
   }
 
-  private saveData(): void {
-    try {
-      this.data.lastUpdated = new Date().toISOString();
-      writeFileSync(FINANCIAL_DATA_FILE, JSON.stringify(this.data, null, 2));
-    } catch (error) {
-      console.error('Error saving financial data:', error);
-    }
+  private async saveData(): Promise<void> {
+    this.data.lastUpdated = new Date().toISOString();
+    await saveJSON('financial-metrics.json', this.data);
   }
 
-  addEntry(category: 'moved' | 'generated' | 'cut', amount: number, description: string, date?: string): FinancialEntry {
+  async addEntry(category: 'moved' | 'generated' | 'cut', amount: number, description: string, date?: string): Promise<FinancialEntry> {
     const entryDate = date || new Date().toISOString().split('T')[0];
     const timestamp = new Date().toISOString();
     
@@ -94,7 +74,7 @@ export class FinancialTracker {
 
     // Recalculate totals
     this.recalculateTotals(entryDate);
-    this.saveData();
+    await this.saveData();
 
     return entry;
   }
@@ -155,7 +135,7 @@ export class FinancialTracker {
   }
 
   // Process conversational input for financial updates
-  processConversationalUpdate(message: string): { added: FinancialEntry[]; message: string } {
+  async processConversationalUpdate(message: string): Promise<{ added: FinancialEntry[]; message: string }> {
     const added: FinancialEntry[] = [];
 
     // Pattern: "Moved $12K: description" or "moved $12,000: description"
@@ -166,7 +146,7 @@ export class FinancialTracker {
       const amount = this.parseAmount(match[1]);
       const description = match[2].trim();
       if (amount > 0) {
-        added.push(this.addEntry('moved', amount, description));
+        added.push(await this.addEntry('moved', amount, description));
       }
     }
 
@@ -176,7 +156,7 @@ export class FinancialTracker {
       const amount = this.parseAmount(match[1]);
       const description = match[2].trim();
       if (amount > 0) {
-        added.push(this.addEntry('generated', amount, description));
+        added.push(await this.addEntry('generated', amount, description));
       }
     }
 
@@ -186,7 +166,7 @@ export class FinancialTracker {
       const amount = this.parseAmount(match[1]);
       const description = match[2].trim();
       if (amount > 0) {
-        added.push(this.addEntry('cut', amount, description));
+        added.push(await this.addEntry('cut', amount, description));
       }
     }
 

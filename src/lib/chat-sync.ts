@@ -7,10 +7,17 @@ export class ChatSyncManager {
   private financialTracker: FinancialTracker;
   private focusTracker: FocusTracker;
 
-  constructor() {
-    this.taskManager = new TaskManager();
-    this.financialTracker = new FinancialTracker();
-    this.focusTracker = new FocusTracker();
+  private constructor(taskManager: TaskManager, financialTracker: FinancialTracker, focusTracker: FocusTracker) {
+    this.taskManager = taskManager;
+    this.financialTracker = financialTracker;
+    this.focusTracker = focusTracker;
+  }
+
+  static async create(): Promise<ChatSyncManager> {
+    const taskManager = await TaskManager.create();
+    const financialTracker = await FinancialTracker.create();
+    const focusTracker = await FocusTracker.create();
+    return new ChatSyncManager(taskManager, financialTracker, focusTracker);
   }
 
   // Process conversational updates from main chat and sync to Mission Control
@@ -18,10 +25,10 @@ export class ChatSyncManager {
     console.log('Syncing chat update:', message);
 
     // Process financial metrics first
-    const financialResult = this.financialTracker.processConversationalUpdate(message);
+    const financialResult = await this.financialTracker.processConversationalUpdate(message);
 
     // Process focus hours
-    const focusResult = this.focusTracker.processConversationalUpdate(message);
+    const focusResult = await this.focusTracker.processConversationalUpdate(message);
 
     const updates: any[] = [];
     const tasks = this.taskManager.getTasks();
@@ -35,7 +42,7 @@ export class ChatSyncManager {
 
         const matchingTask = this.findTaskByTitle(taskTitle);
         if (matchingTask) {
-          const updatedTask = this.taskManager.updateTaskStatus(matchingTask.id, 'Done');
+          const updatedTask = await this.taskManager.updateTaskStatus(matchingTask.id, 'Done');
           if (updatedTask) {
             updates.push(updatedTask);
             console.log('Updated task to Done:', updatedTask.title);
@@ -55,7 +62,7 @@ export class ChatSyncManager {
 
         const matchingTask = this.findTaskByTitle(taskTitle);
         if (matchingTask) {
-          const updatedTask = this.taskManager.updateTaskStatus(matchingTask.id, 'In Progress');
+          const updatedTask = await this.taskManager.updateTaskStatus(matchingTask.id, 'In Progress');
           if (updatedTask) {
             updates.push(updatedTask);
             console.log('Updated task to In Progress:', updatedTask.title);
@@ -67,7 +74,7 @@ export class ChatSyncManager {
     }
 
     // Extract any new tasks mentioned
-    const created = this.taskManager.processNaturalLanguageUpdate(message);
+    const created = await this.taskManager.processNaturalLanguageUpdate(message);
 
     return {
       updated: updates,
@@ -146,6 +153,3 @@ export class ChatSyncManager {
     return null;
   }
 }
-
-// Global instance
-export const chatSyncManager = new ChatSyncManager();
