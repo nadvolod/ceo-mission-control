@@ -216,10 +216,10 @@ function DashboardCarousel() {
         {/* Stats row (always visible) */}
         <div className="grid grid-cols-4 gap-3 mb-4">
           {[
-            { icon: ListTodo, label: 'Active Tasks', value: '12', color: 'text-blue-400' },
-            { icon: Clock, label: 'Focus Hours', value: '6.5h', color: 'text-emerald-400' },
-            { icon: DollarSign, label: 'Revenue', value: '$47K', color: 'text-amber-400' },
-            { icon: BarChart3, label: 'AI Score', value: '94', color: 'text-purple-400' },
+            { icon: ListTodo, label: 'Active Tasks', value: '24', color: 'text-blue-400' },
+            { icon: Clock, label: 'Focus Hours', value: '32h', color: 'text-emerald-400' },
+            { icon: DollarSign, label: 'MRR', value: '$1.2M', color: 'text-amber-400' },
+            { icon: BarChart3, label: 'Team Score', value: '91', color: 'text-purple-400' },
           ].map((stat) => (
             <div key={stat.label} className="rounded-lg bg-white/[0.03] border border-white/[0.04] p-3">
               <stat.icon className={`w-3.5 h-3.5 ${stat.color} mb-1.5`} />
@@ -249,10 +249,10 @@ function DashboardCarousel() {
 
 function TaskPriorityView() {
   const tasks = [
-    { score: 95, title: 'Close Artis WHO contract', tag: 'Revenue', money: '$12K', status: 'doing' },
-    { score: 82, title: 'Complete client delivery sprint', tag: 'Temporal', money: '$10K', status: 'doing' },
-    { score: 71, title: 'File taxes by April 15', tag: 'Tax', money: '', status: 'todo' },
-    { score: 65, title: 'Devonshire HELOC follow-up', tag: 'Finance', money: '$75K', status: 'todo' },
+    { score: 97, title: 'Close Series B term sheet — Sequoia', tag: 'Fundraise', money: '$18M', status: 'doing' },
+    { score: 89, title: 'Ship v3.0 launch to enterprise waitlist', tag: 'Product', money: '$340K', status: 'doing' },
+    { score: 76, title: 'Finalize Q2 hiring plan — 12 engineers', tag: 'Team', money: '', status: 'todo' },
+    { score: 68, title: 'Renegotiate AWS contract for 40% savings', tag: 'Ops', money: '$180K', status: 'todo' },
   ];
 
   return (
@@ -297,18 +297,18 @@ function TaskPriorityView() {
 
 function FocusHoursView() {
   const days = [
-    { day: 'Mon', hours: 5.5, categories: { Temporal: 3.5, Revenue: 1.5, Admin: 0.5 } },
-    { day: 'Tue', hours: 7.0, categories: { Temporal: 4.0, Revenue: 2.0, Tax: 1.0 } },
-    { day: 'Wed', hours: 4.5, categories: { Temporal: 3.0, Finance: 1.5 } },
-    { day: 'Thu', hours: 6.5, categories: { Temporal: 4.0, Revenue: 1.5, Housing: 1.0 } },
-    { day: 'Fri', hours: 5.0, categories: { Temporal: 3.5, Tax: 1.5 } },
-    { day: 'Sat', hours: 2.0, categories: { Personal: 2.0 } },
+    { day: 'Mon', hours: 7.0, categories: { Product: 4.0, Strategy: 2.0, Team: 1.0 } },
+    { day: 'Tue', hours: 6.5, categories: { Product: 3.0, Fundraise: 2.5, Ops: 1.0 } },
+    { day: 'Wed', hours: 8.0, categories: { Product: 5.0, Strategy: 2.0, Sales: 1.0 } },
+    { day: 'Thu', hours: 5.5, categories: { Team: 3.0, Fundraise: 1.5, Ops: 1.0 } },
+    { day: 'Fri', hours: 7.5, categories: { Product: 4.5, Sales: 2.0, Strategy: 1.0 } },
+    { day: 'Sat', hours: 3.0, categories: { Strategy: 3.0 } },
     { day: 'Sun', hours: 0, categories: {} },
   ];
-  const maxH = 8;
+  const maxH = 9;
   const colors: Record<string, string> = {
-    Temporal: '#3b82f6', Revenue: '#8b5cf6', Tax: '#ef4444',
-    Finance: '#10b981', Admin: '#6b7280', Housing: '#f59e0b', Personal: '#ec4899',
+    Product: '#3b82f6', Strategy: '#8b5cf6', Fundraise: '#f59e0b',
+    Team: '#f97316', Sales: '#10b981', Ops: '#6b7280',
   };
 
   return (
@@ -355,7 +355,7 @@ function FocusHoursView() {
 
       {/* Legend */}
       <div className="flex items-center justify-center gap-3 mt-3">
-        {['Temporal', 'Revenue', 'Tax'].map(cat => (
+        {['Product', 'Strategy', 'Fundraise'].map(cat => (
           <div key={cat} className="flex items-center gap-1">
             <div className="w-2 h-2 rounded-sm" style={{ backgroundColor: colors[cat] }} />
             <span className="text-[9px] text-zinc-500">{cat}</span>
@@ -370,10 +370,10 @@ function FocusHoursView() {
 
 function FinancialView() {
   const entries = [
-    { type: 'generated', label: 'Artis WHO contract', amount: '$12,000', icon: TrendingUp, color: 'text-emerald-400' },
-    { type: 'generated', label: 'Tricentis video course', amount: '$6,500', icon: TrendingUp, color: 'text-emerald-400' },
-    { type: 'moved', label: 'Rent payment', amount: '$850', icon: DollarSign, color: 'text-blue-400' },
-    { type: 'cut', label: 'AWS bill reduction', amount: '$340', icon: BarChart3, color: 'text-amber-400' },
+    { type: 'generated', label: 'Enterprise deal — Acme Corp', amount: '$240,000', icon: TrendingUp, color: 'text-emerald-400' },
+    { type: 'generated', label: 'Self-serve upgrades (March)', amount: '$87,500', icon: TrendingUp, color: 'text-emerald-400' },
+    { type: 'moved', label: 'Series A tranche 2 received', amount: '$1.5M', icon: DollarSign, color: 'text-blue-400' },
+    { type: 'cut', label: 'Infra optimization (40% savings)', amount: '$18,200', icon: BarChart3, color: 'text-amber-400' },
   ];
 
   return (
@@ -391,9 +391,9 @@ function FinancialView() {
       {/* Summary cards */}
       <div className="grid grid-cols-3 gap-2 mb-3">
         {[
-          { label: 'Generated', value: '$39,326', color: 'text-emerald-400', bg: 'bg-emerald-500/5' },
-          { label: 'Moved', value: '$20,150', color: 'text-blue-400', bg: 'bg-blue-500/5' },
-          { label: 'Cut', value: '$2,840', color: 'text-amber-400', bg: 'bg-amber-500/5' },
+          { label: 'Revenue', value: '$1.24M', color: 'text-emerald-400', bg: 'bg-emerald-500/5' },
+          { label: 'Runway', value: '18 mo', color: 'text-blue-400', bg: 'bg-blue-500/5' },
+          { label: 'Saved', value: '$62K', color: 'text-amber-400', bg: 'bg-amber-500/5' },
         ].map((s) => (
           <div key={s.label} className={`rounded-lg ${s.bg} border border-white/[0.04] p-2.5 text-center`}>
             <div className={`text-base font-semibold ${s.color}`}>{s.value}</div>
