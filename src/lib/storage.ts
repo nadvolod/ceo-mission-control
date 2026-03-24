@@ -9,14 +9,14 @@ import { WORKSPACE_PATH, ensureWorkspaceReady } from './workspace-path';
  * - Without DATABASE_URL: uses filesystem (local dev)
  */
 
-function useDb(): boolean {
+function hasDb(): boolean {
   return !!process.env.DATABASE_URL;
 }
 
 // --- JSON data (tasks.json, focus-tracking.json, etc.) ---
 
 export async function loadJSON<T>(filename: string, defaultValue: T): Promise<T> {
-  if (useDb()) {
+  if (hasDb()) {
     await ensureDbReady();
     const db = getDb()!;
     try {
@@ -44,7 +44,7 @@ export async function loadJSON<T>(filename: string, defaultValue: T): Promise<T>
 }
 
 export async function saveJSON(filename: string, data: unknown): Promise<void> {
-  if (useDb()) {
+  if (hasDb()) {
     await ensureDbReady();
     const db = getDb()!;
     try {
@@ -71,7 +71,7 @@ export async function saveJSON(filename: string, data: unknown): Promise<void> {
 // --- Text content (INITIATIVES.md, DAILY_SCORECARD.md, etc.) ---
 
 export async function loadText(filename: string, defaultContent: string = ''): Promise<string> {
-  if (useDb()) {
+  if (hasDb()) {
     await ensureDbReady();
     const db = getDb()!;
     try {
@@ -96,7 +96,7 @@ export async function loadText(filename: string, defaultContent: string = ''): P
 }
 
 export async function saveText(filename: string, content: string): Promise<void> {
-  if (useDb()) {
+  if (hasDb()) {
     await ensureDbReady();
     const db = getDb()!;
     try {
@@ -123,7 +123,7 @@ export async function saveText(filename: string, content: string): Promise<void>
 // --- Audit log (replaces memory/{date}.md) ---
 
 export async function appendAuditLog(date: string, entryType: string, content: string): Promise<void> {
-  if (useDb()) {
+  if (hasDb()) {
     await ensureDbReady();
     const db = getDb()!;
     try {
