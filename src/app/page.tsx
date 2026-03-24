@@ -1,16 +1,16 @@
 'use client';
 
-import { TaskCommandCenter } from '@/components/TaskCommandCenter';
-import { ConversationTaskInput } from '@/components/ConversationTaskInput';
+import { TaskDashboard } from '@/components/TaskDashboard';
 import { FocusOptimization } from '@/components/FocusOptimization';
 import { MissionTracker } from '@/components/MissionTracker';
 import { FinancialMetricsDashboard } from '@/components/FinancialMetricsDashboard';
 import { FocusHoursTracker } from '@/components/FocusHoursTracker';
-import { Task, ConversationExtraction, FocusCategory } from '@/lib/types';
+import { AiTask, TaskStats, FocusCategory } from '@/lib/types';
 import { useState, useEffect } from 'react';
 
 export default function HomePage() {
-  const [tasks, setTasks] = useState<Task[]>([]);
+  const [aiTasks, setAiTasks] = useState<AiTask[]>([]);
+  const [taskStats, setTaskStats] = useState<TaskStats>({ total: 0, todo: 0, doing: 0, doneToday: 0, overdue: 0 });
   const [initiatives, setInitiatives] = useState<any[]>([]);
   const [scorecard, setScorecard] = useState<any>(null);
   const [financialData, setFinancialData] = useState<any>(null);
@@ -25,10 +25,13 @@ export default function HomePage() {
 
   const loadAllData = async () => {
     try {
-      // Load tasks
+      // Load tasks from ai-task-list
       const tasksResponse = await fetch('/api/tasks');
-      const tasksData = await tasksResponse.json();
-      setTasks(tasksData.tasks || []);
+      if (tasksResponse.ok) {
+        const tasksData = await tasksResponse.json();
+        setAiTasks(tasksData.tasks || []);
+        setTaskStats(tasksData.stats || { total: 0, todo: 0, doing: 0, doneToday: 0, overdue: 0 });
+      }
 
       // Load workspace data
       const workspaceResponse = await fetch('/api/workspace');
@@ -38,8 +41,8 @@ export default function HomePage() {
 
       // Load financial data
       const financialResponse = await fetch('/api/financial');
-      const financialData = await financialResponse.json();
-      setFinancialData(financialData);
+      const financialDataResult = await financialResponse.json();
+      setFinancialData(financialDataResult);
 
       // Load focus hours data
       const focusResponse = await fetch('/api/focus-hours');
@@ -56,80 +59,38 @@ export default function HomePage() {
     }
   };
 
-  const loadTasks = async () => {
-    try {
-      const response = await fetch('/api/tasks');
-      const data = await response.json();
-      setTasks(data.tasks || []);
-      setLastRefresh(new Date());
-    } catch (error) {
-      console.error('Error loading tasks:', error);
-    }
-  };
-
-  const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
+  const handleCreateTask = async (data: { title: string; category?: string }) => {
     try {
       const response = await fetch('/api/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'update',
-          taskId,
-          updates
-        })
+        body: JSON.stringify(data)
       });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setTasks(prev => prev.map(t => t.id === taskId ? data.task : t));
-      }
+      if (response.ok) await loadAllData();
+    } catch (error) {
+      console.error('Error creating task:', error);
+    }
+  };
+
+  const handleUpdateTask = async (id: number, data: { status?: string; title?: string }) => {
+    try {
+      const response = await fetch(`/api/tasks/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      if (response.ok) await loadAllData();
     } catch (error) {
       console.error('Error updating task:', error);
     }
   };
 
-  const handleConversationMessage = async (message: string): Promise<{ tasks: Task[]; extraction: ConversationExtraction; }> => {
+  const handleDeleteTask = async (id: number) => {
     try {
-      const response = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'processConversation',
-          message
-        })
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-
-        // Process focus hours from the same message
-        const focusResponse = await fetch('/api/focus-hours', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            action: 'processMessage',
-            message
-          })
-        });
-        const focusResult = focusResponse.ok ? await focusResponse.json() : null;
-
-        // Refresh all data to include new tasks and financial updates
-        await loadAllData();
-
-        return {
-          tasks: data.created || [],
-          extraction: {
-            ...data.extraction || { tasks: [], deadlines: [], statusUpdates: [], blockers: [] },
-            financial: data.financial || null,
-            focusHours: focusResult || null
-          }
-        };
-      }
-
-      throw new Error('Failed to process message');
+      const response = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
+      if (response.ok) await loadAllData();
     } catch (error) {
-      console.error('Error processing conversation:', error);
-      throw error;
+      console.error('Error deleting task:', error);
     }
   };
 
@@ -157,21 +118,6 @@ export default function HomePage() {
     }
   };
 
-  const seedTasksFromInitiatives = async () => {
-    try {
-      await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'seedFromInitiatives' })
-      });
-      loadAllData();
-    } catch (error) {
-      console.error('Error seeding tasks:', error);
-    }
-  };
-
-  // Data is loaded via useEffect and stored in state
-
   if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
@@ -190,7 +136,7 @@ export default function HomePage() {
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <h2 className="text-lg font-semibold text-red-800 mb-2">Cannot Load Workspace Data</h2>
             <p className="text-red-700">
-              Unable to read DAILY_SCORECARD.md from workspace. 
+              Unable to read DAILY_SCORECARD.md from workspace.
               Make sure the file exists and the app has access to your OpenClaw workspace.
             </p>
             <div className="mt-4 text-sm text-red-600">
@@ -201,17 +147,6 @@ export default function HomePage() {
       </div>
     );
   }
-
-  const completedToday = tasks.filter(t => 
-    t.status === 'Done' && 
-    new Date(t.updatedAt).toDateString() === new Date().toDateString()
-  ).length;
-
-  const urgentTasks = tasks.filter(t => {
-    if (!t.deadline) return false;
-    const daysUntil = Math.ceil((new Date(t.deadline).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24));
-    return daysUntil <= 3 && t.status !== 'Done';
-  }).length;
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -227,16 +162,16 @@ export default function HomePage() {
             </div>
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
               <div>
-                <div className="text-2xl font-bold text-blue-600">{tasks.length}</div>
+                <div className="text-2xl font-bold text-blue-600">{taskStats.total}</div>
                 <div className="text-xs text-gray-500">Total Tasks</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-green-600">{completedToday}</div>
+                <div className="text-2xl font-bold text-green-600">{taskStats.doneToday}</div>
                 <div className="text-xs text-gray-500">Done Today</div>
               </div>
               <div>
-                <div className="text-2xl font-bold text-red-600">{urgentTasks}</div>
-                <div className="text-xs text-gray-500">Urgent</div>
+                <div className="text-2xl font-bold text-red-600">{taskStats.overdue}</div>
+                <div className="text-xs text-gray-500">Overdue</div>
               </div>
               <div>
                 <div className="text-2xl font-bold text-gray-900">
@@ -256,100 +191,77 @@ export default function HomePage() {
           <MissionTracker />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Task Management */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Conversational Input */}
-            <ConversationTaskInput 
-              onProcessMessage={handleConversationMessage}
+        {/* Metrics - 2 Column Grid */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Focus Hours Dashboard */}
+          {focusData && (
+            <FocusHoursTracker
+              todaysMetrics={focusData.todaysMetrics}
+              weeklyTotals={focusData.weeklyTotals}
+              weekOverWeek={focusData.weekOverWeek}
+              dailyTrend={focusData.dailyTrend}
+              rollingAverage={focusData.rollingAverage}
+              categoryDistribution={focusData.categoryDistribution}
+              recentSessions={focusData.recentSessions}
+              temporalTarget={scorecard.temporalTarget || 0}
+              temporalActual={scorecard.temporalActual || 0}
+              onAddSession={handleAddFocusSession}
             />
+          )}
 
-            {/* Task Command Center */}
-            <TaskCommandCenter
-              initiatives={initiatives}
-              tasks={tasks}
-              onTaskUpdate={handleTaskUpdate}
+          {/* Financial Metrics Dashboard */}
+          {financialData && (
+            <FinancialMetricsDashboard
+              todaysMetrics={financialData.todaysMetrics}
+              weeklyTotals={financialData.weeklyTotals}
+              monthlyTotals={financialData.monthlyTotals}
+              recentEntries={financialData.recentEntries}
             />
+          )}
 
-            {/* Seed Tasks Button */}
-            {tasks.length === 0 && (
-              <div className="text-center py-8">
-                <button
-                  onClick={seedTasksFromInitiatives}
-                  className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
-                >
-                  Import Tasks from Current Initiatives
-                </button>
-                <p className="text-sm text-gray-500 mt-2">
-                  This will create initial tasks based on your INITIATIVES.md file
-                </p>
-              </div>
-            )}
+          {/* Focus Optimization */}
+          <div>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Today&apos;s Focus</h2>
+            <FocusOptimization scorecard={scorecard} />
           </div>
 
-          {/* Right Column - Context & Financial */}
-          <div className="space-y-8">
-            {/* Focus Hours Dashboard */}
-            {focusData && (
-              <FocusHoursTracker
-                todaysMetrics={focusData.todaysMetrics}
-                weeklyTotals={focusData.weeklyTotals}
-                weekOverWeek={focusData.weekOverWeek}
-                dailyTrend={focusData.dailyTrend}
-                rollingAverage={focusData.rollingAverage}
-                categoryDistribution={focusData.categoryDistribution}
-                recentSessions={focusData.recentSessions}
-                temporalTarget={scorecard.temporalTarget || 0}
-                temporalActual={scorecard.temporalActual || 0}
-                onAddSession={handleAddFocusSession}
-              />
-            )}
-
-            {/* Financial Metrics Dashboard */}
-            {financialData && (
-              <FinancialMetricsDashboard
-                todaysMetrics={financialData.todaysMetrics}
-                weeklyTotals={financialData.weeklyTotals}
-                monthlyTotals={financialData.monthlyTotals}
-                recentEntries={financialData.recentEntries}
-              />
-            )}
-
-            {/* Focus Optimization */}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Today's Focus</h2>
-              <FocusOptimization scorecard={scorecard} />
-            </div>
-
-            {/* Quick Stats */}
-            <div className="bg-white rounded-lg shadow-lg p-6">
-              <h3 className="font-semibold text-gray-900 mb-4">System Status</h3>
-              <div className="space-y-3 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Last Refresh</span>
-                  <span className="text-gray-900">{lastRefresh.toLocaleTimeString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Active Projects</span>
-                  <span className="text-gray-900">{initiatives.length}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Tasks Created Today</span>
-                  <span className="text-gray-900">
-                    {tasks.filter(t => 
-                      new Date(t.createdAt).toDateString() === new Date().toDateString()
-                    ).length}
-                  </span>
-                </div>
-                <button
-                  onClick={loadAllData}
-                  className="w-full mt-4 px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-                >
-                  Refresh Data
-                </button>
+          {/* System Status */}
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <h3 className="font-semibold text-gray-900 mb-4">System Status</h3>
+            <div className="space-y-3 text-sm">
+              <div className="flex justify-between">
+                <span className="text-gray-600">Last Refresh</span>
+                <span className="text-gray-900">{lastRefresh.toLocaleTimeString()}</span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Active Projects</span>
+                <span className="text-gray-900">{initiatives.length}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray-600">Active Tasks</span>
+                <span className="text-gray-900">{taskStats.doing}</span>
+              </div>
+              <button
+                onClick={loadAllData}
+                className="w-full mt-4 px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+              >
+                Refresh Data
+              </button>
             </div>
           </div>
+        </div>
+
+        {/* Task Dashboard - Full Width Below Metrics */}
+        <div className="mt-8">
+          <TaskDashboard
+            tasks={aiTasks.filter(t => t.status !== 'done')}
+            stats={taskStats}
+            onCreateTask={handleCreateTask}
+            onUpdateTask={handleUpdateTask}
+            onDeleteTask={handleDeleteTask}
+            onRefresh={loadAllData}
+            taskListUrl={process.env.NEXT_PUBLIC_AI_TASK_LIST_URL || 'https://tasklistai.vercel.app'}
+          />
         </div>
       </main>
     </div>
