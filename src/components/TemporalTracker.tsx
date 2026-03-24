@@ -73,9 +73,9 @@ export function TemporalTracker({ temporalTarget, temporalActual, onUpdateHours 
   const progressPercentage = temporalTarget > 0 ? (temporalActual / temporalTarget) * 100 : 0;
   const remaining = Math.max(0, temporalTarget - temporalActual);
 
-  const todaySessions = sessions.filter(session => 
-    new Date(session.date).toDateString() === new Date().toDateString()
-  );
+  const now = new Date();
+  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const todaySessions = sessions.filter(session => session.date === todayStr);
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">

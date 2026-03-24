@@ -5,6 +5,9 @@ import { TemporalTracker } from './TemporalTracker';
 // Mock fetch globally
 global.fetch = jest.fn();
 
+// Local date string that matches how the component filters sessions
+const LOCAL_TODAY = `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}-${String(new Date().getDate()).padStart(2, '0')}`;
+
 const mockOnUpdateHours = jest.fn();
 
 const defaultProps = {
@@ -66,7 +69,7 @@ describe('TemporalTracker', () => {
         endTime: new Date().toISOString(),
         duration: 2,
         description: 'Morning focus block',
-        date: new Date().toISOString().split('T')[0],
+        date: LOCAL_TODAY,
       },
       {
         id: 'session-2',
@@ -74,7 +77,7 @@ describe('TemporalTracker', () => {
         endTime: new Date().toISOString(),
         duration: 1.5,
         description: 'Afternoon session',
-        date: new Date().toISOString().split('T')[0],
+        date: LOCAL_TODAY,
       },
     ];
 
