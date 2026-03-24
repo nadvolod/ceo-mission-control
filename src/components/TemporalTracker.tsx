@@ -137,10 +137,11 @@ export function TemporalTracker({ temporalTarget, temporalActual, onUpdateHours 
           <h4 className="text-md font-medium text-gray-900 mb-3">Report Temporal Hours</h4>
           <form onSubmit={handleReportHours} className="space-y-3">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="temporal-hours" className="block text-sm font-medium text-gray-700 mb-1">
                 Hours Completed
               </label>
               <input
+                id="temporal-hours"
                 type="number"
                 step="0.1"
                 min="0.1"
@@ -153,10 +154,11 @@ export function TemporalTracker({ temporalTarget, temporalActual, onUpdateHours 
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label htmlFor="temporal-description" className="block text-sm font-medium text-gray-700 mb-1">
                 Description (optional)
               </label>
               <input
+                id="temporal-description"
                 type="text"
                 value={reportDescription}
                 onChange={(e) => setReportDescription(e.target.value)}

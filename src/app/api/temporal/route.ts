@@ -45,19 +45,17 @@ function updateDailyScorecard(date: string, newTotal: number): void {
     let content = readFileSync(scorecardPath, 'utf8');
     
     // Update the "Actual:" line in the temporal hours section
-    const actualRegex = /(-\s*Actual:\s*)([\d\.]*)/;
+    const actualRegex = /(-[ \t]*Actual:[ \t]*)([\d.]*)/;
     const match = content.match(actualRegex);
-    
+
     if (match) {
-      const updatedLine = `${match[1]}${newTotal}`;
-      content = content.replace(actualRegex, updatedLine);
+      content = content.replace(actualRegex, `- Actual: ${newTotal}`);
     } else {
       // If no "Actual:" line exists, add it after "Target today:"
-      const targetRegex = /(-\s*Target today:\s*[\d\.]+)/;
+      const targetRegex = /(-[ \t]*Target today:[ \t]*[\d.]+)/;
       const targetMatch = content.match(targetRegex);
       if (targetMatch) {
-        const insertAfter = targetMatch[0];
-        content = content.replace(insertAfter, `${insertAfter}\n- Actual: ${newTotal}`);
+        content = content.replace(targetMatch[0], `${targetMatch[0]}\n- Actual: ${newTotal}`);
       }
     }
     

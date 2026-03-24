@@ -201,7 +201,7 @@ export class FinancialTracker {
 
   private parseAmount(amountStr: string): number {
     // Remove commas and handle K suffix
-    let cleanAmount = amountStr.replace(/,/g, '').toLowerCase().trim();
+    const cleanAmount = amountStr.replace(/,/g, '').toLowerCase().trim();
     
     if (cleanAmount.endsWith('k')) {
       const numPart = cleanAmount.slice(0, -1);

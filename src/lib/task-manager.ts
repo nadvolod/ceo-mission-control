@@ -292,6 +292,7 @@ export class TaskManager {
 
   // Load sample tasks for initial setup
   seedSampleTasks(): void {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { sampleTasks } = require('./sample-tasks');
     sampleTasks.forEach((taskData: Partial<Task>) => {
       this.createTask(taskData);

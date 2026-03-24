@@ -1,22 +1,26 @@
-import { describe, it, expect, beforeEach, afterEach, jest } from '@jest/globals';
+/**
+ * @jest-environment node
+ */
 import { NextRequest } from 'next/server';
 import { GET, POST } from './route';
-import fs from 'fs';
-import path from 'path';
 
 // Mock fs module
 jest.mock('fs', () => ({
   readFileSync: jest.fn(),
   writeFileSync: jest.fn(),
+  mkdirSync: jest.fn(),
 }));
 
-const mockReadFileSync = fs.readFileSync as jest.MockedFunction<typeof fs.readFileSync>;
-const mockWriteFileSync = fs.writeFileSync as jest.MockedFunction<typeof fs.writeFileSync>;
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const fs = require('fs');
+const mockReadFileSync = fs.readFileSync as jest.Mock;
+const mockWriteFileSync = fs.writeFileSync as jest.Mock;
+
+const TODAY = new Date().toISOString().split('T')[0];
 
 describe('/api/temporal', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env.NODE_ENV = 'test';
   });
 
   afterEach(() => {
@@ -49,11 +53,11 @@ describe('/api/temporal', () => {
             endTime: '2026-03-23T08:30:00.000Z',
             duration: 2,
             description: 'Morning focus block',
-            date: '2026-03-23'
+            date: TODAY
           }
         ],
         dailyTotals: {
-          '2026-03-23': 2
+          [TODAY]: 2
         }
       };
 
@@ -66,7 +70,7 @@ describe('/api/temporal', () => {
       expect(data.success).toBe(true);
       expect(data.sessions).toHaveLength(1);
       expect(data.sessions[0].duration).toBe(2);
-      expect(data.dailyTotals['2026-03-23']).toBe(2);
+      expect(data.dailyTotals[TODAY]).toBe(2);
     });
 
     it('should handle file read errors gracefully', async () => {
@@ -75,7 +79,7 @@ describe('/api/temporal', () => {
       });
 
       const response = await GET();
-      
+
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({
         success: true,
@@ -87,13 +91,11 @@ describe('/api/temporal', () => {
 
   describe('POST /api/temporal', () => {
     it('should add a new temporal session and update files', async () => {
-      // Mock existing temporal data
       const existingData = {
         sessions: [],
         dailyTotals: {}
       };
-      
-      // Mock existing scorecard content
+
       const scorecardContent = `# DAILY_SCORECARD.md
 
 ## Date
@@ -137,27 +139,23 @@ describe('/api/temporal', () => {
       // Verify temporal data was saved
       expect(mockWriteFileSync).toHaveBeenCalledWith(
         expect.stringContaining('temporal-tracking.json'),
-        expect.stringContaining('"duration":2.5'),
-        { encoding: undefined }
+        expect.stringContaining('"duration": 2.5')
       );
 
       // Verify scorecard was updated
       expect(mockWriteFileSync).toHaveBeenCalledWith(
         expect.stringContaining('DAILY_SCORECARD.md'),
-        expect.stringContaining('- Actual: 2.5'),
-        { encoding: undefined }
+        expect.stringContaining('- Actual: 2.5')
       );
 
       // Verify memory was updated
       expect(mockWriteFileSync).toHaveBeenCalledWith(
-        expect.stringContaining('memory/2026-03-23.md'),
-        expect.stringContaining('## Temporal Session Completed'),
-        { encoding: undefined }
+        expect.stringContaining('memory/'),
+        expect.stringContaining('## Temporal Session Completed')
       );
     });
 
     it('should accumulate hours when multiple sessions are added', async () => {
-      // Mock existing temporal data with one session
       const existingData = {
         sessions: [
           {
@@ -166,11 +164,11 @@ describe('/api/temporal', () => {
             endTime: '2026-03-23T08:30:00.000Z',
             duration: 2,
             description: 'First session',
-            date: '2026-03-23'
+            date: TODAY
           }
         ],
         dailyTotals: {
-          '2026-03-23': 2
+          [TODAY]: 2
         }
       };
 
@@ -229,9 +227,8 @@ describe('/api/temporal', () => {
 
       // Verify new memory file was created
       expect(mockWriteFileSync).toHaveBeenCalledWith(
-        expect.stringContaining('memory/2026-03-23.md'),
-        expect.stringContaining('# Daily Memory - 2026-03-23'),
-        { encoding: undefined }
+        expect.stringContaining('memory/'),
+        expect.stringContaining('# Daily Memory -')
       );
     });
 
@@ -253,7 +250,7 @@ describe('/api/temporal', () => {
       expect(data.error).toBe('Invalid action');
     });
 
-    it('should handle missing hours parameter', async () => {
+    it('should reject missing hours parameter', async () => {
       const request = new NextRequest('http://localhost:3000/api/temporal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -264,9 +261,41 @@ describe('/api/temporal', () => {
       });
 
       const response = await POST(request);
-      
-      expect(response.status).toBe(500);
-      expect((await response.json()).success).toBe(false);
+
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toBe('Hours must be a number between 0 and 24');
+    });
+
+    it('should reject negative hours', async () => {
+      const request = new NextRequest('http://localhost:3000/api/temporal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'addSession',
+          hours: -2
+        })
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toBe('Hours must be a number between 0 and 24');
+    });
+
+    it('should reject hours exceeding 24', async () => {
+      const request = new NextRequest('http://localhost:3000/api/temporal', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'addSession',
+          hours: 25
+        })
+      });
+
+      const response = await POST(request);
+
+      expect(response.status).toBe(400);
+      expect((await response.json()).error).toBe('Hours must be a number between 0 and 24');
     });
 
     it('should use default description when none provided', async () => {
