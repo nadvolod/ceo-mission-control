@@ -2,34 +2,46 @@
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ArrowRight, Sparkles, BarChart3, ListTodo, Clock, DollarSign } from 'lucide-react';
+import { ArrowRight, Sparkles, Loader2, BarChart3, ListTodo, Clock, DollarSign } from 'lucide-react';
+
+const EMPLOYEE_OPTIONS = [
+  { value: '', label: 'Company size' },
+  { value: '1', label: 'Just me' },
+  { value: '2-5', label: '2–5 employees' },
+  { value: '6-20', label: '6–20 employees' },
+  { value: '21-50', label: '21–50 employees' },
+  { value: '51-200', label: '51–200 employees' },
+  { value: '200+', label: '200+ employees' },
+];
 
 export function HeroSection() {
-  const [email, setEmail] = useState('');
+  const [form, setForm] = useState({ email: '', name: '', title: '', company: '', employeeCount: '' });
   const [status, setStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+
+  const update = (field: string, value: string) => setForm(prev => ({ ...prev, [field]: value }));
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
+    if (!form.email.trim() || !form.name.trim()) return;
     setStatus('loading');
     try {
       const res = await fetch('/api/waitlist', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify(form),
       });
       if (res.ok) {
         setStatus('success');
-        setEmail('');
       } else {
-        const data = await res.json();
         if (res.status === 409) setStatus('success');
-        else { console.error(data.error); setStatus('error'); }
+        else { setStatus('error'); }
       }
     } catch {
       setStatus('error');
     }
   };
+
+  const inputClass = 'w-full px-4 py-3 rounded-xl bg-white/[0.04] border border-white/[0.08] text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500/40 focus:ring-1 focus:ring-indigo-500/20 transition-all text-sm';
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
@@ -106,27 +118,36 @@ export function HeroSection() {
               <span>You&apos;re on the list. We&apos;ll be in touch.</span>
             </div>
           ) : (
-            <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row items-center gap-3 max-w-md mx-auto">
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="your@email.com"
-                required
-                className="w-full sm:flex-1 px-4 py-3 rounded-xl bg-white/5 border border-white/10 text-white placeholder-zinc-500 focus:outline-none focus:border-indigo-500/50 focus:ring-1 focus:ring-indigo-500/20 transition-all"
-              />
+            <form onSubmit={handleSubmit} className="glass-card rounded-2xl p-6 sm:p-8 max-w-xl mx-auto space-y-3 text-left">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input type="text" placeholder="Full name *" required value={form.name} onChange={e => update('name', e.target.value)} className={inputClass} />
+                <input type="email" placeholder="Work email *" required value={form.email} onChange={e => update('email', e.target.value)} className={inputClass} />
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input type="text" placeholder="Title (e.g. CEO, Founder)" value={form.title} onChange={e => update('title', e.target.value)} className={inputClass} />
+                <input type="text" placeholder="Company" value={form.company} onChange={e => update('company', e.target.value)} className={inputClass} />
+              </div>
+              <select value={form.employeeCount} onChange={e => update('employeeCount', e.target.value)}
+                className={`${inputClass} ${!form.employeeCount ? 'text-zinc-500' : ''} appearance-none cursor-pointer`}
+              >
+                {EMPLOYEE_OPTIONS.map(opt => (
+                  <option key={opt.value} value={opt.value} className="bg-[#0c0c14] text-white">{opt.label}</option>
+                ))}
+              </select>
+              {status === 'error' && <p className="text-red-400 text-sm">Something went wrong. Try again.</p>}
               <button
                 type="submit"
                 disabled={status === 'loading'}
-                className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-medium transition-all disabled:opacity-50 cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-medium transition-all disabled:opacity-50 cursor-pointer"
               >
-                {status === 'loading' ? 'Joining...' : 'Get Early Access'}
-                <ArrowRight className="w-4 h-4" />
+                {status === 'loading' ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Joining...</>
+                ) : (
+                  <>Get Early Access <ArrowRight className="w-4 h-4" /></>
+                )}
               </button>
+              <p className="text-center text-xs text-zinc-600">No spam. Early access only.</p>
             </form>
-          )}
-          {status === 'error' && (
-            <p className="text-red-400 text-sm mt-2">Something went wrong. Try again.</p>
           )}
         </motion.div>
 
