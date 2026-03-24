@@ -26,9 +26,11 @@ export function readInitiatives(): Initiative[] {
       if (inTable && line.startsWith('|') && line.includes('|')) {
         const cols = line.split('|').map(col => col.trim()).filter(col => col);
         if (cols.length >= 8) {
+          const name = cols[1] || '';
           initiatives.push({
+            id: `initiative-${initiatives.length + 1}`,
             rank: parseInt(cols[0]) || 0,
-            name: cols[1] || '',
+            name,
             money: parseInt(cols[2]) || 0,
             strategic: parseInt(cols[3]) || 0,
             urgency: parseInt(cols[4]) || 0,
@@ -42,7 +44,9 @@ export function readInitiatives(): Initiative[] {
             nextMove: '',
             payoff: '',
             confidence: '',
-            deprioritize: ''
+            deprioritize: '',
+            status: 'Not Started',
+            tasks: []
           });
         }
       }

@@ -2,17 +2,19 @@
 
 import { TaskCommandCenter } from '@/components/TaskCommandCenter';
 import { ConversationTaskInput } from '@/components/ConversationTaskInput';
-import { FinancialCommandCenter } from '@/components/FinancialCommandCenter';
 import { FocusOptimization } from '@/components/FocusOptimization';
 import { MissionTracker } from '@/components/MissionTracker';
+import { FinancialMetricsDashboard } from '@/components/FinancialMetricsDashboard';
+import { TemporalTracker } from '@/components/TemporalTracker';
 // Removed import - will fetch via API instead
-import { Task, TaskStatus, ConversationExtraction } from '@/lib/types';
+import { Task, ConversationExtraction } from '@/lib/types';
 import { useState, useEffect } from 'react';
 
 export default function HomePage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [initiatives, setInitiatives] = useState<any[]>([]);
   const [scorecard, setScorecard] = useState<any>(null);
+  const [financialData, setFinancialData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
@@ -33,6 +35,11 @@ export default function HomePage() {
       const workspaceData = await workspaceResponse.json();
       setInitiatives(workspaceData.initiatives || []);
       setScorecard(workspaceData.scorecard);
+
+      // Load financial data
+      const financialResponse = await fetch('/api/financial');
+      const financialData = await financialResponse.json();
+      setFinancialData(financialData);
 
       setLastRefresh(new Date());
     } catch (error) {
@@ -88,12 +95,15 @@ export default function HomePage() {
       if (response.ok) {
         const data = await response.json();
         
-        // Refresh tasks to include new ones
+        // Refresh all data to include new tasks and financial updates
         await loadAllData();
         
         return {
           tasks: data.created || [],
-          extraction: data.extraction || { tasks: [], deadlines: [], statusUpdates: [], blockers: [] }
+          extraction: {
+            ...data.extraction || { tasks: [], deadlines: [], statusUpdates: [], blockers: [] },
+            financial: data.financial || null
+          }
         };
       }
       
@@ -102,6 +112,11 @@ export default function HomePage() {
       console.error('Error processing conversation:', error);
       throw error;
     }
+  };
+
+  const handleUpdateTemporalHours = async (hours: number) => {
+    // Refresh workspace data to get updated temporal actual from scorecard
+    await loadAllData();
   };
 
   const seedTasksFromInitiatives = async () => {
@@ -237,11 +252,22 @@ export default function HomePage() {
 
           {/* Right Column - Context & Financial */}
           <div className="space-y-8">
-            {/* Financial Command Center */}
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900 mb-4">Financial Status</h2>
-              <FinancialCommandCenter />
-            </div>
+            {/* Temporal Tracker */}
+            <TemporalTracker
+              temporalTarget={scorecard.temporalTarget || 0}
+              temporalActual={scorecard.temporalActual || 0}
+              onUpdateHours={handleUpdateTemporalHours}
+            />
+
+            {/* Financial Metrics Dashboard */}
+            {financialData && (
+              <FinancialMetricsDashboard
+                todaysMetrics={financialData.todaysMetrics}
+                weeklyTotals={financialData.weeklyTotals}
+                monthlyTotals={financialData.monthlyTotals}
+                recentEntries={financialData.recentEntries}
+              />
+            )}
 
             {/* Focus Optimization */}
             <div>

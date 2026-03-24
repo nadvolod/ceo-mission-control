@@ -1,0 +1,77 @@
+name: PR Checklist
+
+on:
+  pull_request:
+    types: [opened, edited, synchronize]
+
+jobs:
+  pr-checklist:
+    name: Validate PR Checklist
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check PR description for required checklist items
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = context.payload.pull_request.body || '';
+
+            // These are the mandatory checklist items from AGENTS.md
+            const requiredItems = [
+              { pattern: /Was canonical Agents\.md followed\?/, label: 'Was canonical Agents.md followed?' },
+              { pattern: /Was code coverage report included\?/, label: 'Was code coverage report included?' },
+              { pattern: /Was a behavior-first summary provided\?/, label: 'Was a behavior-first summary provided?' },
+              { pattern: /Were all user flows documented/, label: 'Were all user flows documented (happy path + failure paths)?' },
+              { pattern: /Was evidence included/, label: 'Was evidence included (screenshot, recording, or CLI output)?' },
+              { pattern: /Was an architectural review completed/, label: 'Was an architectural review completed (areas of weakness identified)?' },
+              { pattern: /Were edge cases identified and tested\?/, label: 'Were edge cases identified and tested?' },
+              { pattern: /Was monitoring and logging addressed\?/, label: 'Was monitoring and logging addressed?' },
+            ];
+
+            const missing = [];
+            const unchecked = [];
+
+            for (const item of requiredItems) {
+              // Find the line matching this checklist item
+              const lines = body.split('\n');
+              const matchingLine = lines.find(line => item.pattern.test(line));
+
+              if (!matchingLine) {
+                missing.push(item.label);
+              } else if (!/\[x\]/i.test(matchingLine)) {
+                unchecked.push(item.label);
+              }
+            }
+
+            if (missing.length > 0 || unchecked.length > 0) {
+              let message = '## PR Checklist Validation Failed\n\n';
+              message += 'The PR description must include the AGENTS.md checklist with all items checked.\n\n';
+
+              if (missing.length > 0) {
+                message += '### Missing items\n';
+                for (const item of missing) {
+                  message += `- ${item}\n`;
+                }
+                message += '\n';
+              }
+
+              if (unchecked.length > 0) {
+                message += '### Unchecked items\n';
+                for (const item of unchecked) {
+                  message += `- ${item}\n`;
+                }
+                message += '\n';
+              }
+
+              message += '### How to fix\n';
+              message += 'Edit the PR description to include the checklist from AGENTS.md with all items checked `[x]`.\n';
+              message += 'This workflow will re-run automatically when the description is updated.\n';
+
+              core.setFailed(message);
+              core.summary.addRaw(message);
+              await core.summary.write();
+            } else {
+              const message = '## PR Checklist: All items present and checked';
+              core.summary.addRaw(message);
+              await core.summary.write();
+              core.info('All checklist items are present and checked.');
+            }
