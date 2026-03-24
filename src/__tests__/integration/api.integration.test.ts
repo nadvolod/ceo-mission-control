@@ -6,6 +6,12 @@
  */
 
 import { NextRequest } from 'next/server';
+import { loadJSON, saveJSON, loadText, saveText, appendAuditLog } from '@/lib/storage';
+import { getDb, ensureDbReady } from '@/lib/db';
+import { GET as focusGet, POST as focusPost } from '@/app/api/focus-hours/route';
+import { GET as temporalGet, POST as temporalPost } from '@/app/api/temporal/route';
+import { POST as syncPost } from '@/app/api/sync/route';
+import { GET as workspaceGet } from '@/app/api/workspace/route';
 
 // Do NOT mock storage — these tests use the real DB
 const REQUIRED_ENV = 'DATABASE_URL';
@@ -26,14 +32,10 @@ const TEST_PREFIX = `__test_${Date.now()}_`;
 // --- Storage layer tests ---
 
 describe('Storage layer (real DB)', () => {
-  const { loadJSON, saveJSON, loadText, saveText, appendAuditLog } = require('@/lib/storage');
-
   const testJsonKey = `${TEST_PREFIX}test-data.json`;
   const testTextKey = `${TEST_PREFIX}test-content.md`;
 
   afterAll(async () => {
-    // Clean up test data
-    const { getDb, ensureDbReady } = require('@/lib/db');
     await ensureDbReady();
     const db = getDb();
     if (db) {
@@ -81,8 +83,7 @@ describe('Storage layer (real DB)', () => {
   it('should write audit log entries', async () => {
     await appendAuditLog('2026-01-01', 'integration-test', 'Test audit entry');
 
-    const { getDb } = require('@/lib/db');
-    const db = getDb();
+    const db = getDb()!;
     const rows = await db`SELECT * FROM audit_log WHERE entry_type = 'integration-test' AND date = '2026-01-01'`;
     expect(rows.length).toBeGreaterThanOrEqual(1);
     expect(rows[0].content).toBe('Test audit entry');
@@ -92,23 +93,17 @@ describe('Storage layer (real DB)', () => {
 // --- Focus Hours API tests ---
 
 describe('/api/focus-hours (real DB)', () => {
-  const { GET, POST } = require('@/app/api/focus-hours/route');
-
-  const focusDataKey = 'focus-tracking.json';
-
   afterAll(async () => {
-    // Clean up: remove test sessions from focus data
-    const { getDb, ensureDbReady } = require('@/lib/db');
     await ensureDbReady();
     const db = getDb();
     if (db) {
-      await db`DELETE FROM data_store WHERE key = ${focusDataKey}`;
+      await db`DELETE FROM data_store WHERE key = 'focus-tracking.json'`;
       await db`DELETE FROM audit_log WHERE entry_type = 'focus'`;
     }
   });
 
   it('GET should return dashboard data structure', async () => {
-    const response = await GET();
+    const response = await focusGet();
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -133,7 +128,7 @@ describe('/api/focus-hours (real DB)', () => {
       }),
     });
 
-    const response = await POST(request);
+    const response = await focusPost(request);
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -142,50 +137,40 @@ describe('/api/focus-hours (real DB)', () => {
     expect(data.session.hours).toBe(1.5);
 
     // Verify it persists — GET should return it
-    const getResponse = await GET();
+    const getResponse = await focusGet();
     const getData = await getResponse.json();
     expect(getData.todaysMetrics.totalHours).toBeGreaterThanOrEqual(1.5);
-    expect(getData.recentSessions.some((s: any) => s.description === 'Integration test session')).toBe(true);
+    const found = getData.recentSessions.some((s: { description: string }) => s.description === 'Integration test session');
+    expect(found).toBe(true);
   });
 
   it('POST addSession should reject invalid hours', async () => {
     const request = new NextRequest('http://localhost/api/focus-hours', {
       method: 'POST',
-      body: JSON.stringify({
-        action: 'addSession',
-        category: 'Temporal',
-        hours: -1,
-      }),
+      body: JSON.stringify({ action: 'addSession', category: 'Temporal', hours: -1 }),
     });
 
-    const response = await POST(request);
+    const response = await focusPost(request);
     expect(response.status).toBe(400);
   });
 
   it('POST addSession should reject invalid category', async () => {
     const request = new NextRequest('http://localhost/api/focus-hours', {
       method: 'POST',
-      body: JSON.stringify({
-        action: 'addSession',
-        category: 'NotACategory',
-        hours: 1,
-      }),
+      body: JSON.stringify({ action: 'addSession', category: 'NotACategory', hours: 1 }),
     });
 
-    const response = await POST(request);
+    const response = await focusPost(request);
     expect(response.status).toBe(400);
   });
 
   it('POST processMessage should detect focus patterns', async () => {
     const request = new NextRequest('http://localhost/api/focus-hours', {
       method: 'POST',
-      body: JSON.stringify({
-        action: 'processMessage',
-        message: 'logged 2h on revenue calls'
-      }),
+      body: JSON.stringify({ action: 'processMessage', message: 'logged 2h on revenue calls' }),
     });
 
-    const response = await POST(request);
+    const response = await focusPost(request);
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -197,13 +182,10 @@ describe('/api/focus-hours (real DB)', () => {
   it('POST processMessage with no patterns returns empty', async () => {
     const request = new NextRequest('http://localhost/api/focus-hours', {
       method: 'POST',
-      body: JSON.stringify({
-        action: 'processMessage',
-        message: 'Had a great meeting today'
-      }),
+      body: JSON.stringify({ action: 'processMessage', message: 'Had a great meeting today' }),
     });
 
-    const response = await POST(request);
+    const response = await focusPost(request);
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -214,10 +196,7 @@ describe('/api/focus-hours (real DB)', () => {
 // --- Temporal API tests ---
 
 describe('/api/temporal (real DB)', () => {
-  const { GET, POST } = require('@/app/api/temporal/route');
-
   afterAll(async () => {
-    const { getDb, ensureDbReady } = require('@/lib/db');
     await ensureDbReady();
     const db = getDb();
     if (db) {
@@ -227,7 +206,7 @@ describe('/api/temporal (real DB)', () => {
   });
 
   it('GET should return sessions and daily totals', async () => {
-    const response = await GET();
+    const response = await temporalGet();
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -247,7 +226,7 @@ describe('/api/temporal (real DB)', () => {
       })
     });
 
-    const response = await POST(request);
+    const response = await temporalPost(request);
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -256,9 +235,10 @@ describe('/api/temporal (real DB)', () => {
     expect(data.newTotal).toBeGreaterThanOrEqual(2);
 
     // Verify persistence
-    const getResponse = await GET();
+    const getResponse = await temporalGet();
     const getData = await getResponse.json();
-    expect(getData.sessions.some((s: any) => s.description === 'Integration test temporal session')).toBe(true);
+    const found = getData.sessions.some((s: { description: string }) => s.description === 'Integration test temporal session');
+    expect(found).toBe(true);
   });
 
   it('POST should reject invalid hours', async () => {
@@ -268,7 +248,7 @@ describe('/api/temporal (real DB)', () => {
       body: JSON.stringify({ action: 'addSession', hours: 0 })
     });
 
-    const response = await POST(request);
+    const response = await temporalPost(request);
     expect(response.status).toBe(400);
   });
 
@@ -279,7 +259,7 @@ describe('/api/temporal (real DB)', () => {
       body: JSON.stringify({ action: 'badAction' })
     });
 
-    const response = await POST(request);
+    const response = await temporalPost(request);
     expect(response.status).toBe(400);
   });
 });
@@ -287,10 +267,7 @@ describe('/api/temporal (real DB)', () => {
 // --- Sync API tests ---
 
 describe('/api/sync (real DB)', () => {
-  const { POST } = require('@/app/api/sync/route');
-
   afterAll(async () => {
-    const { getDb, ensureDbReady } = require('@/lib/db');
     await ensureDbReady();
     const db = getDb();
     if (db) {
@@ -303,13 +280,11 @@ describe('/api/sync (real DB)', () => {
     const request = new NextRequest('http://localhost/api/sync', {
       method: 'POST',
       body: JSON.stringify({
-        files: {
-          [`${TEST_PREFIX}INITIATIVES.md`]: '# Test Initiatives\n\nContent here',
-        }
+        files: { [`${TEST_PREFIX}INITIATIVES.md`]: '# Test Initiatives\n\nContent here' }
       }),
     });
 
-    const response = await POST(request);
+    const response = await syncPost(request);
     const data = await response.json();
 
     expect(response.status).toBe(200);
@@ -317,7 +292,6 @@ describe('/api/sync (real DB)', () => {
     expect(data.synced).toContain(`text: ${TEST_PREFIX}INITIATIVES.md`);
 
     // Verify it's readable
-    const { loadText } = require('@/lib/storage');
     const content = await loadText(`${TEST_PREFIX}INITIATIVES.md`, '');
     expect(content).toContain('# Test Initiatives');
   });
@@ -326,20 +300,17 @@ describe('/api/sync (real DB)', () => {
     const request = new NextRequest('http://localhost/api/sync', {
       method: 'POST',
       body: JSON.stringify({
-        json: {
-          [`${TEST_PREFIX}data.json`]: { tasks: [{ id: 'test-1', title: 'Test task' }] }
-        }
+        json: { [`${TEST_PREFIX}data.json`]: { tasks: [{ id: 'test-1', title: 'Test task' }] } }
       }),
     });
 
-    const response = await POST(request);
+    const response = await syncPost(request);
     const data = await response.json();
 
     expect(response.status).toBe(200);
     expect(data.synced).toContain(`json: ${TEST_PREFIX}data.json`);
 
     // Verify it's readable
-    const { loadJSON } = require('@/lib/storage');
     const loaded = await loadJSON(`${TEST_PREFIX}data.json`, {});
     expect(loaded.tasks[0].title).toBe('Test task');
   });
@@ -353,7 +324,7 @@ describe('/api/sync (real DB)', () => {
       }),
     });
 
-    const response = await POST(request);
+    const response = await syncPost(request);
     const data = await response.json();
 
     expect(data.synced.length).toBe(2);
@@ -363,11 +334,8 @@ describe('/api/sync (real DB)', () => {
 // --- Workspace API tests ---
 
 describe('/api/workspace (real DB)', () => {
-  const { GET } = require('@/app/api/workspace/route');
-
   it('should return initiatives and scorecard', async () => {
     // Seed test data first
-    const { saveText } = require('@/lib/storage');
     await saveText('INITIATIVES.md', `# INITIATIVES.md
 
 ## Current ranking (2026-03-22)
@@ -386,7 +354,7 @@ describe('/api/workspace (real DB)', () => {
 - Actual: 2.5
 `);
 
-    const response = await GET();
+    const response = await workspaceGet();
     const data = await response.json();
 
     expect(response.status).toBe(200);
