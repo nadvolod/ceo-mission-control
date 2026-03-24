@@ -54,7 +54,20 @@ jobs:
 
       - run: npm ci
 
-      - run: npm run test:coverage -- --ci --reporters=default
+      - name: Unit tests (mocked)
+        run: npx jest --ci --reporters=default --testPathIgnorePatterns='integration'
+        env:
+          CI: true
+
+      - name: Integration tests (real DB)
+        run: npx jest --ci --reporters=default --testPathPattern='integration'
+        env:
+          CI: true
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Coverage report
+        if: always()
+        run: npx jest --coverage --ci --reporters=default --testPathIgnorePatterns='integration'
         env:
           CI: true
 
