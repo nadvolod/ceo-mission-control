@@ -194,8 +194,7 @@ export default function HomePage() {
               Make sure the file exists and the app has access to your OpenClaw workspace.
             </p>
             <div className="mt-4 text-sm text-red-600">
-              <p>Expected path: /Users/nikolay/.openclaw/workspace/DAILY_SCORECARD.md</p>
-              <p>Development mode: {process.env.NODE_ENV}</p>
+              <p>Check that workspace data files are available.</p>
             </div>
           </div>
         </div>

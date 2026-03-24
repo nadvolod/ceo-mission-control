@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
-
-const WORKSPACE_PATH = process.env.NODE_ENV === 'development' 
-  ? '/Users/nikolay/.openclaw/workspace'
-  : '/app/workspace';
+import { WORKSPACE_PATH, ensureWorkspaceReady } from '@/lib/workspace-path';
 
 interface TemporalSession {
   id: string;
@@ -67,6 +64,7 @@ function updateDailyScorecard(date: string, newTotal: number): void {
 
 export async function GET() {
   try {
+    ensureWorkspaceReady();
     const data = loadTemporalData();
     
     return NextResponse.json({
@@ -85,6 +83,7 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    ensureWorkspaceReady();
     const body = await request.json();
     const { action, hours, description } = body;
 
