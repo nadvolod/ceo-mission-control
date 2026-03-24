@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readFileSync, writeFileSync } from 'fs';
-import { join } from 'path';
+import { readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { join, dirname } from 'path';
 
 const WORKSPACE_PATH = process.env.NODE_ENV === 'development' 
   ? '/Users/nikolay/.openclaw/workspace'
@@ -91,13 +91,20 @@ export async function POST(request: NextRequest) {
     const { action, hours, description } = body;
 
     if (action === 'addSession') {
+      if (typeof hours !== 'number' || !isFinite(hours) || hours <= 0 || hours > 24) {
+        return NextResponse.json(
+          { success: false, error: 'Hours must be a number between 0 and 24' },
+          { status: 400 }
+        );
+      }
+
       const data = loadTemporalData();
       const now = new Date();
       const today = now.toISOString().split('T')[0];
       
       // Create new session
       const session: TemporalSession = {
-        id: `temporal-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+        id: `temporal-${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
         startTime: new Date(now.getTime() - (hours * 60 * 60 * 1000)).toISOString(),
         endTime: now.toISOString(),
         duration: hours,
@@ -122,18 +129,19 @@ export async function POST(request: NextRequest) {
       // Also log to memory file
       try {
         const memoryPath = join(WORKSPACE_PATH, `memory/${today}.md`);
-        const timestamp = now.toLocaleTimeString([], { 
-          hour: '2-digit', 
-          minute: '2-digit', 
-          timeZone: 'America/New_York' 
+        mkdirSync(dirname(memoryPath), { recursive: true });
+        const timestamp = now.toLocaleTimeString([], {
+          hour: '2-digit',
+          minute: '2-digit',
+          timeZone: 'America/New_York'
         });
-        
-        const logEntry = `\n## Temporal Session Completed (${timestamp})\n- **Duration**: ${hours} hours\n- **Description**: ${description}\n- **Daily total**: ${newTotal} hours\n\n`;
-        
+
+        const logEntry = `\n## Temporal Session Completed (${timestamp})\n- **Duration**: ${session.duration} hours\n- **Description**: ${session.description}\n- **Daily total**: ${newTotal} hours\n\n`;
+
         try {
           const existingContent = readFileSync(memoryPath, 'utf8');
           writeFileSync(memoryPath, existingContent + logEntry);
-        } catch (error) {
+        } catch {
           // Create new memory file if it doesn't exist
           const newContent = `# Daily Memory - ${today}\n\n## Temporal Execution\n${logEntry}`;
           writeFileSync(memoryPath, newContent);

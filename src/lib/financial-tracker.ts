@@ -32,7 +32,10 @@ export interface FinancialData {
 }
 
 export class FinancialTracker {
-  private data: FinancialData;
+  private data: FinancialData = {
+    dailyMetrics: {},
+    lastUpdated: new Date().toISOString()
+  };
 
   constructor() {
     this.loadData();
@@ -72,7 +75,7 @@ export class FinancialTracker {
     const timestamp = new Date().toISOString();
     
     const entry: FinancialEntry = {
-      id: `${category}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      id: `${category}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
       amount,
       description,
       timestamp,

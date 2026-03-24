@@ -2,13 +2,12 @@
 
 import { TaskCommandCenter } from '@/components/TaskCommandCenter';
 import { ConversationTaskInput } from '@/components/ConversationTaskInput';
-import { FinancialCommandCenter } from '@/components/FinancialCommandCenter';
 import { FocusOptimization } from '@/components/FocusOptimization';
 import { MissionTracker } from '@/components/MissionTracker';
 import { FinancialMetricsDashboard } from '@/components/FinancialMetricsDashboard';
 import { TemporalTracker } from '@/components/TemporalTracker';
 // Removed import - will fetch via API instead
-import { Task, TaskStatus, ConversationExtraction } from '@/lib/types';
+import { Task, ConversationExtraction } from '@/lib/types';
 import { useState, useEffect } from 'react';
 
 export default function HomePage() {

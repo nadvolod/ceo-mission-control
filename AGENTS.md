@@ -3,3 +3,75 @@
 
 This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
 <!-- END:nextjs-agent-rules -->
+
+# AI Agent Operating Rules (Repo)
+
+Canonical source: <https://gist.github.com/nadvolod/6604ff221b057bf31860ac288ae162b9>
+
+The rules below are the authoritative local copy. Follow them exactly for every change and PR.
+
+---
+
+## Non-Negotiables (for every PR)
+
+1. **Behavior-first summary** – Provide a short "What changed" list focused on user-visible behavior and system contracts (UI, API, data, permissions).
+2. **User Flow Coverage** – For every feature or change, document:
+   1. Happy path
+   2. Failure paths (validation errors, permissions, network/offline, empty states, 404/500, timeouts)
+3. **Evidence** – Include at least one of: screenshot(s) for UI changes, short screen recording (10–45 s) showing the flow, or CLI output snippet for non-UI changes (commands + results).
+4. **Test Proof** – Tests must exist and must be runnable locally/CI. Provide: what tests you added/updated, the exact commands to run, and the result summary (pass/fail, coverage deltas if available).
+5. Act as an architect and review the PR for areas of weakness. Identify those clearly and prioritized.
+6. Act as a tester and identify all of the edge cases. Write tests. The majority of tests should be integration tests that make real DB and API calls with no mocking. Minority of tests should be unit tests. Should also have main use case e2e tests that exercise real functionality. It's better to clean up test data than mock.
+7. Code coverage must be measured and maintained.
+8. Must have thorough monitoring.
+9. Must include thorough logging.
+10. Never skip any tests if an env variable isn't configured. fail the tests with a clear error message.
+11. Push every feature into a PR and then wait for review from Copilot or Coderabbit, implement their feedback when it makes sense.
+12. Deploy on Vercel has to be tested and working.
+
+---
+
+## Versioning
+
+- App version lives in `v2/package.json` and is injected at build time via `next.config.ts`
+- **Patch versions** auto-bump on every merge to main that touches `v2/**` (`.github/workflows/v2-version-bump.yml`)
+- **Minor/major bumps**: manually update `v2/package.json` version in your PR
+- Version is visible at `/api/health` endpoint and on the test dashboard
+- Convention: patch = bug fixes & small changes, minor = new features, major = breaking changes
+
+---
+
+### Common pitfalls
+
+- **Email notifications** are the biggest pain point — flaky and hard to test. Always cover email delivery failures explicitly.
+- **Update the /test page** whenever you add or change a testable endpoint so manual QA stays easy.
+
+---
+
+## PR Checklist (v2) — MANDATORY
+
+> **CI will fail** if these items are missing or unchecked in the PR description.
+> The `pr-checklist` job in `.github/workflows/v2-pr-checklist.yml` scans the PR body
+> for each line below. Every item **must** appear with `[x]` (checked).
+>
+> Copy the block below **verbatim** into every PR description and check each item:
+
+```markdown
+## PR Checklist (v2)
+
+- [x] Was canonical Agents.md followed?
+<!-- CI matches "Agents.md" (title-case) — keep this exact casing even though the file is AGENTS.md -->
+- [x] Was code coverage report included?
+- [x] Was a behavior-first summary provided?
+- [x] Were all user flows documented (happy path + failure paths)?
+- [x] Was evidence included (screenshot, recording, or CLI output)?
+- [x] Was an architectural review completed (areas of weakness identified)?
+- [x] Were edge cases identified and tested?
+- [x] Was monitoring and logging addressed?
+```
+
+### If CI fails on the PR Checklist job
+
+1. Read the workflow log to identify which checklist items are missing or unchecked.
+2. Edit the PR description to add / check the missing items.
+3. The workflow triggers on PR description edits (`edited` event), so updating the description is enough to re-run CI. If it doesn't re-trigger, push a new commit or manually re-run the workflow.

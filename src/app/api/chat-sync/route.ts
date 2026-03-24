@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error in chat sync:', error);
     return NextResponse.json(
-      { error: 'Failed to sync chat update', details: error.message },
+      { success: false, error: 'Failed to sync chat update' },
       { status: 500 }
     );
   }

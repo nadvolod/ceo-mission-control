@@ -1,10 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FinancialTracker } from '@/lib/financial-tracker';
 
-const financialTracker = new FinancialTracker();
-
 export async function GET() {
   try {
+    const financialTracker = new FinancialTracker();
     const todaysMetrics = financialTracker.getTodaysMetrics();
     const weeklyTotals = financialTracker.getWeeklyTotals();
     const monthlyTotals = financialTracker.getMonthlyTotals();
@@ -28,35 +27,42 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
+    const financialTracker = new FinancialTracker();
     const body = await request.json();
     const { action, ...data } = body;
 
     switch (action) {
-      case 'addEntry':
+      case 'addEntry': {
         const { category, amount, description, date } = data;
         const entry = financialTracker.addEntry(category, amount, description, date);
         return NextResponse.json({ entry });
+      }
 
-      case 'processMessage':
+      case 'processMessage': {
         const { message } = data;
         const result = financialTracker.processConversationalUpdate(message);
         return NextResponse.json(result);
+      }
 
-      case 'getTodaysMetrics':
+      case 'getTodaysMetrics': {
         const todaysMetrics = financialTracker.getTodaysMetrics();
         return NextResponse.json({ todaysMetrics });
+      }
 
-      case 'getWeeklyTotals':
+      case 'getWeeklyTotals': {
         const weeklyTotals = financialTracker.getWeeklyTotals();
         return NextResponse.json({ weeklyTotals });
+      }
 
-      case 'getMonthlyTotals':
+      case 'getMonthlyTotals': {
         const monthlyTotals = financialTracker.getMonthlyTotals();
         return NextResponse.json({ monthlyTotals });
+      }
 
-      case 'getAllData':
+      case 'getAllData': {
         const allData = financialTracker.getAllData();
         return NextResponse.json({ data: allData });
+      }
 
       default:
         return NextResponse.json(

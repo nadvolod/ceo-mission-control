@@ -17,24 +17,7 @@ export class ChatSyncManager {
     // Process financial metrics first
     const financialResult = this.financialTracker.processConversationalUpdate(message);
     
-    // Enhanced pattern matching for status updates
-    const patterns = {
-      completed: [
-        /(?:done|completed|finished)\s*:?\s*([^.]+?)(?:\s*[-–]\s*(.+?))?(?:\.|$)/gi,
-        /(?:completed|finished|done)\s+(.+?)(?:\.|$)/gi
-      ],
-      inProgress: [
-        /(?:in progress|started|working on)\s*:?\s*([^.]+?)(?:\s*[-–]\s*(.+?))?(?:\.|$)/gi,
-        /(?:started|began)\s+(.+?)(?:\.|$)/gi
-      ],
-      blocked: [
-        /(?:blocked|waiting)\s*:?\s*([^.]+?)(?:\s*[-–]\s*(.+?))?(?:\.|$)/gi,
-        /blocked on\s+(.+?)(?:\.|$)/gi
-      ]
-    };
-
     const updates: any[] = [];
-    const tasks = this.taskManager.getTasks();
     
     // Check for "Done: TASK_NAME" pattern
     const doneMatches = message.match(/Done\s*:?\s*([^.]+?)(?:\s*[-–]\s*(.+?))?(?:\.|$)/gi);

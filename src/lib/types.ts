@@ -90,6 +90,7 @@ export interface ConversationExtraction {
   deadlines: { task: string; date: string; }[];
   statusUpdates: { taskId: string; status: TaskStatus; note?: string; }[];
   blockers: { taskId: string; reason: string; }[];
+  financial?: { added: { id: string; amount: number; description: string; category: string }[]; message: string } | null;
 }
 
 export interface TemporalSession {

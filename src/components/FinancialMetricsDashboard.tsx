@@ -1,7 +1,25 @@
 'use client';
 
 import { DollarSign, TrendingUp, Scissors, Calculator, ArrowUp, ArrowDown } from 'lucide-react';
-import { FinancialEntry, DailyFinancialMetrics } from '@/lib/financial-tracker';
+
+interface FinancialEntry {
+  id: string;
+  amount: number;
+  description: string;
+  timestamp: string;
+  category: 'moved' | 'generated' | 'cut';
+}
+
+interface DailyFinancialMetrics {
+  date: string;
+  entries: FinancialEntry[];
+  totals: {
+    moved: number;
+    generated: number;
+    cut: number;
+    netImpact: number;
+  };
+}
 
 interface FinancialMetricsDashboardProps {
   todaysMetrics: DailyFinancialMetrics;
