@@ -1,7 +1,7 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { BrainCog, Compass, Clock, Zap } from 'lucide-react';
+import { BrainCog, Compass, Clock, Zap, Users, DollarSign } from 'lucide-react';
 
 const pains = [
   {
@@ -19,16 +19,30 @@ const pains = [
     glow: 'rgba(59, 130, 246, 0.06)',
   },
   {
-    icon: Clock,
-    title: "Can't Measure What Matters",
-    description: 'You work 60-hour weeks but can\'t tell where the hours go. Or which ones actually moved the needle.',
+    icon: Users,
+    title: 'Blind to Team Performance',
+    description: 'You delegate but lose track. Who\'s delivering? Who\'s blocked? You find out in standup — three days too late.',
+    color: 'text-orange-400',
+    glow: 'rgba(251, 146, 60, 0.06)',
+  },
+  {
+    icon: DollarSign,
+    title: 'Cash Metrics in Spreadsheets',
+    description: 'Revenue, burn rate, runway, and pipeline live in 4 different spreadsheets. You check them once a week — if you remember.',
     color: 'text-emerald-400',
     glow: 'rgba(52, 211, 153, 0.06)',
   },
   {
+    icon: Clock,
+    title: "Can't Measure Operational Efficiency",
+    description: 'No idea what your operations actually cost per outcome. Bottlenecks hide until they\'re already on fire.',
+    color: 'text-teal-400',
+    glow: 'rgba(20, 184, 166, 0.06)',
+  },
+  {
     icon: Zap,
     title: 'Decision Fatigue by 2 PM',
-    description: '50 things competing for attention. No ranking system. You\'re the bottleneck in your own company.',
+    description: '50 things competing for attention. No AI-powered ranking. You\'re the bottleneck in your own company.',
     color: 'text-amber-400',
     glow: 'rgba(251, 191, 36, 0.06)',
   },
@@ -51,7 +65,7 @@ export function PainPointsSection() {
           </h2>
         </motion.div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {pains.map((pain, i) => (
             <motion.div
               key={pain.title}
