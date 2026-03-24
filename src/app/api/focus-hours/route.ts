@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
 
         if (typeof hours !== 'number' || !isFinite(hours) || hours <= 0 || hours > 24) {
           return NextResponse.json(
-            { success: false, error: 'Hours must be a number between 0 and 24' },
+            { success: false, error: 'Hours must be a number greater than 0 and at most 24' },
             { status: 400 }
           );
         }

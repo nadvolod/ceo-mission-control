@@ -61,22 +61,22 @@ describe('FocusTracker', () => {
 
     it('should reject invalid hours (negative)', () => {
       const tracker = new FocusTracker();
-      expect(() => tracker.addSession('Temporal', -1, 'test')).toThrow('Hours must be a number between 0 and 24');
+      expect(() => tracker.addSession('Temporal', -1, 'test')).toThrow('Hours must be a number greater than 0 and at most 24');
     });
 
     it('should reject invalid hours (zero)', () => {
       const tracker = new FocusTracker();
-      expect(() => tracker.addSession('Temporal', 0, 'test')).toThrow('Hours must be a number between 0 and 24');
+      expect(() => tracker.addSession('Temporal', 0, 'test')).toThrow('Hours must be a number greater than 0 and at most 24');
     });
 
     it('should reject invalid hours (> 24)', () => {
       const tracker = new FocusTracker();
-      expect(() => tracker.addSession('Temporal', 25, 'test')).toThrow('Hours must be a number between 0 and 24');
+      expect(() => tracker.addSession('Temporal', 25, 'test')).toThrow('Hours must be a number greater than 0 and at most 24');
     });
 
     it('should reject NaN hours', () => {
       const tracker = new FocusTracker();
-      expect(() => tracker.addSession('Temporal', NaN, 'test')).toThrow('Hours must be a number between 0 and 24');
+      expect(() => tracker.addSession('Temporal', NaN, 'test')).toThrow('Hours must be a number greater than 0 and at most 24');
     });
 
     it('should default unknown category to Other', () => {

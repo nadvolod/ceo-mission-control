@@ -43,8 +43,10 @@ export default function HomePage() {
 
       // Load focus hours data
       const focusResponse = await fetch('/api/focus-hours');
-      const focusDataResult = await focusResponse.json();
-      setFocusData(focusDataResult);
+      if (focusResponse.ok) {
+        const focusDataResult = await focusResponse.json();
+        setFocusData(focusDataResult);
+      }
 
       setLastRefresh(new Date());
     } catch (error) {
@@ -99,19 +101,31 @@ export default function HomePage() {
 
       if (response.ok) {
         const data = await response.json();
-        
+
+        // Process focus hours from the same message
+        const focusResponse = await fetch('/api/focus-hours', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'processMessage',
+            message
+          })
+        });
+        const focusResult = focusResponse.ok ? await focusResponse.json() : null;
+
         // Refresh all data to include new tasks and financial updates
         await loadAllData();
-        
+
         return {
           tasks: data.created || [],
           extraction: {
             ...data.extraction || { tasks: [], deadlines: [], statusUpdates: [], blockers: [] },
-            financial: data.financial || null
+            financial: data.financial || null,
+            focusHours: focusResult || null
           }
         };
       }
-      
+
       throw new Error('Failed to process message');
     } catch (error) {
       console.error('Error processing conversation:', error);
@@ -132,9 +146,12 @@ export default function HomePage() {
         })
       });
 
-      if (response.ok) {
-        await loadAllData();
+      if (!response.ok) {
+        const errorBody = await response.json().catch(() => ({}));
+        throw new Error(errorBody.error || 'Failed to add focus session');
       }
+
+      await loadAllData();
     } catch (error) {
       console.error('Error adding focus session:', error);
     }

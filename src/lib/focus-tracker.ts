@@ -90,7 +90,7 @@ export class FocusTracker {
     source: 'manual' | 'conversational' | 'temporal-sync' = 'manual'
   ): FocusSession {
     if (typeof hours !== 'number' || !isFinite(hours) || hours <= 0 || hours > 24) {
-      throw new Error('Hours must be a number between 0 and 24');
+      throw new Error('Hours must be a number greater than 0 and at most 24');
     }
 
     if (!VALID_CATEGORIES.includes(category)) {
@@ -165,7 +165,7 @@ export class FocusTracker {
     const now = new Date();
     const thisWeekStart = startOfWeek(now, { weekStartsOn: 1 });
     const prevWeekStart = subWeeks(thisWeekStart, 1);
-    return this.getTotalsForPeriod(prevWeekStart, thisWeekStart);
+    return this.getTotalsForPeriod(prevWeekStart, subDays(thisWeekStart, 1));
   }
 
   private getTotalsForPeriod(start: Date, end: Date): Record<string, number> {
