@@ -4,7 +4,7 @@ import { chatSyncManager } from '@/lib/chat-sync';
 export async function POST(request: NextRequest) {
   try {
     const { message } = await request.json();
-    
+
     if (!message) {
       return NextResponse.json(
         { error: 'Message is required' },
@@ -13,21 +13,22 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('Processing chat sync for message:', message);
-    
+
     const result = await chatSyncManager.syncChatUpdate(message);
-    
+
     return NextResponse.json({
       success: true,
       updated: result.updated,
       created: result.created,
       financial: result.financial,
-      message: `Updated ${result.updated.length} tasks, created ${result.created.length} tasks${result.financial?.added?.length ? `, tracked ${result.financial.added.length} financial entries` : ''}`
+      focusHours: result.focusHours,
+      message: `Updated ${result.updated.length} tasks, created ${result.created.length} tasks${result.financial?.added?.length ? `, tracked ${result.financial.added.length} financial entries` : ''}${result.focusHours?.added?.length ? `, logged ${result.focusHours.added.length} focus session(s)` : ''}`
     });
-    
+
   } catch (error) {
     console.error('Error in chat sync:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to sync chat update' },
+      { success: false, error: 'Failed to sync chat update', details: (error as Error).message },
       { status: 500 }
     );
   }
