@@ -17,12 +17,19 @@
   - Outcome: Sent to Angela for review
   - Next steps: Approval pipeline (Clair, Jason, Baker)
 
-## In Progress - HIGH PRIORITY
-- NEXUS TUTORIAL RELEASE - Tutorial and messaging updates (NEW)
-  - Status: HIGH PRIORITY - Just identified from Mike Nichols meeting
-  - Subtasks: Tutorial content updates + messaging revisions
-  - Context: Meeting with Mike Nichols (Temporal) 12:47 PM
-  - Revenue impact: Supports Temporal contract deliverables
+## Pending External Decision
+- AI UNIVERSITY PROPOSAL - Angela meeting update (4:24 PM)
+  - Status: PENDING - Reached out to Angie Jones for decision
+  - Context: Waiting on Angie Jones response
+  - No immediate action required
+
+## In Progress - MAJOR PRIORITY
+- NEXUS TUTORIAL RELEASE - HUGE TASK confirmed (Angela meeting 4:24 PM)
+  - Status: MAJOR EXECUTION PRIORITY
+  - Tomorrow: 2-hour coding session with Angela to finalize feedback
+  - Scope: Confirmed as massive undertaking
+  - Context: Mike Nichols meeting (12:47 PM) + Angela update (4:24 PM)
+  - Revenue impact: Major Temporal contract deliverable
 
 - TEMPORAL FY27 STRATEGIC DOCUMENT REVIEW - Critical reading task
   - Status: CRITICAL & IN PROGRESS - Added to queue
