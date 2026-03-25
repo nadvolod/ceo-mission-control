@@ -32,18 +32,32 @@ function getHeaders(): Record<string, string> {
 }
 
 function readLocalTasks(): { tasks: unknown[] } {
-  if (!existsSync(TASKS_FILE)) {
+  try {
+    if (!existsSync(TASKS_FILE)) {
+      return { tasks: [] };
+    }
+    const content = readFileSync(TASKS_FILE, 'utf8');
+    const data = JSON.parse(content);
+    return { tasks: data.tasks || [] };
+  } catch (err) {
+    console.error(`Failed to read ${TASKS_FILE}:`, err);
     return { tasks: [] };
   }
-  const content = readFileSync(TASKS_FILE, 'utf8');
-  const data = JSON.parse(content);
-  return { tasks: data.tasks || [] };
 }
 
 function writeLocalTasks(tasks: unknown[]): void {
-  const data = JSON.parse(existsSync(TASKS_FILE) ? readFileSync(TASKS_FILE, 'utf8') : '{}');
-  data.tasks = tasks;
-  writeFileSync(TASKS_FILE, JSON.stringify(data, null, 2));
+  try {
+    const data = JSON.parse(existsSync(TASKS_FILE) ? readFileSync(TASKS_FILE, 'utf8') : '{}');
+    data.tasks = tasks;
+    writeFileSync(TASKS_FILE, JSON.stringify(data, null, 2));
+  } catch (err) {
+    console.error(`Failed to write ${TASKS_FILE}:`, err);
+    throw err;
+  }
+}
+
+function errorText(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 const server = new McpServer({
@@ -65,24 +79,28 @@ server.tool(
       return { content: [{ type: 'text' as const, text: 'No local tasks found in ' + TASKS_FILE }] };
     }
 
-    const response = await fetch(`${DASHBOARD_URL}/api/sync-tasks`, {
-      method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify({ action: 'push', tasks: local.tasks }),
-    });
+    try {
+      const response = await fetch(`${DASHBOARD_URL}/api/sync-tasks`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ action: 'push', tasks: local.tasks }),
+      });
 
-    if (!response.ok) {
-      const err = await response.text();
-      return { content: [{ type: 'text' as const, text: `Push failed (${response.status}): ${err}` }] };
+      if (!response.ok) {
+        const err = await response.text();
+        return { content: [{ type: 'text' as const, text: `Push failed (${response.status}): ${err}` }] };
+      }
+
+      const result = await response.json();
+      return {
+        content: [{
+          type: 'text' as const,
+          text: `Pushed ${result.pushed} tasks → ${result.merged} total in production. Synced at ${result.timestamp}`,
+        }],
+      };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: `Push failed (network): ${errorText(err)}` }] };
     }
-
-    const result = await response.json();
-    return {
-      content: [{
-        type: 'text' as const,
-        text: `Pushed ${result.pushed} tasks → ${result.merged} total in production. Synced at ${result.timestamp}`,
-      }],
-    };
   }
 );
 
@@ -95,27 +113,31 @@ server.tool(
       return { content: [{ type: 'text' as const, text: 'Error: DASHBOARD_URL not configured' }] };
     }
 
-    const response = await fetch(`${DASHBOARD_URL}/api/sync-tasks`, {
-      method: 'POST',
-      headers: getHeaders(),
-      body: JSON.stringify({ action: 'pull' }),
-    });
+    try {
+      const response = await fetch(`${DASHBOARD_URL}/api/sync-tasks`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ action: 'pull' }),
+      });
 
-    if (!response.ok) {
-      const err = await response.text();
-      return { content: [{ type: 'text' as const, text: `Pull failed (${response.status}): ${err}` }] };
+      if (!response.ok) {
+        const err = await response.text();
+        return { content: [{ type: 'text' as const, text: `Pull failed (${response.status}): ${err}` }] };
+      }
+
+      const result = await response.json();
+      const tasks = result.tasks || [];
+      writeLocalTasks(tasks);
+
+      return {
+        content: [{
+          type: 'text' as const,
+          text: `Pulled ${tasks.length} tasks → written to ${TASKS_FILE}`,
+        }],
+      };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: `Pull failed: ${errorText(err)}` }] };
     }
-
-    const result = await response.json();
-    const tasks = result.tasks || [];
-    writeLocalTasks(tasks);
-
-    return {
-      content: [{
-        type: 'text' as const,
-        text: `Pulled ${tasks.length} tasks → written to ${TASKS_FILE}`,
-      }],
-    };
   }
 );
 
@@ -130,36 +152,40 @@ server.tool(
       return { content: [{ type: 'text' as const, text: 'Error: DASHBOARD_URL not configured' }] };
     }
 
-    const response = await fetch(`${DASHBOARD_URL}/api/sync-tasks`, {
-      headers: getHeaders(),
-    });
+    try {
+      const response = await fetch(`${DASHBOARD_URL}/api/sync-tasks`, {
+        headers: getHeaders(),
+      });
 
-    if (!response.ok) {
-      const err = await response.text();
-      return { content: [{ type: 'text' as const, text: `List failed (${response.status}): ${err}` }] };
+      if (!response.ok) {
+        const err = await response.text();
+        return { content: [{ type: 'text' as const, text: `List failed (${response.status}): ${err}` }] };
+      }
+
+      const data = await response.json();
+      let tasks = data.tasks || [];
+
+      if (status && status !== 'all') {
+        tasks = tasks.filter((t: { status: string }) => t.status === status);
+      }
+
+      if (tasks.length === 0) {
+        return { content: [{ type: 'text' as const, text: 'No synced tasks found.' }] };
+      }
+
+      const summary = tasks.map((t: { title: string; status: string; priority: string; category: string | null }) =>
+        `- [${t.status}] ${t.title} (${t.priority}${t.category ? ', ' + t.category : ''})`
+      ).join('\n');
+
+      return {
+        content: [{
+          type: 'text' as const,
+          text: `${tasks.length} synced tasks:\n\n${summary}`,
+        }],
+      };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: `List failed: ${errorText(err)}` }] };
     }
-
-    const data = await response.json();
-    let tasks = data.tasks || [];
-
-    if (status && status !== 'all') {
-      tasks = tasks.filter((t: { status: string }) => t.status === status);
-    }
-
-    if (tasks.length === 0) {
-      return { content: [{ type: 'text' as const, text: 'No synced tasks found.' }] };
-    }
-
-    const summary = tasks.map((t: { title: string; status: string; priority: string; category: string | null }) =>
-      `- [${t.status}] ${t.title} (${t.priority}${t.category ? ', ' + t.category : ''})`
-    ).join('\n');
-
-    return {
-      content: [{
-        type: 'text' as const,
-        text: `${tasks.length} synced tasks:\n\n${summary}`,
-      }],
-    };
   }
 );
 
