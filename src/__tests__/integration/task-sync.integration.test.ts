@@ -47,9 +47,11 @@ afterAll(async () => {
 
 function makeRequest(method: string, body?: unknown, headers?: Record<string, string>): NextRequest {
   const url = 'http://localhost:3000/api/sync-tasks';
-  const init: RequestInit = { method, headers: { 'Content-Type': 'application/json', ...headers } };
-  if (body) init.body = JSON.stringify(body);
-  return new NextRequest(url, init);
+  return new NextRequest(url, {
+    method,
+    headers: { 'Content-Type': 'application/json', ...headers },
+    body: body ? JSON.stringify(body) : undefined,
+  });
 }
 
 function makeLocalTask(id: string, overrides: Partial<LocalTask> = {}): LocalTask {
