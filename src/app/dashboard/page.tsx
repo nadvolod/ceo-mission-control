@@ -17,6 +17,7 @@ export default function HomePage() {
   const [financialData, setFinancialData] = useState<any>(null);
   const [focusData, setFocusData] = useState<any>(null);
   const [monarchData, setMonarchData] = useState<MonarchFinancialSnapshot | null>(null);
+  const [monarchError, setMonarchError] = useState<string | null>(null);
   const [monarchLoading, setMonarchLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
@@ -60,11 +61,12 @@ export default function HomePage() {
 
       // Load Monarch financial data
       const monarchResponse = await fetch('/api/monarch');
-      if (monarchResponse.ok) {
-        const monarchResult = await monarchResponse.json();
-        if (!monarchResult.error) {
-          setMonarchData(monarchResult);
-        }
+      const monarchResult = await monarchResponse.json().catch(() => null);
+      if (monarchResult?.error) {
+        setMonarchError(monarchResult.error);
+      } else if (monarchResult) {
+        setMonarchData(monarchResult);
+        setMonarchError(null);
       }
 
       setLastRefresh(new Date());
@@ -118,11 +120,12 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'refresh' }),
       });
-      if (response.ok) {
-        const result = await response.json();
-        if (!result.error) {
-          setMonarchData(result);
-        }
+      const result = await response.json().catch(() => null);
+      if (result?.error) {
+        setMonarchError(result.error);
+      } else if (result) {
+        setMonarchData(result);
+        setMonarchError(null);
       }
     } catch (error) {
       console.error('Error refreshing Monarch data:', error);
@@ -234,6 +237,7 @@ export default function HomePage() {
             snapshot={monarchData}
             isLoading={monarchLoading}
             onRefresh={handleMonarchRefresh}
+            error={monarchError}
           />
         </div>
 

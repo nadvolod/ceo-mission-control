@@ -44,9 +44,10 @@ export function buildSnapshot(
 
   const monthlyIncome = cashflowSummary.sumIncome;
   const monthlyExpenses = Math.abs(cashflowSummary.sumExpense);
-  const burnRate = monthlyExpenses;
-  // Use -1 sentinel for "infinite" runway since JSON.stringify(Infinity) → null
-  const rawRunway = burnRate > 0 ? cashPosition / burnRate : -1;
+  // Net burn = expenses minus income (0 if profitable)
+  const burnRate = Math.max(monthlyExpenses - monthlyIncome, 0);
+  // Use -1 sentinel for "infinite/no burn" since JSON.stringify(Infinity) → null
+  const rawRunway = burnRate > 0 ? Math.max(cashPosition / burnRate, 0) : -1;
   const runwayMonths = Number.isFinite(rawRunway) ? rawRunway : -1;
 
   return {

@@ -73,19 +73,31 @@ describe('buildSnapshot', () => {
     expect(result.netWorth).toBe(7000);
   });
 
-  it('computes runway as cashPosition / burnRate', () => {
+  it('computes runway from net burn (expenses - income)', () => {
     const accounts = [makeAccount({ currentBalance: 10000 })];
-    const cashflow = makeCashflow({ sumExpense: -5000 });
+    const cashflow = makeCashflow({ sumIncome: 3000, sumExpense: -5000 });
 
     const result = buildSnapshot(accounts, cashflow);
 
-    expect(result.burnRate).toBe(5000);
-    expect(result.runwayMonths).toBe(2);
+    // Net burn = 5000 - 3000 = 2000
+    expect(result.burnRate).toBe(2000);
+    expect(result.runwayMonths).toBe(5); // 10000 / 2000
+  });
+
+  it('returns -1 runway sentinel when profitable (no net burn)', () => {
+    const accounts = [makeAccount({ currentBalance: 10000 })];
+    const cashflow = makeCashflow({ sumIncome: 8000, sumExpense: -5000 });
+
+    const result = buildSnapshot(accounts, cashflow);
+
+    // Net burn = max(5000 - 8000, 0) = 0 → profitable
+    expect(result.burnRate).toBe(0);
+    expect(result.runwayMonths).toBe(-1);
   });
 
   it('returns -1 runway sentinel when expenses are zero', () => {
     const accounts = [makeAccount({ currentBalance: 10000 })];
-    const cashflow = makeCashflow({ sumExpense: 0 });
+    const cashflow = makeCashflow({ sumIncome: 8000, sumExpense: 0 });
 
     const result = buildSnapshot(accounts, cashflow);
 
@@ -139,12 +151,21 @@ describe('buildSnapshot', () => {
   });
 
   it('handles empty accounts array', () => {
+    // With default cashflow (income 8000, expense -5000), net burn = 0 (profitable)
     const result = buildSnapshot([], makeCashflow());
 
     expect(result.cashPosition).toBe(0);
     expect(result.totalAssets).toBe(0);
     expect(result.totalLiabilities).toBe(0);
     expect(result.netWorth).toBe(0);
+    expect(result.runwayMonths).toBe(-1); // profitable = no burn
+  });
+
+  it('handles zero cash with net burn', () => {
+    // Income 0, expense -5000 → net burn = 5000, cash = 0 → runway = 0
+    const result = buildSnapshot([], makeCashflow({ sumIncome: 0, sumExpense: -5000 }));
+
+    expect(result.cashPosition).toBe(0);
     expect(result.runwayMonths).toBe(0);
   });
 

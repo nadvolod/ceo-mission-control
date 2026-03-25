@@ -7,6 +7,7 @@ interface FinancialCommandCenterProps {
   snapshot: MonarchFinancialSnapshot | null;
   isLoading: boolean;
   onRefresh: () => void;
+  error?: string | null;
 }
 
 function formatCurrency(amount: number): string {
@@ -20,7 +21,7 @@ function formatCurrency(amount: number): string {
 }
 
 function formatRunway(months: number): string {
-  if (months < 0) return 'N/A'; // -1 sentinel = infinite/no burn
+  if (months < 0) return 'No burn'; // -1 sentinel = profitable/no net burn
   if (months >= 12) return `${(months / 12).toFixed(1)} years`;
   return `${months.toFixed(1)} months`;
 }
@@ -45,7 +46,7 @@ function timeSince(dateStr: string): string {
   return `${Math.floor(hours / 24)}d ago`;
 }
 
-export function FinancialCommandCenter({ snapshot, isLoading, onRefresh }: FinancialCommandCenterProps) {
+export function FinancialCommandCenter({ snapshot, isLoading, onRefresh, error }: FinancialCommandCenterProps) {
   if (isLoading && !snapshot) {
     return (
       <div className="bg-white rounded-lg shadow-lg p-6">
@@ -65,10 +66,12 @@ export function FinancialCommandCenter({ snapshot, isLoading, onRefresh }: Finan
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="h-5 w-5 text-yellow-600" />
-            <span className="font-medium text-yellow-800">Monarch Money Not Connected</span>
+            <span className="font-medium text-yellow-800">
+              {error ? 'Monarch Money Error' : 'Monarch Money Not Connected'}
+            </span>
           </div>
           <p className="text-sm text-yellow-700">
-            Set the <code className="bg-yellow-100 px-1 rounded">MONARCH_TOKEN</code> environment variable to connect your financial accounts.
+            {error || 'Set the MONARCH_TOKEN environment variable to connect your financial accounts.'}
           </p>
         </div>
       </div>
@@ -207,7 +210,7 @@ export function FinancialCommandCenter({ snapshot, isLoading, onRefresh }: Finan
                     className="h-2 rounded-full bg-green-500"
                     style={{
                       width: `${Math.min(
-                        (snapshot.monthlyIncome / Math.max(snapshot.monthlyIncome, snapshot.monthlyExpenses)) * 100,
+                        (snapshot.monthlyIncome / Math.max(snapshot.monthlyIncome, snapshot.monthlyExpenses, 1)) * 100,
                         100
                       )}%`
                     }}
@@ -224,7 +227,7 @@ export function FinancialCommandCenter({ snapshot, isLoading, onRefresh }: Finan
                     className="h-2 rounded-full bg-red-400"
                     style={{
                       width: `${Math.min(
-                        (snapshot.monthlyExpenses / Math.max(snapshot.monthlyIncome, snapshot.monthlyExpenses)) * 100,
+                        (snapshot.monthlyExpenses / Math.max(snapshot.monthlyIncome, snapshot.monthlyExpenses, 1)) * 100,
                         100
                       )}%`
                     }}

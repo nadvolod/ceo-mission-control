@@ -14,9 +14,10 @@
 import assert from 'node:assert/strict';
 import { fetchAccounts, fetchCashflowSummary } from '../src/lib/monarch-client';
 import { getFinancialSnapshot, getCachedSnapshot, buildSnapshot } from '../src/lib/monarch-service';
-import { saveJSON } from '../src/lib/storage';
+import { loadJSON, saveJSON } from '../src/lib/storage';
 
 const CACHE_KEY = 'monarch-financial-data.json';
+let savedCacheData: unknown = null;
 
 // --- Helpers ---
 
@@ -58,6 +59,9 @@ if (!process.env.DATABASE_URL) {
 // --- Tests ---
 
 async function run() {
+  // Snapshot existing cache before tests mutate it
+  savedCacheData = await loadJSON(CACHE_KEY, null);
+
   console.log('\nMonarchClient\n');
 
   await test('fetches accounts with expected fields', async () => {
@@ -177,9 +181,13 @@ async function run() {
     );
   });
 
-  // --- Cleanup ---
+  // --- Cleanup: restore original cache ---
   try {
-    await saveJSON(CACHE_KEY, null);
+    if (savedCacheData) {
+      await saveJSON(CACHE_KEY, savedCacheData);
+    } else {
+      await saveJSON(CACHE_KEY, null);
+    }
   } catch {
     // Ignore
   }
