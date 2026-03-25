@@ -10,7 +10,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:monarch": "npx tsx src/__tests__/integration/monarch.integration.test.ts"
+    "test:monarch": "npx tsx tests/monarch.integration.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.0.2",

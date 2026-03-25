@@ -5,16 +5,16 @@
  * Requires MONARCH_TOKEN and DATABASE_URL environment variables.
  *
  * Run with tsx (NOT Jest) since monarch-money-api is ESM-only:
- *   npx tsx src/__tests__/integration/monarch.integration.test.ts
+ *   npx tsx tests/monarch.integration.ts
  *
  * Or via npm script:
  *   npm run test:monarch
  */
 
 import assert from 'node:assert/strict';
-import { fetchAccounts, fetchCashflowSummary } from '../../lib/monarch-client';
-import { getFinancialSnapshot, getCachedSnapshot, buildSnapshot } from '../../lib/monarch-service';
-import { saveJSON } from '../../lib/storage';
+import { fetchAccounts, fetchCashflowSummary } from '../src/lib/monarch-client';
+import { getFinancialSnapshot, getCachedSnapshot, buildSnapshot } from '../src/lib/monarch-service';
+import { saveJSON } from '../src/lib/storage';
 
 const CACHE_KEY = 'monarch-financial-data.json';
 
