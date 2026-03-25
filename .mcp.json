@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "task-sync": {
+      "command": "npx",
+      "args": ["tsx", "mcp/task-sync-server.ts"],
+      "env": {
+        "DASHBOARD_URL": "",
+        "SYNC_API_KEY": "",
+        "WORKSPACE_PATH": ""
+      }
+    }
+  }
+}

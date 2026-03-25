@@ -126,3 +126,51 @@ export interface TemporalData {
   sessions: TemporalSession[];
   dailyTotals: Record<string, number>;
 }
+
+// Task sync types — bidirectional sync between local OpenClaw and production dashboard
+
+export interface LocalTask {
+  id: string;
+  title: string;
+  description?: string;
+  status: string;
+  priority: string;
+  projectId?: string;
+  tags?: string[];
+  missionRelevance?: string;
+  monthlyRevenueImpact?: number;
+  estimatedHours?: number;
+  deadline?: string;
+  dueDate?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  aiLeverageScore?: number;
+  timeLogged?: Array<{ date: string; minutes: number; note: string }>;
+  cronJobId?: string;
+  schedule?: string;
+}
+
+export interface SyncedTask {
+  localId: string;
+  title: string;
+  description: string | null;
+  status: 'todo' | 'doing' | 'done';
+  priority: string;
+  category: string | null;
+  tags: string[];
+  dueDate: string | null;
+  monetaryValue: number | null;
+  missionRelevance: string | null;
+  estimatedHours: number | null;
+  createdAt: string;
+  updatedAt: string;
+  source: 'local' | 'dashboard';
+  extra: Record<string, unknown>;
+}
+
+export interface SyncResult {
+  pushed: number;
+  pulled: number;
+  merged: number;
+  timestamp: string;
+}
