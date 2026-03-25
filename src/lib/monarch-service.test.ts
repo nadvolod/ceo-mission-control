@@ -83,13 +83,13 @@ describe('buildSnapshot', () => {
     expect(result.runwayMonths).toBe(2);
   });
 
-  it('returns Infinity runway when expenses are zero', () => {
+  it('returns -1 runway sentinel when expenses are zero', () => {
     const accounts = [makeAccount({ currentBalance: 10000 })];
     const cashflow = makeCashflow({ sumExpense: 0 });
 
     const result = buildSnapshot(accounts, cashflow);
 
-    expect(result.runwayMonths).toBe(Infinity);
+    expect(result.runwayMonths).toBe(-1);
   });
 
   it('excludes hidden accounts', () => {

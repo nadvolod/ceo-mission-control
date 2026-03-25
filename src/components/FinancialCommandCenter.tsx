@@ -20,7 +20,7 @@ function formatCurrency(amount: number): string {
 }
 
 function formatRunway(months: number): string {
-  if (!isFinite(months)) return 'N/A';
+  if (months < 0) return 'N/A'; // -1 sentinel = infinite/no burn
   if (months >= 12) return `${(months / 12).toFixed(1)} years`;
   return `${months.toFixed(1)} months`;
 }
@@ -75,9 +75,10 @@ export function FinancialCommandCenter({ snapshot, isLoading, onRefresh }: Finan
     );
   }
 
-  const isStale = (Date.now() - new Date(snapshot.lastSynced).getTime()) > 60 * 60 * 1000;
-  const runwayColor = snapshot.runwayMonths < 3 ? 'text-red-600' : snapshot.runwayMonths < 6 ? 'text-yellow-600' : 'text-green-600';
-  const runwayBgColor = snapshot.runwayMonths < 3 ? 'bg-red-50' : snapshot.runwayMonths < 6 ? 'bg-yellow-50' : 'bg-green-50';
+  const isStale = (snapshot as any).stale === true;
+  const runwayPositive = snapshot.runwayMonths >= 0;
+  const runwayColor = !runwayPositive ? 'text-green-600' : snapshot.runwayMonths < 3 ? 'text-red-600' : snapshot.runwayMonths < 6 ? 'text-yellow-600' : 'text-green-600';
+  const runwayBgColor = !runwayPositive ? 'bg-green-50' : snapshot.runwayMonths < 3 ? 'bg-red-50' : snapshot.runwayMonths < 6 ? 'bg-yellow-50' : 'bg-green-50';
   const accountGroups = groupAccountsByType(snapshot.accounts);
 
   const cards = [
@@ -88,7 +89,7 @@ export function FinancialCommandCenter({ snapshot, isLoading, onRefresh }: Finan
       icon: Wallet,
       color: runwayColor,
       bgColor: runwayBgColor,
-      urgent: isFinite(snapshot.runwayMonths) && snapshot.runwayMonths < 3,
+      urgent: snapshot.runwayMonths >= 0 && snapshot.runwayMonths < 3,
     },
     {
       title: 'Net Worth',
@@ -137,6 +138,7 @@ export function FinancialCommandCenter({ snapshot, isLoading, onRefresh }: Finan
             onClick={onRefresh}
             disabled={isLoading}
             className="p-1.5 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors disabled:opacity-50"
+            aria-label="Refresh from Monarch Money"
             title="Refresh from Monarch Money"
           >
             <RefreshCw className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
@@ -182,7 +184,7 @@ export function FinancialCommandCenter({ snapshot, isLoading, onRefresh }: Finan
                 snapshot.runwayMonths < 3 ? 'bg-red-500' :
                 snapshot.runwayMonths < 6 ? 'bg-yellow-500' : 'bg-green-500'
               }`}
-              style={{ width: `${Math.min(isFinite(snapshot.runwayMonths) ? (snapshot.runwayMonths / 24) * 100 : 100, 100)}%` }}
+              style={{ width: `${Math.min(snapshot.runwayMonths >= 0 ? (snapshot.runwayMonths / 24) * 100 : 100, 100)}%` }}
             ></div>
           </div>
           <div className="flex items-center justify-between text-xs text-gray-500">

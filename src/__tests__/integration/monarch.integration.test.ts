@@ -47,6 +47,14 @@ if (!process.env.MONARCH_TOKEN) {
   process.exit(1);
 }
 
+if (!process.env.DATABASE_URL) {
+  console.error(
+    'ERROR: DATABASE_URL environment variable is required.\n' +
+    'Integration tests must hit the real Neon DB, not filesystem fallback.'
+  );
+  process.exit(1);
+}
+
 // --- Tests ---
 
 async function run() {

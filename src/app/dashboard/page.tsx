@@ -38,14 +38,18 @@ export default function HomePage() {
 
       // Load workspace data
       const workspaceResponse = await fetch('/api/workspace');
-      const workspaceData = await workspaceResponse.json();
-      setInitiatives(workspaceData.initiatives || []);
-      setScorecard(workspaceData.scorecard);
+      if (workspaceResponse.ok) {
+        const workspaceData = await workspaceResponse.json();
+        setInitiatives(workspaceData.initiatives || []);
+        setScorecard(workspaceData.scorecard);
+      }
 
       // Load financial data
       const financialResponse = await fetch('/api/financial');
-      const financialDataResult = await financialResponse.json();
-      setFinancialData(financialDataResult);
+      if (financialResponse.ok) {
+        const financialDataResult = await financialResponse.json();
+        setFinancialData(financialDataResult);
+      }
 
       // Load focus hours data
       const focusResponse = await fetch('/api/focus-hours');

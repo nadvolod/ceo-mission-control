@@ -33,11 +33,11 @@ export function buildSnapshot(
   const cashPosition = cashAccounts.reduce((sum, a) => sum + (a.currentBalance ?? 0), 0);
 
   const totalAssets = visibleAccounts
-    .filter((a) => a.isAsset)
+    .filter((a) => a.isAsset && a.includeInNetWorth !== false)
     .reduce((sum, a) => sum + (a.currentBalance ?? 0), 0);
 
   const totalLiabilities = visibleAccounts
-    .filter((a) => !a.isAsset)
+    .filter((a) => !a.isAsset && a.includeInNetWorth !== false)
     .reduce((sum, a) => sum + Math.abs(a.currentBalance ?? 0), 0);
 
   const netWorth = totalAssets - totalLiabilities;
@@ -45,7 +45,9 @@ export function buildSnapshot(
   const monthlyIncome = cashflowSummary.sumIncome;
   const monthlyExpenses = Math.abs(cashflowSummary.sumExpense);
   const burnRate = monthlyExpenses;
-  const runwayMonths = burnRate > 0 ? cashPosition / burnRate : Infinity;
+  // Use -1 sentinel for "infinite" runway since JSON.stringify(Infinity) → null
+  const rawRunway = burnRate > 0 ? cashPosition / burnRate : -1;
+  const runwayMonths = Number.isFinite(rawRunway) ? rawRunway : -1;
 
   return {
     accounts: visibleAccounts,
