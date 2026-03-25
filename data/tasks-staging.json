@@ -1,0 +1,76 @@
+{"importedAt":"2026-03-25T11:32:00-04:00","source":"/Users/nikolay/.openclaw/workspace/tasks.json","tasks":
+[
+  {
+    "id":"task_1774224869142_uhqu4vavu",
+    "title":"Complete client delivery sprint",
+    "description":"Finish current sprint deliverables for major client",
+    "status":"In Progress",
+    "priority":"Critical",
+    "projectId":"Temporal",
+    "estimatedHours":8,
+    "tags":["temporal","client-work"],
+    "missionRelevance":"Mission Critical",
+    "monthlyRevenueImpact":10000
+  },
+  {
+    "id":"task_1774224869144_fwj4c5zny",
+    "title":"Send aggressive follow-up to Artis WHO",
+    "description":"Push for $12K contract closure with timeline",
+    "status":"In Progress",
+    "priority":"High",
+    "projectId":"Revenue",
+    "tags":["revenue","artis"],
+    "missionRelevance":"Mission Critical"
+  },
+  {
+    "id":"task_1774224869144_8sm6i4exp",
+    "title":"Follow up on Devonshire HELOC application",
+    "description":"Push for completion of $75K equity line",
+    "status":"In Progress",
+    "priority":"Critical",
+    "projectId":"HELOC",
+    "tags":["finance","heloc"]
+  },
+  {
+    "id":"task_1774224869144_wvt3eqjsw",
+    "title":"Complete Alton condo move-out",
+    "description":"Finalize move-out process and lease termination",
+    "status":"In Progress",
+    "priority":"High",
+    "deadline":"2026-03-30",
+    "projectId":"Housing",
+    "tags":["housing","move-out"]
+  },
+  {
+    "id":"task_1774224869145_mle6s9q0i",
+    "title":"Prepare Tony Robbins pitch presentation",
+    "description":"Create compelling pitch for $100K+ opportunity",
+    "status":"Not Started",
+    "priority":"High",
+    "deadline":"2026-03-30",
+    "projectId":"Revenue",
+    "tags":["revenue","tony-robbins"]
+  },
+  {
+    "id":"task_discover_first_statement",
+    "title":"Check Discover first statement",
+    "description":"Weekly check: Discover card set up 2026-03-25. If statement arrived, review amount and confirm auto-pay amount.",
+    "status":"Not Started",
+    "priority":"High",
+    "projectId":"Finance",
+    "tags":["finance","discover","reminder"],
+    "schedule":"weekly",
+    "cronJobId":"3c7e6f33-b699-4077-a856-562121157ca0"
+  },
+  {
+    "id":"task_discover_0percent_apr",
+    "title":"Discover 0% APR reminder",
+    "description":"0% interest ends on 2027-10-23. Plan payoff or transfer before this date.",
+    "status":"Not Started",
+    "priority":"Medium",
+    "projectId":"Finance",
+    "tags":["finance","discover","long-term"],
+    "dueDate":"2027-10-23"
+  }
+]
+}
