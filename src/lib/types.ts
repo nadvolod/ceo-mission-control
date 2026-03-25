@@ -127,48 +127,50 @@ export interface TemporalData {
   dailyTotals: Record<string, number>;
 }
 
-// Monarch Money integration types
-export interface MonarchAccount {
+// Task sync types — bidirectional sync between local OpenClaw and production dashboard
+
+export interface LocalTask {
   id: string;
-  displayName: string;
-  currentBalance: number;
-  displayBalance: number;
-  isAsset: boolean;
-  isHidden: boolean;
-  syncDisabled: boolean;
-  includeInNetWorth: boolean;
-  deactivatedAt: string | null;
+  title: string;
+  description?: string;
+  status: string;
+  priority: string;
+  projectId?: string;
+  tags?: string[];
+  missionRelevance?: string;
+  monthlyRevenueImpact?: number;
+  estimatedHours?: number;
+  deadline?: string;
+  dueDate?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  aiLeverageScore?: number;
+  timeLogged?: Array<{ date: string; minutes: number; note: string }>;
+  cronJobId?: string;
+  schedule?: string;
+}
+
+export interface SyncedTask {
+  localId: string;
+  title: string;
+  description: string | null;
+  status: 'todo' | 'doing' | 'done';
+  priority: string;
+  category: string | null;
+  tags: string[];
+  dueDate: string | null;
+  monetaryValue: number | null;
+  missionRelevance: string | null;
+  estimatedHours: number | null;
+  createdAt: string;
   updatedAt: string;
-  displayLastUpdatedAt: string;
-  logoUrl: string | null;
-  type: { name: string; display: string };
-  subtype: { name: string; display: string };
-  institution: { id: string; name: string } | null;
-  credential: {
-    id: string;
-    updateRequired: boolean;
-    disconnectedFromDataProviderAt: string | null;
-    institution: { id: string; name: string } | null;
-  } | null;
+  source: 'local' | 'dashboard';
+  extra: Record<string, unknown>;
 }
 
-export interface MonarchCashflowSummary {
-  sumIncome: number;
-  sumExpense: number;
-  savings: number;
-  savingsRate: number;
-}
-
-export interface MonarchFinancialSnapshot {
-  accounts: MonarchAccount[];
-  cashPosition: number;
-  totalAssets: number;
-  totalLiabilities: number;
-  netWorth: number;
-  monthlyIncome: number;
-  monthlyExpenses: number;
-  burnRate: number;
-  runwayMonths: number;
-  savingsRate: number;
-  lastSynced: string;
+export interface SyncResult {
+  pushed: number;
+  pulled: number;
+  merged: number;
+  timestamp: string;
 }
