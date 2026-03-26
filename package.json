@@ -11,7 +11,8 @@
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
     "test:monarch": "tsx tests/monarch.integration.ts",
-    "test:e2e": "tsx tests/dashboard-e2e.ts"
+    "test:e2e": "tsx tests/dashboard-e2e.ts",
+    "test:e2e:playwright": "playwright test"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.28.0",
@@ -29,6 +30,7 @@
     "recharts": "^3.8.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.58.2",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.4.2",
     "@testing-library/react": "^16.1.0",
