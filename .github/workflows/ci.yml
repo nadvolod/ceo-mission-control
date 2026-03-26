@@ -85,6 +85,12 @@ jobs:
           CI: true
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
+      - name: Monarch integration tests (real API)
+        run: npm run test:monarch
+        env:
+          MONARCH_TOKEN: ${{ secrets.MONARCH_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
       - name: Coverage report
         if: always()
         run: npx jest --coverage --ci --reporters=default --testPathIgnorePatterns='integration'
