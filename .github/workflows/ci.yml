@@ -75,7 +75,7 @@ jobs:
       - run: npm ci
 
       - name: Unit tests (mocked)
-        run: npx jest --ci --reporters=default --testPathIgnorePatterns='integration'
+        run: npx jest --ci --reporters=default --testPathIgnorePatterns='integration|e2e'
         env:
           CI: true
 
@@ -98,7 +98,7 @@ jobs:
 
       - name: Coverage report
         if: always()
-        run: npx jest --coverage --ci --reporters=default --testPathIgnorePatterns='integration'
+        run: npx jest --coverage --ci --reporters=default --testPathIgnorePatterns='integration|e2e'
         env:
           CI: true
 
