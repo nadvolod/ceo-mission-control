@@ -30,7 +30,8 @@ The rules below are the authoritative local copy. Follow them exactly for every 
 12. **Playwright E2E tests are mandatory** — Every PR must maintain at least 5 Playwright E2E tests that verify the most critical user flows render correctly in a real browser. Tests must run in CI against a local Next.js server (not production URL) so they validate the PR's code before merge. They catch client-side JavaScript crashes, null reference errors, and rendering failures that unit tests and HTTP-based tests cannot detect. Always run Playwright on localhost in CI.
 13. Push every feature into a PR and then wait for review from Copilot or Coderabbit, implement their feedback when it makes sense.
 14. Deploy on Vercel has to be tested and working.
-15. **CI-green before handoff** – After pushing a PR, monitor CI and reviewer bots (CodeRabbit, Copilot). Address all valuable feedback, re-push, and only notify the human once every check is green and bot comments are resolved. Do not hand off a red PR.
+15. **Always create a PR** — Never push directly to main. Every change goes through a PR that follows all the steps in this file. Only notify the human when every step is complete: CI green, bot feedback resolved, checklist checked, and PR is ready to merge.
+16. **CI-green before handoff** – After pushing a PR, monitor CI and reviewer bots (CodeRabbit, Copilot). Address all valuable feedback, re-push, and only notify the human once every check is green and bot comments are resolved. Do not hand off a red PR.
 
 ---
 
