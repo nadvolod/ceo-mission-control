@@ -1,19 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadJSON, saveJSON } from '@/lib/storage';
+import { checkAuth } from '@/lib/auth';
 import { localTaskToSynced, syncedToLocalTask, mergeTasks } from '@/lib/task-sync';
 import type { LocalTask, SyncedTask, SyncResult } from '@/lib/types';
 
 const STORE_KEY = 'synced-tasks.json';
-
-function checkAuth(request: NextRequest): boolean {
-  const apiKey = process.env.SYNC_API_KEY;
-  if (!apiKey) {
-    console.warn('SYNC_API_KEY not configured — sync-tasks auth disabled');
-    return true;
-  }
-  const provided = request.headers.get('x-sync-api-key') ?? request.headers.get('authorization')?.replace('Bearer ', '');
-  return provided === apiKey;
-}
 
 /**
  * GET /api/sync-tasks

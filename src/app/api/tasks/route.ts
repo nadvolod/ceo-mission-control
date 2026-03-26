@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fetchTasks, createTask, computeTaskStats } from '@/lib/task-api';
+import { checkAuth } from '@/lib/auth';
 import { loadJSON } from '@/lib/storage';
 import type { SyncedTask, AiTask } from '@/lib/types';
 
@@ -47,6 +48,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  if (!checkAuth(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const body = await request.json();
     const task = await createTask(body);

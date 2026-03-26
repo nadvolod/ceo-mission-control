@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { saveJSON, saveText } from '@/lib/storage';
+import { checkAuth } from '@/lib/auth';
 
 /**
  * Sync endpoint - accepts workspace data and persists it to the database.
@@ -9,6 +10,9 @@ import { saveJSON, saveText } from '@/lib/storage';
  * Body: { files: { [filename]: content }, json: { [filename]: data } }
  */
 export async function POST(request: NextRequest) {
+  if (!checkAuth(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const body = await request.json();
     const { files, json } = body;
