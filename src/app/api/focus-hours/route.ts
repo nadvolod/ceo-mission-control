@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FocusTracker } from '@/lib/focus-tracker';
+import { checkAuth } from '@/lib/auth';
 import type { FocusCategory, FocusSession } from '@/lib/types';
 import { appendAuditLog } from '@/lib/storage';
 
@@ -53,6 +54,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  if (!checkAuth(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const body = await request.json();
     const { action, ...data } = body;

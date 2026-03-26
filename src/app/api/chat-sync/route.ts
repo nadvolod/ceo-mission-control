@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ChatSyncManager } from '@/lib/chat-sync';
+import { checkAuth } from '@/lib/auth';
 
 let chatSyncManagerPromise: Promise<ChatSyncManager> | null = null;
 function getChatSyncManager() {
@@ -10,6 +11,9 @@ function getChatSyncManager() {
 }
 
 export async function POST(request: NextRequest) {
+  if (!checkAuth(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const { message } = await request.json();
     if (!message) {

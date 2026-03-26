@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readInitiatives, readDailyScorecard, updateScorecardField } from '@/lib/workspace-reader';
+import { checkAuth } from '@/lib/auth';
 
 export async function GET() {
   try {
@@ -21,6 +22,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  if (!checkAuth(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const { action, ...data } = await request.json();
 

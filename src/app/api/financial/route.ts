@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FinancialTracker } from '@/lib/financial-tracker';
+import { checkAuth } from '@/lib/auth';
 
 export async function GET() {
   try {
@@ -26,6 +27,9 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  if (!checkAuth(request)) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
   try {
     const financialTracker = await FinancialTracker.create();
     const body = await request.json();
