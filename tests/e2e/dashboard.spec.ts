@@ -36,7 +36,7 @@ test.describe('Dashboard page rendering', () => {
 
     // Verify task stats in header
     await expect(page.getByText('Total Tasks')).toBeVisible();
-    await expect(page.getByText('Done Today')).toBeVisible();
+    await expect(page.getByText('Done Today', { exact: true })).toBeVisible();
     await expect(page.getByText('Overdue')).toBeVisible();
 
     // Verify system status section rendered

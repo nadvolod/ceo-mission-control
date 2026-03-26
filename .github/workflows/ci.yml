@@ -145,12 +145,11 @@ jobs:
         env:
           NODE_ENV: production
 
-  # Playwright E2E: runs in a real browser against production after deploy
-  # Only on push to main (post-merge) since preview URLs require Vercel auth
+  # Playwright E2E: runs in a real browser against localhost
+  # Validates client-side rendering on every PR and push
   playwright:
     name: Playwright E2E
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: [build]
     steps:
       - uses: actions/checkout@v4
@@ -162,16 +161,19 @@ jobs:
 
       - run: npm ci
 
+      - name: Build app
+        run: npm run build
+        env:
+          NODE_ENV: production
+
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
-      - name: Wait for Vercel production deploy
-        run: sleep 60
-
-      - name: Playwright E2E tests (real browser rendering)
-        run: npm run test:e2e:playwright
-        env:
-          DASHBOARD_URL: https://ceo-mission-control-nine.vercel.app
+      - name: Start server and run Playwright tests
+        run: |
+          npm start &
+          npx wait-on http://localhost:3000 --timeout 30000
+          DASHBOARD_URL=http://localhost:3000 npm run test:e2e:playwright
 
       - name: Upload Playwright report
         if: failure()
