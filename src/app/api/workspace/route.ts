@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { readInitiatives, readDailyScorecard } from '@/lib/workspace-reader';
+import { readInitiatives, readDailyScorecard, updateScorecardField } from '@/lib/workspace-reader';
 
 export async function GET() {
   try {
@@ -25,10 +25,24 @@ export async function POST(request: NextRequest) {
     const { action, ...data } = await request.json();
 
     switch (action) {
-      case 'refresh':
+      case 'refresh': {
         const initiatives = await readInitiatives();
         const scorecard = await readDailyScorecard();
         return NextResponse.json({ initiatives, scorecard });
+      }
+
+      case 'updateScorecard': {
+        const { field, value } = data;
+        if (!field) {
+          return NextResponse.json({ error: 'field is required' }, { status: 400 });
+        }
+        if (value === undefined || value === null) {
+          return NextResponse.json({ error: 'value is required' }, { status: 400 });
+        }
+        console.log(`Updating scorecard field "${field}":`, value);
+        const updatedScorecard = await updateScorecardField(field, value);
+        return NextResponse.json({ success: true, scorecard: updatedScorecard });
+      }
 
       default:
         return NextResponse.json(

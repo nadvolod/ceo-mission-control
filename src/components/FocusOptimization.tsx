@@ -1,6 +1,6 @@
 'use client';
 
-import { Clock, Target, Zap, AlertCircle } from 'lucide-react';
+import { Target, AlertCircle } from 'lucide-react';
 import { DailyScorecard } from '@/lib/types';
 
 interface FocusOptimizationProps {
@@ -8,75 +8,8 @@ interface FocusOptimizationProps {
 }
 
 export function FocusOptimization({ scorecard }: FocusOptimizationProps) {
-  const temporalProgress = scorecard.temporalActual 
-    ? (scorecard.temporalActual / scorecard.temporalTarget) * 100 
-    : 0;
-    
-  const isOnTrack = temporalProgress >= 80;
-  const progressColor = temporalProgress >= 100 ? 'bg-green-500' : 
-                       temporalProgress >= 80 ? 'bg-yellow-500' : 'bg-red-500';
-
-  const focusMetrics = [
-    {
-      title: 'Temporal Hours',
-      value: `${scorecard.temporalActual || 0}/${scorecard.temporalTarget}`,
-      percentage: temporalProgress,
-      icon: Clock,
-      color: isOnTrack ? 'text-green-600' : 'text-red-600',
-      bgColor: isOnTrack ? 'bg-green-50' : 'bg-red-50'
-    },
-    {
-      title: 'Focus Blocks',
-      value: `${scorecard.focusBlocks.length}`,
-      percentage: 100, // Always show full since it's scheduled
-      icon: Target,
-      color: 'text-blue-600',
-      bgColor: 'bg-blue-50'
-    },
-    {
-      title: 'Energy Level',
-      value: 'High', // Could be dynamic based on time/data
-      percentage: 85,
-      icon: Zap,
-      color: 'text-purple-600',
-      bgColor: 'bg-purple-50'
-    }
-  ];
-
   return (
     <div className="space-y-6">
-      {/* Focus Metrics Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {focusMetrics.map((metric) => {
-          const Icon = metric.icon;
-          return (
-            <div key={metric.title} className={`${metric.bgColor} rounded-lg p-4`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600">{metric.title}</p>
-                  <p className={`text-2xl font-bold ${metric.color}`}>{metric.value}</p>
-                </div>
-                <Icon className={`h-8 w-8 ${metric.color}`} />
-              </div>
-              {metric.title === 'Temporal Hours' && (
-                <div className="mt-3">
-                  <div className="flex justify-between text-sm text-gray-600 mb-1">
-                    <span>Progress</span>
-                    <span>{Math.round(metric.percentage)}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className={`h-2 rounded-full ${progressColor}`}
-                      style={{ width: `${Math.min(metric.percentage, 100)}%` }}
-                    ></div>
-                  </div>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
       {/* Today's Schedule */}
       <div className="bg-white rounded-lg shadow-lg p-6">
         <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">

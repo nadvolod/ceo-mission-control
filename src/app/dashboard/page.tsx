@@ -210,25 +210,34 @@ export default function HomePage() {
                 Conversational task command center for {scorecard.date}
               </p>
             </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
-              <div>
-                <div className="text-2xl font-bold text-blue-600">{taskStats.total}</div>
-                <div className="text-xs text-gray-500">Total Tasks</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-green-600">{taskStats.doneToday}</div>
-                <div className="text-xs text-gray-500">Done Today</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-red-600">{taskStats.overdue}</div>
-                <div className="text-xs text-gray-500">Overdue</div>
-              </div>
-              <div>
-                <div className="text-2xl font-bold text-gray-900">
-                  {focusData?.todaysMetrics?.totalHours || 0}h
+            <div className="flex items-center gap-6">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
+                <div>
+                  <div className="text-2xl font-bold text-blue-600">{taskStats.total}</div>
+                  <div className="text-xs text-gray-500">Total Tasks</div>
                 </div>
-                <div className="text-xs text-gray-500">Focus Hours</div>
+                <div>
+                  <div className="text-2xl font-bold text-green-600">{taskStats.doneToday}</div>
+                  <div className="text-xs text-gray-500">Done Today</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-red-600">{taskStats.overdue}</div>
+                  <div className="text-xs text-gray-500">Overdue</div>
+                </div>
+                <div>
+                  <div className="text-2xl font-bold text-gray-900">
+                    {focusData?.todaysMetrics?.totalHours || 0}h
+                  </div>
+                  <div className="text-xs text-gray-500">Focus Hours</div>
+                </div>
               </div>
+              <button
+                onClick={loadAllData}
+                className="flex-shrink-0 px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
+                title="Refresh all data"
+              >
+                Refresh
+              </button>
             </div>
           </div>
         </div>
@@ -236,12 +245,7 @@ export default function HomePage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-8 py-8">
-        {/* Mission Tracker - Top Priority */}
-        <div className="mb-8">
-          <MissionTracker />
-        </div>
-
-        {/* Monarch Financial Command Center - Full Width */}
+        {/* Financial Command Center - Real Monarch data */}
         <div className="mb-8">
           <FinancialCommandCenter
             snapshot={monarchData}
@@ -251,7 +255,30 @@ export default function HomePage() {
           />
         </div>
 
-        {/* Metrics - 2 Column Grid */}
+        {/* Mission Tracker - Connected to real MRR from Monarch */}
+        <div className="mb-8">
+          <MissionTracker currentMRR={monarchData?.monthlyIncome} />
+        </div>
+
+        {/* Today's Plan - Priorities, Critical Moves, Focus Blocks */}
+        <div className="mb-8">
+          <FocusOptimization scorecard={scorecard} />
+        </div>
+
+        {/* Task Dashboard - Full Width */}
+        <div className="mb-8">
+          <TaskDashboard
+            tasks={aiTasks.filter(t => t.status !== 'done')}
+            stats={taskStats}
+            onCreateTask={handleCreateTask}
+            onUpdateTask={handleUpdateTask}
+            onDeleteTask={handleDeleteTask}
+            onRefresh={loadAllData}
+            taskListUrl={process.env.NEXT_PUBLIC_AI_TASK_LIST_URL || 'https://tasklistai.vercel.app'}
+          />
+        </div>
+
+        {/* Detail Sections - 2 Column Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* Focus Hours Dashboard */}
           {focusData && (
@@ -269,7 +296,7 @@ export default function HomePage() {
             />
           )}
 
-          {/* Financial Metrics Dashboard */}
+          {/* Financial Impact Tracking - only show if there's activity */}
           {financialData && (
             <FinancialMetricsDashboard
               todaysMetrics={financialData.todaysMetrics}
@@ -278,50 +305,6 @@ export default function HomePage() {
               recentEntries={financialData.recentEntries}
             />
           )}
-
-          {/* Focus Optimization */}
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Today&apos;s Focus</h2>
-            <FocusOptimization scorecard={scorecard} />
-          </div>
-
-          {/* System Status */}
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h3 className="font-semibold text-gray-900 mb-4">System Status</h3>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between">
-                <span className="text-gray-600">Last Refresh</span>
-                <span className="text-gray-900">{lastRefresh.toLocaleTimeString()}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Active Projects</span>
-                <span className="text-gray-900">{initiatives.length}</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-gray-600">Active Tasks</span>
-                <span className="text-gray-900">{taskStats.doing}</span>
-              </div>
-              <button
-                onClick={loadAllData}
-                className="w-full mt-4 px-4 py-2 text-sm bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
-              >
-                Refresh Data
-              </button>
-            </div>
-          </div>
-        </div>
-
-        {/* Task Dashboard - Full Width Below Metrics */}
-        <div className="mt-8">
-          <TaskDashboard
-            tasks={aiTasks.filter(t => t.status !== 'done')}
-            stats={taskStats}
-            onCreateTask={handleCreateTask}
-            onUpdateTask={handleUpdateTask}
-            onDeleteTask={handleDeleteTask}
-            onRefresh={loadAllData}
-            taskListUrl={process.env.NEXT_PUBLIC_AI_TASK_LIST_URL || 'https://tasklistai.vercel.app'}
-          />
         </div>
       </main>
     </div>

@@ -1,6 +1,7 @@
 import { FinancialTracker } from './financial-tracker';
 import { FocusTracker } from './focus-tracker';
 import { fetchTasks, createTask, updateTask } from './task-api';
+import { updateScorecardField } from './workspace-reader';
 import type { AiTask } from './types';
 
 export class ChatSyncManager {
@@ -18,17 +19,19 @@ export class ChatSyncManager {
     return new ChatSyncManager(financialTracker, focusTracker);
   }
 
-  async syncChatUpdate(message: string): Promise<{ financial?: any; focusHours?: any; tasks?: any }> {
+  async syncChatUpdate(message: string): Promise<{ financial?: any; focusHours?: any; tasks?: any; scorecard?: any }> {
     console.log('Syncing chat update:', message);
 
     const financialResult = await this.financialTracker.processConversationalUpdate(message);
     const focusResult = await this.focusTracker.processConversationalUpdate(message);
     const taskResult = await this.syncTaskPatterns(message);
+    const scorecardResult = await this.syncScorecardPatterns(message);
 
     return {
       financial: financialResult,
       focusHours: focusResult,
-      tasks: taskResult
+      tasks: taskResult,
+      scorecard: scorecardResult,
     };
   }
 
@@ -66,6 +69,58 @@ export class ChatSyncManager {
     }
 
     return { updated, created };
+  }
+
+  private async syncScorecardPatterns(message: string): Promise<{ updated: string[] }> {
+    const updated: string[] = [];
+
+    // "top 3: X, Y, Z" or "priorities: X, Y, Z" or "today's priorities: X, Y, Z"
+    const priorityMatch = message.match(/(?:top\s*3|priorities|today'?s\s*priorities)\s*:\s*(.+)/i);
+    if (priorityMatch) {
+      const items = priorityMatch[1].split(/,|\n/).map(s => s.trim()).filter(Boolean);
+      if (items.length > 0) {
+        await updateScorecardField('priorities', items);
+        updated.push('priorities');
+        console.log('Scorecard updated: priorities →', items);
+      }
+    }
+
+    // "biggest blocker: ..." or "blocker: ..."
+    const blockerMatch = message.match(/(?:biggest\s*)?blocker\s*:\s*(.+?)(?:\.|$)/i);
+    if (blockerMatch) {
+      await updateScorecardField('biggestBlocker', blockerMatch[1].trim());
+      updated.push('biggestBlocker');
+      console.log('Scorecard updated: biggestBlocker →', blockerMatch[1].trim());
+    }
+
+    // "money move: ..." or "major money move: ..."
+    const moneyMoveMatch = message.match(/(?:major\s*)?money\s*move\s*:\s*(.+?)(?:\.|$)/i);
+    if (moneyMoveMatch) {
+      await updateScorecardField('majorMoneyMove', moneyMoveMatch[1].trim());
+      updated.push('majorMoneyMove');
+      console.log('Scorecard updated: majorMoneyMove →', moneyMoveMatch[1].trim());
+    }
+
+    // "strategic move: ..."
+    const strategicMatch = message.match(/strategic\s*move\s*:\s*(.+?)(?:\.|$)/i);
+    if (strategicMatch) {
+      await updateScorecardField('strategicMove', strategicMatch[1].trim());
+      updated.push('strategicMove');
+      console.log('Scorecard updated: strategicMove →', strategicMatch[1].trim());
+    }
+
+    // "focus blocks: 2h Temporal, 1h Finance, ..."
+    const blocksMatch = message.match(/focus\s*blocks?\s*:\s*(.+)/i);
+    if (blocksMatch) {
+      const blocks = blocksMatch[1].split(/,|\n/).map(s => s.trim()).filter(Boolean);
+      if (blocks.length > 0) {
+        await updateScorecardField('focusBlocks', blocks);
+        updated.push('focusBlocks');
+        console.log('Scorecard updated: focusBlocks →', blocks);
+      }
+    }
+
+    return { updated };
   }
 
   private findTaskInList(search: string, tasks: AiTask[]): AiTask | null {
