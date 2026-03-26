@@ -1,7 +1,7 @@
 'use client';
 
-import { DollarSign, TrendingUp, TrendingDown, Wallet, PiggyBank, RefreshCw, AlertTriangle, Building2 } from 'lucide-react';
-import type { MonarchFinancialSnapshot, MonarchAccount } from '@/lib/types';
+import { TrendingUp, TrendingDown, Wallet, PiggyBank, RefreshCw, AlertTriangle } from 'lucide-react';
+import type { MonarchFinancialSnapshot } from '@/lib/types';
 
 interface FinancialCommandCenterProps {
   snapshot: MonarchFinancialSnapshot | null;
@@ -26,16 +26,6 @@ function formatRunway(months: number | null | undefined): string {
   if (n < 0) return 'No burn'; // -1 sentinel = profitable/no net burn
   if (n >= 12) return `${(n / 12).toFixed(1)} years`;
   return `${n.toFixed(1)} months`;
-}
-
-function groupAccountsByType(accounts: MonarchAccount[]): Record<string, MonarchAccount[]> {
-  const groups: Record<string, MonarchAccount[]> = {};
-  for (const account of accounts) {
-    const type = account.type?.display ?? 'Other';
-    if (!groups[type]) groups[type] = [];
-    groups[type].push(account);
-  }
-  return groups;
 }
 
 function timeSince(dateStr: string): string {
@@ -85,8 +75,6 @@ export function FinancialCommandCenter({ snapshot, isLoading, onRefresh, error }
   const runwayPositive = runway >= 0;
   const runwayColor = !runwayPositive ? 'text-green-600' : runway < 3 ? 'text-red-600' : runway < 6 ? 'text-yellow-600' : 'text-green-600';
   const runwayBgColor = !runwayPositive ? 'bg-green-50' : runway < 3 ? 'bg-red-50' : runway < 6 ? 'bg-yellow-50' : 'bg-green-50';
-  const accountGroups = groupAccountsByType(snapshot.accounts ?? []);
-
   const cards = [
     {
       title: 'Cash Position',
@@ -245,45 +233,6 @@ export function FinancialCommandCenter({ snapshot, isLoading, onRefresh, error }
         </div>
       </div>
 
-      {/* Account Breakdown */}
-      <div className="bg-white rounded-lg shadow-lg p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Accounts</h3>
-        <div className="space-y-4">
-          {Object.entries(accountGroups).map(([type, accounts]) => {
-            const groupTotal = accounts.reduce((sum, a) => sum + (a.currentBalance ?? 0), 0);
-            return (
-              <div key={type}>
-                <div className="flex items-center justify-between mb-2">
-                  <div className="flex items-center gap-2">
-                    <Building2 className="h-4 w-4 text-gray-400" />
-                    <span className="text-sm font-medium text-gray-700">{type}</span>
-                    <span className="text-xs text-gray-400">({accounts.length})</span>
-                  </div>
-                  <span className={`text-sm font-bold ${groupTotal >= 0 ? 'text-gray-900' : 'text-red-600'}`}>
-                    {formatCurrency(groupTotal)}
-                  </span>
-                </div>
-                <div className="ml-6 space-y-1">
-                  {accounts.map((account) => (
-                    <div key={account.id} className="flex items-center justify-between py-1 text-sm">
-                      <div className="flex items-center gap-2">
-                        <DollarSign className="h-3 w-3 text-gray-300" />
-                        <span className="text-gray-600">{account.displayName}</span>
-                        {account.institution?.name && (
-                          <span className="text-xs text-gray-400">&middot; {account.institution.name}</span>
-                        )}
-                      </div>
-                      <span className={`font-medium ${(account.currentBalance ?? 0) >= 0 ? 'text-gray-900' : 'text-red-600'}`}>
-                        {formatCurrency(account.currentBalance)}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
     </div>
   );
 }
