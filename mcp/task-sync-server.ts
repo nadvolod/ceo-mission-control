@@ -24,6 +24,7 @@ const DASHBOARD_URL = process.env.DASHBOARD_URL || '';
 const SYNC_API_KEY = process.env.SYNC_API_KEY || '';
 const WORKSPACE_PATH = process.env.WORKSPACE_PATH || join(homedir(), '.openclaw', 'workspace');
 const TASKS_FILE = join(WORKSPACE_PATH, 'tasks.json');
+const SCORECARD_FILE = join(WORKSPACE_PATH, 'DAILY_SCORECARD.md');
 
 function getHeaders(): Record<string, string> {
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
@@ -188,6 +189,155 @@ server.tool(
     }
   }
 );
+
+server.tool(
+  'push_scorecard',
+  'Push local DAILY_SCORECARD.md to the production dashboard. Syncs priorities, focus blocks, moves, and blockers.',
+  {},
+  async () => {
+    if (!DASHBOARD_URL) {
+      return { content: [{ type: 'text' as const, text: 'Error: DASHBOARD_URL not configured' }] };
+    }
+
+    try {
+      if (!existsSync(SCORECARD_FILE)) {
+        return { content: [{ type: 'text' as const, text: `No scorecard found at ${SCORECARD_FILE}` }] };
+      }
+
+      const content = readFileSync(SCORECARD_FILE, 'utf8');
+      const response = await fetch(`${DASHBOARD_URL}/api/sync`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ files: { 'DAILY_SCORECARD.md': content } }),
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        return { content: [{ type: 'text' as const, text: `Push failed (${response.status}): ${err}` }] };
+      }
+
+      return {
+        content: [{
+          type: 'text' as const,
+          text: `Pushed DAILY_SCORECARD.md → production dashboard synced.`,
+        }],
+      };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: `Push failed: ${errorText(err)}` }] };
+    }
+  }
+);
+
+server.tool(
+  'pull_scorecard',
+  'Pull the daily scorecard from the production dashboard and write to local DAILY_SCORECARD.md.',
+  {},
+  async () => {
+    if (!DASHBOARD_URL) {
+      return { content: [{ type: 'text' as const, text: 'Error: DASHBOARD_URL not configured' }] };
+    }
+
+    try {
+      const response = await fetch(`${DASHBOARD_URL}/api/workspace`, {
+        headers: getHeaders(),
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        return { content: [{ type: 'text' as const, text: `Pull failed (${response.status}): ${err}` }] };
+      }
+
+      const data = await response.json();
+      const scorecard = data.scorecard;
+      if (!scorecard) {
+        return { content: [{ type: 'text' as const, text: 'No scorecard data returned from dashboard.' }] };
+      }
+
+      // Format scorecard back to markdown
+      const md = formatScorecardMarkdown(scorecard);
+      writeFileSync(SCORECARD_FILE, md);
+
+      return {
+        content: [{
+          type: 'text' as const,
+          text: `Pulled scorecard (${scorecard.date}) → written to ${SCORECARD_FILE}\nPriorities: ${scorecard.priorities?.length || 0}, Focus blocks: ${scorecard.focusBlocks?.length || 0}`,
+        }],
+      };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: `Pull failed: ${errorText(err)}` }] };
+    }
+  }
+);
+
+server.tool(
+  'update_scorecard',
+  'Update a single field on the production dashboard scorecard. Fields: priorities, focusBlocks, majorMoneyMove, strategicMove, taxesMove, biggestBlocker, ignoreList.',
+  {
+    field: z.string().describe('Scorecard field to update'),
+    value: z.union([z.string(), z.array(z.string())]).describe('New value (string for scalar fields, array for list fields)'),
+  },
+  async ({ field, value }) => {
+    if (!DASHBOARD_URL) {
+      return { content: [{ type: 'text' as const, text: 'Error: DASHBOARD_URL not configured' }] };
+    }
+
+    try {
+      const response = await fetch(`${DASHBOARD_URL}/api/workspace`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ action: 'updateScorecard', field, value }),
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        return { content: [{ type: 'text' as const, text: `Update failed (${response.status}): ${err}` }] };
+      }
+
+      await response.json();
+      return {
+        content: [{
+          type: 'text' as const,
+          text: `Updated scorecard "${field}" on production dashboard.`,
+        }],
+      };
+    } catch (err) {
+      return { content: [{ type: 'text' as const, text: `Update failed: ${errorText(err)}` }] };
+    }
+  }
+);
+
+function formatScorecardMarkdown(scorecard: any): string {
+  const lines: string[] = [
+    '# DAILY_SCORECARD.md',
+    '',
+    '## Date',
+    `- ${scorecard.date || new Date().toISOString().split('T')[0]}`,
+    '',
+    '## Top 3 priorities',
+  ];
+  (scorecard.priorities || []).forEach((p: string, i: number) => lines.push(`${i + 1}. ${p}`));
+  lines.push('', '## Temporal focused hours target');
+  lines.push(`- **Target today:** ${scorecard.temporalTarget || 0}`);
+  lines.push(`- **Actual:** ${scorecard.temporalActual || ''}`);
+  lines.push('', '## Focus blocks');
+  (scorecard.focusBlocks || []).forEach((b: string) => lines.push(`- ${b}`));
+  lines.push('', '## Major money move today');
+  if (scorecard.majorMoneyMove) lines.push(`- ${scorecard.majorMoneyMove}`);
+  lines.push('', '## Strategic project move today');
+  if (scorecard.strategicMove) lines.push(`- ${scorecard.strategicMove}`);
+  lines.push('', '## Taxes / risk reduction move today');
+  if (scorecard.taxesMove) lines.push(`- ${scorecard.taxesMove}`);
+  lines.push('', '## What to ignore today');
+  (scorecard.ignoreList || []).forEach((i: string) => lines.push(`- ${i}`));
+  lines.push('', '## Biggest blocker');
+  if (scorecard.biggestBlocker) lines.push(`- ${scorecard.biggestBlocker}`);
+  lines.push('', '## End-of-day review');
+  lines.push('- Wins:');
+  lines.push('- Misses:');
+  lines.push('- Open loops:');
+  lines.push('- Money advanced:');
+  return lines.join('\n') + '\n';
+}
 
 async function main() {
   const transport = new StdioServerTransport();
