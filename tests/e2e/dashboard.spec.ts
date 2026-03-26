@@ -89,4 +89,25 @@ test.describe('Dashboard page rendering', () => {
       await expect(page.getByText('Error details')).toBeVisible();
     }
   });
+
+  test('dashboard API endpoints return valid JSON responses', async ({ page, request }) => {
+    // Verify all critical API endpoints respond with valid data
+    const endpoints = [
+      { path: '/api/tasks', key: 'tasks' },
+      { path: '/api/workspace', key: 'scorecard' },
+      { path: '/api/financial', key: 'todaysMetrics' },
+      { path: '/api/focus-hours', key: 'success' },
+      { path: '/api/monarch', key: 'accounts' },
+    ];
+
+    for (const { path, key } of endpoints) {
+      const response = await request.get(path);
+      expect(response.status(), `${path} should return 200`).toBe(200);
+      const data = await response.json();
+      expect(data, `${path} should return valid JSON`).toBeTruthy();
+      // Monarch may return error if token expired — that's a valid JSON response
+      if (path === '/api/monarch' && data.error) continue;
+      expect(data[key], `${path} should have "${key}" property`).toBeDefined();
+    }
+  });
 });
