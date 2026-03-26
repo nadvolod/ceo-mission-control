@@ -141,8 +141,12 @@ async function run() {
   await test('snapshot has correct derived calculations', async () => {
     const snapshot = await getFinancialSnapshot(false);
 
-    // Burn rate = monthly expenses
-    assert.equal(snapshot.burnRate, snapshot.monthlyExpenses);
+    // Burn rate = net burn (expenses - income, floored at 0)
+    const expectedBurnRate = Math.max(snapshot.monthlyExpenses - snapshot.monthlyIncome, 0);
+    assert.ok(
+      Math.abs(snapshot.burnRate - expectedBurnRate) < 0.01,
+      `burnRate ${snapshot.burnRate} should equal max(expenses - income, 0) = ${expectedBurnRate}`
+    );
 
     // Runway = cash / burn
     if (snapshot.burnRate > 0) {
