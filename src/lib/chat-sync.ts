@@ -74,49 +74,41 @@ export class ChatSyncManager {
   private async syncScorecardPatterns(message: string): Promise<{ updated: string[] }> {
     const updated: string[] = [];
 
+    const updates: Array<{ field: string; value: string | string[] }> = [];
+
     // "top 3: X, Y, Z" or "priorities: X, Y, Z" or "today's priorities: X, Y, Z"
     const priorityMatch = message.match(/(?:top\s*3|priorities|today'?s\s*priorities)\s*:\s*(.+)/i);
     if (priorityMatch) {
       const items = priorityMatch[1].split(/,|\n/).map(s => s.trim()).filter(Boolean);
-      if (items.length > 0) {
-        await updateScorecardField('priorities', items);
-        updated.push('priorities');
-        console.log('Scorecard updated: priorities →', items);
-      }
+      if (items.length > 0) updates.push({ field: 'priorities', value: items });
     }
 
     // "biggest blocker: ..." or "blocker: ..."
     const blockerMatch = message.match(/(?:biggest\s*)?blocker\s*:\s*(.+?)(?:\.|$)/i);
-    if (blockerMatch) {
-      await updateScorecardField('biggestBlocker', blockerMatch[1].trim());
-      updated.push('biggestBlocker');
-      console.log('Scorecard updated: biggestBlocker →', blockerMatch[1].trim());
-    }
+    if (blockerMatch) updates.push({ field: 'biggestBlocker', value: blockerMatch[1].trim() });
 
     // "money move: ..." or "major money move: ..."
     const moneyMoveMatch = message.match(/(?:major\s*)?money\s*move\s*:\s*(.+?)(?:\.|$)/i);
-    if (moneyMoveMatch) {
-      await updateScorecardField('majorMoneyMove', moneyMoveMatch[1].trim());
-      updated.push('majorMoneyMove');
-      console.log('Scorecard updated: majorMoneyMove →', moneyMoveMatch[1].trim());
-    }
+    if (moneyMoveMatch) updates.push({ field: 'majorMoneyMove', value: moneyMoveMatch[1].trim() });
 
     // "strategic move: ..."
     const strategicMatch = message.match(/strategic\s*move\s*:\s*(.+?)(?:\.|$)/i);
-    if (strategicMatch) {
-      await updateScorecardField('strategicMove', strategicMatch[1].trim());
-      updated.push('strategicMove');
-      console.log('Scorecard updated: strategicMove →', strategicMatch[1].trim());
-    }
+    if (strategicMatch) updates.push({ field: 'strategicMove', value: strategicMatch[1].trim() });
 
     // "focus blocks: 2h Temporal, 1h Finance, ..."
     const blocksMatch = message.match(/focus\s*blocks?\s*:\s*(.+)/i);
     if (blocksMatch) {
       const blocks = blocksMatch[1].split(/,|\n/).map(s => s.trim()).filter(Boolean);
-      if (blocks.length > 0) {
-        await updateScorecardField('focusBlocks', blocks);
-        updated.push('focusBlocks');
-        console.log('Scorecard updated: focusBlocks →', blocks);
+      if (blocks.length > 0) updates.push({ field: 'focusBlocks', value: blocks });
+    }
+
+    for (const { field, value } of updates) {
+      try {
+        await updateScorecardField(field, value);
+        updated.push(field);
+        console.log(`Scorecard updated: ${field}`);
+      } catch (err) {
+        console.error(`Failed to update scorecard field "${field}":`, err);
       }
     }
 

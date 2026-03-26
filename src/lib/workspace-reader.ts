@@ -80,7 +80,7 @@ export async function readDailyScorecard(): Promise<DailyScorecard | null> {
 
     return {
       date: extractValue(content, 'Date') || new Date().toISOString().split('T')[0],
-      priorities: extractListItems(content, 'Top 3 priorities'),
+      priorities: extractListItems(content, 'priorities'),
       temporalTarget: parseFloat(extractValue(content, 'Target today:') || '0'),
       temporalActual: parseFloat(extractValue(content, 'Actual:') || '0') || undefined,
       focusBlocks: extractListItems(content, 'Focus blocks'),
@@ -102,7 +102,7 @@ export async function readDailyScorecard(): Promise<DailyScorecard | null> {
 
 // Scorecard field-to-section mapping for write operations
 const SCORECARD_FIELD_MAP: Record<string, { section: string; isList: boolean }> = {
-  priorities: { section: 'Top 2 priorities', isList: true },
+  priorities: { section: 'priorities', isList: true },
   focusBlocks: { section: 'Focus blocks', isList: true },
   majorMoneyMove: { section: 'Major money move today', isList: false },
   strategicMove: { section: 'Strategic project move today', isList: false },

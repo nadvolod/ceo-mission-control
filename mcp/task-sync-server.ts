@@ -293,11 +293,11 @@ server.tool(
         return { content: [{ type: 'text' as const, text: `Update failed (${response.status}): ${err}` }] };
       }
 
-      const result = await response.json();
+      await response.json();
       return {
         content: [{
           type: 'text' as const,
-          text: `Updated scorecard "${field}" → ${JSON.stringify(value).slice(0, 100)}`,
+          text: `Updated scorecard "${field}" on production dashboard.`,
         }],
       };
     } catch (err) {

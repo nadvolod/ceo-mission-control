@@ -39,7 +39,8 @@ export async function POST(request: NextRequest) {
         if (value === undefined || value === null) {
           return NextResponse.json({ error: 'value is required' }, { status: 400 });
         }
-        console.log(`Updating scorecard field "${field}":`, value);
+        console.log(`Updating scorecard field "${field}"`);
+
         const updatedScorecard = await updateScorecardField(field, value);
         return NextResponse.json({ success: true, scorecard: updatedScorecard });
       }
