@@ -69,4 +69,21 @@ describe('checkAuth', () => {
       'host': 'localhost:3000',
     }))).toBe(false);
   });
+
+  it('rejects substring bypass attack on origin', () => {
+    process.env.SYNC_API_KEY = 'test-secret';
+    // Attacker crafts origin containing the host as substring
+    expect(checkAuth(makeRequest({
+      'origin': 'http://evil-localhost:3000.attacker.com',
+      'host': 'localhost:3000',
+    }))).toBe(false);
+  });
+
+  it('rejects substring bypass attack on referer', () => {
+    process.env.SYNC_API_KEY = 'test-secret';
+    expect(checkAuth(makeRequest({
+      'referer': 'http://evil.com/fake?redirect=http://localhost:3000',
+      'host': 'localhost:3000',
+    }))).toBe(false);
+  });
 });

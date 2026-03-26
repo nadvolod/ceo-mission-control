@@ -11,6 +11,7 @@ import { NextRequest } from 'next/server';
 export function checkAuth(request: NextRequest): boolean {
   const apiKey = process.env.SYNC_API_KEY;
   if (!apiKey) {
+    console.warn('SYNC_API_KEY not configured — write auth disabled');
     return true;
   }
 
@@ -23,16 +24,24 @@ export function checkAuth(request: NextRequest): boolean {
   }
 
   // Allow same-origin requests (dashboard browser UI)
-  const origin = request.headers.get('origin');
   const host = request.headers.get('host');
-  if (origin && host && origin.includes(host)) {
-    return true;
-  }
+  if (host) {
+    const origin = request.headers.get('origin');
+    if (origin) {
+      try {
+        const originHost = new URL(origin).host;
+        if (originHost === host) return true;
+      } catch { /* invalid URL, skip */ }
+    }
 
-  // Allow requests with referer from same host (non-CORS same-origin fetches)
-  const referer = request.headers.get('referer');
-  if (referer && host && referer.includes(host)) {
-    return true;
+    // Allow requests with referer from same host (non-CORS same-origin fetches)
+    const referer = request.headers.get('referer');
+    if (referer) {
+      try {
+        const refererHost = new URL(referer).host;
+        if (refererHost === host) return true;
+      } catch { /* invalid URL, skip */ }
+    }
   }
 
   return false;
