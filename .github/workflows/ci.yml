@@ -11,6 +11,26 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  env-check:
+    name: Validate Required Env Vars
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check required secrets are configured
+        run: |
+          missing=()
+          if [ -z "${{ secrets.DATABASE_URL }}" ]; then
+            missing+=("DATABASE_URL")
+          fi
+          if [ -z "${{ secrets.MONARCH_TOKEN }}" ]; then
+            missing+=("MONARCH_TOKEN")
+          fi
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Missing required secrets: ${missing[*]}"
+            echo "Configure these in GitHub repo Settings > Secrets and variables > Actions"
+            exit 1
+          fi
+          echo "All required env vars are configured."
+
   lint:
     name: Lint
     runs-on: ubuntu-latest
@@ -99,7 +119,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [lint, type-check, test]
+    needs: [env-check, lint, type-check, test]
     steps:
       - uses: actions/checkout@v4
 

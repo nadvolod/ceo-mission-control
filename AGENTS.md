@@ -25,10 +25,11 @@ The rules below are the authoritative local copy. Follow them exactly for every 
 7. Code coverage must be measured and maintained.
 8. Must have thorough monitoring.
 9. Must include thorough logging.
-10. Never skip any tests if an env variable isn't configured. fail the tests with a clear error message.
-11. Push every feature into a PR and then wait for review from Copilot or Coderabbit, implement their feedback when it makes sense.
-12. Deploy on Vercel has to be tested and working.
-13. **CI-green before handoff** – After pushing a PR, monitor CI and reviewer bots (CodeRabbit, Copilot). Address all valuable feedback, re-push, and only notify the human once every check is green and bot comments are resolved. Do not hand off a red PR.
+10. Never skip any tests if an env variable isn't configured. Fail the tests with a clear error message that names the missing variable and how to set it.
+11. **CI must validate required env vars** — A dedicated CI job must check that all required secrets/env vars (e.g. `DATABASE_URL`, `MONARCH_TOKEN`) are configured in the repo. If any are missing, the job must fail with a clear message listing which vars are absent. This catches misconfiguration before tests silently pass with mocked data.
+12. Push every feature into a PR and then wait for review from Copilot or Coderabbit, implement their feedback when it makes sense.
+13. Deploy on Vercel has to be tested and working.
+14. **CI-green before handoff** – After pushing a PR, monitor CI and reviewer bots (CodeRabbit, Copilot). Address all valuable feedback, re-push, and only notify the human once every check is green and bot comments are resolved. Do not hand off a red PR.
 
 ---
 
