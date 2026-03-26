@@ -36,5 +36,11 @@ const config = {
   },
 }
 
-// createJestConfig is exported this way to ensure that next/jest can load the Next.js config which is async
-module.exports = createJestConfig(config)
+// next/jest overrides transformIgnorePatterns; apply our ESM exclusions after
+module.exports = async () => {
+  const jestConfig = await createJestConfig(config)()
+  jestConfig.transformIgnorePatterns = [
+    '/node_modules/(?!(monarch-money-api|graphql-request|node-fetch|data-uri-to-buffer|fetch-blob|formdata-polyfill|form-data)/)',
+  ]
+  return jestConfig
+}

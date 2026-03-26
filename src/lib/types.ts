@@ -127,6 +127,52 @@ export interface TemporalData {
   dailyTotals: Record<string, number>;
 }
 
+// Monarch Money integration types
+export interface MonarchAccount {
+  id: string;
+  displayName: string;
+  currentBalance: number;
+  displayBalance: number;
+  isAsset: boolean;
+  isHidden: boolean;
+  syncDisabled: boolean;
+  includeInNetWorth: boolean;
+  deactivatedAt: string | null;
+  updatedAt: string;
+  displayLastUpdatedAt: string;
+  logoUrl: string | null;
+  type: { name: string; display: string };
+  subtype: { name: string; display: string };
+  institution: { id: string; name: string } | null;
+  credential: {
+    id: string;
+    updateRequired: boolean;
+    disconnectedFromDataProviderAt: string | null;
+    institution: { id: string; name: string } | null;
+  } | null;
+}
+
+export interface MonarchCashflowSummary {
+  sumIncome: number;
+  sumExpense: number;
+  savings: number;
+  savingsRate: number;
+}
+
+export interface MonarchFinancialSnapshot {
+  accounts: MonarchAccount[];
+  cashPosition: number;
+  totalAssets: number;
+  totalLiabilities: number;
+  netWorth: number;
+  monthlyIncome: number;
+  monthlyExpenses: number;
+  burnRate: number;
+  runwayMonths: number;
+  savingsRate: number;
+  lastSynced: string;
+}
+
 // Task sync types — bidirectional sync between local OpenClaw and production dashboard
 
 export interface LocalTask {

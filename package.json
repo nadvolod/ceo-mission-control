@@ -9,7 +9,8 @@
     "lint": "eslint",
     "test": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "test:monarch": "npx tsx tests/monarch.integration.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.28.0",
@@ -20,6 +21,7 @@
     "framer-motion": "^12.38.0",
     "gray-matter": "^4.0.3",
     "lucide-react": "^0.577.0",
+    "monarch-money-api": "^0.0.7",
     "next": "16.2.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",

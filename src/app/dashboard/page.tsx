@@ -6,7 +6,7 @@ import { MissionTracker } from '@/components/MissionTracker';
 import { FinancialMetricsDashboard } from '@/components/FinancialMetricsDashboard';
 import { FinancialCommandCenter } from '@/components/FinancialCommandCenter';
 import { FocusHoursTracker } from '@/components/FocusHoursTracker';
-import { AiTask, TaskStats, FocusCategory } from '@/lib/types';
+import { AiTask, TaskStats, FocusCategory, MonarchFinancialSnapshot } from '@/lib/types';
 import { useState, useEffect } from 'react';
 
 export default function HomePage() {
@@ -16,6 +16,9 @@ export default function HomePage() {
   const [scorecard, setScorecard] = useState<any>(null);
   const [financialData, setFinancialData] = useState<any>(null);
   const [focusData, setFocusData] = useState<any>(null);
+  const [monarchData, setMonarchData] = useState<MonarchFinancialSnapshot | null>(null);
+  const [monarchError, setMonarchError] = useState<string | null>(null);
+  const [monarchLoading, setMonarchLoading] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
@@ -54,6 +57,16 @@ export default function HomePage() {
       if (focusResponse.ok) {
         const focusDataResult = await focusResponse.json();
         setFocusData(focusDataResult);
+      }
+
+      // Load Monarch financial data
+      const monarchResponse = await fetch('/api/monarch');
+      const monarchResult = await monarchResponse.json().catch(() => null);
+      if (monarchResult?.error) {
+        setMonarchError(monarchResult.error);
+      } else if (monarchResult) {
+        setMonarchData(monarchResult);
+        setMonarchError(null);
       }
 
       setLastRefresh(new Date());
@@ -96,6 +109,28 @@ export default function HomePage() {
       if (response.ok) await loadAllData();
     } catch (error) {
       console.error('Error deleting task:', error);
+    }
+  };
+
+  const handleMonarchRefresh = async () => {
+    setMonarchLoading(true);
+    try {
+      const response = await fetch('/api/monarch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'refresh' }),
+      });
+      const result = await response.json().catch(() => null);
+      if (result?.error) {
+        setMonarchError(result.error);
+      } else if (result) {
+        setMonarchData(result);
+        setMonarchError(null);
+      }
+    } catch (error) {
+      console.error('Error refreshing Monarch data:', error);
+    } finally {
+      setMonarchLoading(false);
     }
   };
 
@@ -196,9 +231,14 @@ export default function HomePage() {
           <MissionTracker />
         </div>
 
-        {/* Financial Command Center - Full Width */}
+        {/* Monarch Financial Command Center - Full Width */}
         <div className="mb-8">
-          <FinancialCommandCenter />
+          <FinancialCommandCenter
+            snapshot={monarchData}
+            isLoading={monarchLoading}
+            onRefresh={handleMonarchRefresh}
+            error={monarchError}
+          />
         </div>
 
         {/* Metrics - 2 Column Grid */}
