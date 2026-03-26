@@ -28,53 +28,63 @@ export default function HomePage() {
   }, []);
 
   const loadAllData = async () => {
-    try {
-      // Load tasks from ai-task-list
-      const tasksResponse = await fetch('/api/tasks');
-      if (tasksResponse.ok) {
-        const tasksData = await tasksResponse.json();
-        setAiTasks(tasksData.tasks || []);
-        setTaskStats(tasksData.stats || { total: 0, todo: 0, doing: 0, doneToday: 0, overdue: 0 });
-      }
+    // Fetch each data source independently so one failure doesn't block others
+    const fetchers = [
+      async () => {
+        try {
+          const res = await fetch('/api/tasks');
+          if (res.ok) {
+            const data = await res.json();
+            setAiTasks(data.tasks || []);
+            setTaskStats(data.stats || { total: 0, todo: 0, doing: 0, doneToday: 0, overdue: 0 });
+          }
+        } catch (e) { console.error('Error loading tasks:', e); }
+      },
+      async () => {
+        try {
+          const res = await fetch('/api/workspace');
+          if (res.ok) {
+            const data = await res.json();
+            setInitiatives(data.initiatives || []);
+            setScorecard(data.scorecard);
+          }
+        } catch (e) { console.error('Error loading workspace:', e); }
+      },
+      async () => {
+        try {
+          const res = await fetch('/api/financial');
+          if (res.ok) {
+            const data = await res.json();
+            setFinancialData(data);
+          }
+        } catch (e) { console.error('Error loading financial:', e); }
+      },
+      async () => {
+        try {
+          const res = await fetch('/api/focus-hours');
+          if (res.ok) {
+            const data = await res.json();
+            setFocusData(data);
+          }
+        } catch (e) { console.error('Error loading focus hours:', e); }
+      },
+      async () => {
+        try {
+          const res = await fetch('/api/monarch');
+          const data = await res.json().catch(() => null);
+          if (data?.error) {
+            setMonarchError(data.error);
+          } else if (data) {
+            setMonarchData(data);
+            setMonarchError(null);
+          }
+        } catch (e) { console.error('Error loading Monarch:', e); }
+      },
+    ];
 
-      // Load workspace data
-      const workspaceResponse = await fetch('/api/workspace');
-      if (workspaceResponse.ok) {
-        const workspaceData = await workspaceResponse.json();
-        setInitiatives(workspaceData.initiatives || []);
-        setScorecard(workspaceData.scorecard);
-      }
-
-      // Load financial data
-      const financialResponse = await fetch('/api/financial');
-      if (financialResponse.ok) {
-        const financialDataResult = await financialResponse.json();
-        setFinancialData(financialDataResult);
-      }
-
-      // Load focus hours data
-      const focusResponse = await fetch('/api/focus-hours');
-      if (focusResponse.ok) {
-        const focusDataResult = await focusResponse.json();
-        setFocusData(focusDataResult);
-      }
-
-      // Load Monarch financial data
-      const monarchResponse = await fetch('/api/monarch');
-      const monarchResult = await monarchResponse.json().catch(() => null);
-      if (monarchResult?.error) {
-        setMonarchError(monarchResult.error);
-      } else if (monarchResult) {
-        setMonarchData(monarchResult);
-        setMonarchError(null);
-      }
-
-      setLastRefresh(new Date());
-    } catch (error) {
-      console.error('Error loading data:', error);
-    } finally {
-      setIsLoading(false);
-    }
+    await Promise.allSettled(fetchers.map(f => f()));
+    setLastRefresh(new Date());
+    setIsLoading(false);
   };
 
   const handleCreateTask = async (data: { title: string; category?: string }) => {
