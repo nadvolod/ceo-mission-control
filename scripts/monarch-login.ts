@@ -22,11 +22,36 @@ async function main() {
   const ask = (prompt: string): Promise<string> =>
     new Promise((resolve) => rl.question(prompt, resolve));
 
+  const askPassword = (prompt: string): Promise<string> =>
+    new Promise((resolve) => {
+      process.stderr.write(prompt);
+      const stdin = process.stdin;
+      const wasRaw = stdin.isRaw;
+      if (stdin.isTTY) stdin.setRawMode(true);
+      let password = '';
+      const onData = (ch: Buffer) => {
+        const c = ch.toString('utf8');
+        if (c === '\n' || c === '\r') {
+          stdin.removeListener('data', onData);
+          if (stdin.isTTY) stdin.setRawMode(wasRaw ?? false);
+          process.stderr.write('\n');
+          resolve(password);
+        } else if (c === '\u0003') {
+          process.exit(1);
+        } else if (c === '\u007f' || c === '\b') {
+          password = password.slice(0, -1);
+        } else {
+          password += c;
+        }
+      };
+      stdin.on('data', onData);
+    });
+
   console.error('\nMonarch Money Login\n');
   console.error('This will generate a session token for the MONARCH_TOKEN env var.\n');
 
   const email = await ask('Email: ');
-  const password = await ask('Password: ');
+  const password = await askPassword('Password: ');
 
   // Dynamic import of ESM package
   const { loginUser, multiFactorAuthenticate, getToken } = await import('monarch-money-api');
@@ -58,7 +83,7 @@ async function main() {
 
   console.error('\nLogin successful!\n');
   console.error('Add to your environment:');
-  console.error(`  MONARCH_TOKEN=${token}\n`);
+  console.error('  MONARCH_TOKEN=<token printed above>\n');
   console.error('For Vercel:');
   console.error('  vercel env add MONARCH_TOKEN\n');
 }

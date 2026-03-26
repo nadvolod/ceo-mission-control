@@ -16,9 +16,13 @@ export async function GET() {
     console.error('Error fetching Monarch data:', error);
 
     // Try to serve stale cache on error
-    const stale = await getCachedSnapshot();
-    if (stale) {
-      return NextResponse.json({ ...stale, stale: true });
+    try {
+      const stale = await getCachedSnapshot();
+      if (stale) {
+        return NextResponse.json({ ...stale, stale: true });
+      }
+    } catch (cacheError) {
+      console.error('Error reading cached Monarch data:', cacheError);
     }
 
     return NextResponse.json(
