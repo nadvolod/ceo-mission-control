@@ -10,20 +10,22 @@ interface FinancialCommandCenterProps {
   error?: string | null;
 }
 
-function formatCurrency(amount: number): string {
-  if (Math.abs(amount) >= 1_000_000) {
-    return `$${(amount / 1_000_000).toFixed(2)}M`;
+function formatCurrency(amount: number | null | undefined): string {
+  const n = amount ?? 0;
+  if (Math.abs(n) >= 1_000_000) {
+    return `$${(n / 1_000_000).toFixed(2)}M`;
   }
-  if (Math.abs(amount) >= 1_000) {
-    return `$${(amount / 1_000).toFixed(1)}K`;
+  if (Math.abs(n) >= 1_000) {
+    return `$${(n / 1_000).toFixed(1)}K`;
   }
-  return `$${amount.toFixed(0)}`;
+  return `$${n.toFixed(0)}`;
 }
 
-function formatRunway(months: number): string {
-  if (months < 0) return 'No burn'; // -1 sentinel = profitable/no net burn
-  if (months >= 12) return `${(months / 12).toFixed(1)} years`;
-  return `${months.toFixed(1)} months`;
+function formatRunway(months: number | null | undefined): string {
+  const n = months ?? 0;
+  if (n < 0) return 'No burn'; // -1 sentinel = profitable/no net burn
+  if (n >= 12) return `${(n / 12).toFixed(1)} years`;
+  return `${n.toFixed(1)} months`;
 }
 
 function groupAccountsByType(accounts: MonarchAccount[]): Record<string, MonarchAccount[]> {
@@ -79,28 +81,29 @@ export function FinancialCommandCenter({ snapshot, isLoading, onRefresh, error }
   }
 
   const isStale = (snapshot as any).stale === true;
-  const runwayPositive = snapshot.runwayMonths >= 0;
-  const runwayColor = !runwayPositive ? 'text-green-600' : snapshot.runwayMonths < 3 ? 'text-red-600' : snapshot.runwayMonths < 6 ? 'text-yellow-600' : 'text-green-600';
-  const runwayBgColor = !runwayPositive ? 'bg-green-50' : snapshot.runwayMonths < 3 ? 'bg-red-50' : snapshot.runwayMonths < 6 ? 'bg-yellow-50' : 'bg-green-50';
-  const accountGroups = groupAccountsByType(snapshot.accounts);
+  const runway = snapshot.runwayMonths ?? 0;
+  const runwayPositive = runway >= 0;
+  const runwayColor = !runwayPositive ? 'text-green-600' : runway < 3 ? 'text-red-600' : runway < 6 ? 'text-yellow-600' : 'text-green-600';
+  const runwayBgColor = !runwayPositive ? 'bg-green-50' : runway < 3 ? 'bg-red-50' : runway < 6 ? 'bg-yellow-50' : 'bg-green-50';
+  const accountGroups = groupAccountsByType(snapshot.accounts ?? []);
 
   const cards = [
     {
       title: 'Cash Position',
       value: formatCurrency(snapshot.cashPosition),
-      subValue: `${formatRunway(snapshot.runwayMonths)} runway`,
+      subValue: `${formatRunway(runway)} runway`,
       icon: Wallet,
       color: runwayColor,
       bgColor: runwayBgColor,
-      urgent: snapshot.runwayMonths >= 0 && snapshot.runwayMonths < 3,
+      urgent: runway >= 0 && runway < 3,
     },
     {
       title: 'Net Worth',
       value: formatCurrency(snapshot.netWorth),
       subValue: `${formatCurrency(snapshot.totalAssets)} assets - ${formatCurrency(snapshot.totalLiabilities)} debt`,
       icon: TrendingUp,
-      color: snapshot.netWorth >= 0 ? 'text-green-600' : 'text-red-600',
-      bgColor: snapshot.netWorth >= 0 ? 'bg-green-50' : 'bg-red-50',
+      color: (snapshot.netWorth ?? 0) >= 0 ? 'text-green-600' : 'text-red-600',
+      bgColor: (snapshot.netWorth ?? 0) >= 0 ? 'bg-green-50' : 'bg-red-50',
       urgent: false,
     },
     {
@@ -114,11 +117,11 @@ export function FinancialCommandCenter({ snapshot, isLoading, onRefresh, error }
     },
     {
       title: 'Savings Rate',
-      value: `${(snapshot.savingsRate * 100).toFixed(0)}%`,
-      subValue: `${formatCurrency(snapshot.monthlyIncome - snapshot.monthlyExpenses)}/mo saved`,
+      value: `${((snapshot.savingsRate ?? 0) * 100).toFixed(0)}%`,
+      subValue: `${formatCurrency((snapshot.monthlyIncome ?? 0) - (snapshot.monthlyExpenses ?? 0))}/mo saved`,
       icon: PiggyBank,
-      color: snapshot.savingsRate > 0 ? 'text-emerald-600' : 'text-red-600',
-      bgColor: snapshot.savingsRate > 0 ? 'bg-emerald-50' : 'bg-red-50',
+      color: (snapshot.savingsRate ?? 0) > 0 ? 'text-emerald-600' : 'text-red-600',
+      bgColor: (snapshot.savingsRate ?? 0) > 0 ? 'bg-emerald-50' : 'bg-red-50',
       urgent: false,
     },
   ];
@@ -178,16 +181,16 @@ export function FinancialCommandCenter({ snapshot, isLoading, onRefresh, error }
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-gray-700">Current Position</span>
             <span className={`text-sm font-bold ${runwayColor}`}>
-              {formatRunway(snapshot.runwayMonths)}
+              {formatRunway(runway)}
             </span>
           </div>
           <div className="w-full bg-gray-200 rounded-full h-3">
             <div
               className={`h-3 rounded-full transition-all ${
-                snapshot.runwayMonths < 3 ? 'bg-red-500' :
-                snapshot.runwayMonths < 6 ? 'bg-yellow-500' : 'bg-green-500'
+                runway < 3 ? 'bg-red-500' :
+                runway < 6 ? 'bg-yellow-500' : 'bg-green-500'
               }`}
-              style={{ width: `${Math.min(snapshot.runwayMonths >= 0 ? (snapshot.runwayMonths / 24) * 100 : 100, 100)}%` }}
+              style={{ width: `${Math.min(runway >= 0 ? (runway / 24) * 100 : 100, 100)}%` }}
             ></div>
           </div>
           <div className="flex items-center justify-between text-xs text-gray-500">
@@ -210,7 +213,7 @@ export function FinancialCommandCenter({ snapshot, isLoading, onRefresh, error }
                     className="h-2 rounded-full bg-green-500"
                     style={{
                       width: `${Math.min(
-                        (snapshot.monthlyIncome / Math.max(snapshot.monthlyIncome, snapshot.monthlyExpenses, 1)) * 100,
+                        ((snapshot.monthlyIncome ?? 0) / Math.max(snapshot.monthlyIncome ?? 0, snapshot.monthlyExpenses ?? 0, 1)) * 100,
                         100
                       )}%`
                     }}
@@ -227,7 +230,7 @@ export function FinancialCommandCenter({ snapshot, isLoading, onRefresh, error }
                     className="h-2 rounded-full bg-red-400"
                     style={{
                       width: `${Math.min(
-                        (snapshot.monthlyExpenses / Math.max(snapshot.monthlyIncome, snapshot.monthlyExpenses, 1)) * 100,
+                        ((snapshot.monthlyExpenses ?? 0) / Math.max(snapshot.monthlyIncome ?? 0, snapshot.monthlyExpenses ?? 0, 1)) * 100,
                         100
                       )}%`
                     }}
@@ -270,7 +273,7 @@ export function FinancialCommandCenter({ snapshot, isLoading, onRefresh, error }
                           <span className="text-xs text-gray-400">&middot; {account.institution.name}</span>
                         )}
                       </div>
-                      <span className={`font-medium ${account.currentBalance >= 0 ? 'text-gray-900' : 'text-red-600'}`}>
+                      <span className={`font-medium ${(account.currentBalance ?? 0) >= 0 ? 'text-gray-900' : 'text-red-600'}`}>
                         {formatCurrency(account.currentBalance)}
                       </span>
                     </div>

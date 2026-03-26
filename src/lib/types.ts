@@ -131,8 +131,8 @@ export interface TemporalData {
 export interface MonarchAccount {
   id: string;
   displayName: string;
-  currentBalance: number;
-  displayBalance: number;
+  currentBalance: number | null;
+  displayBalance: number | null;
   isAsset: boolean;
   isHidden: boolean;
   syncDisabled: boolean;
