@@ -10,7 +10,8 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "test:coverage": "jest --coverage",
-    "test:monarch": "tsx tests/monarch.integration.ts"
+    "test:monarch": "tsx tests/monarch.integration.ts",
+    "test:e2e": "tsx tests/dashboard-e2e.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.28.0",

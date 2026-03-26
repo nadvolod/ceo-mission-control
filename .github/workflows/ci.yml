@@ -91,6 +91,11 @@ jobs:
           MONARCH_TOKEN: ${{ secrets.MONARCH_TOKEN }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
+      - name: E2E dashboard rendering tests
+        run: npm run test:e2e
+        env:
+          DASHBOARD_URL: https://ceo-mission-control-nine.vercel.app
+
       - name: Coverage report
         if: always()
         run: npx jest --coverage --ci --reporters=default --testPathIgnorePatterns='integration'
