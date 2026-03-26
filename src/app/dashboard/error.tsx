@@ -26,7 +26,6 @@ export default function DashboardError({
           </summary>
           <pre className="mt-2 text-xs text-red-600 whitespace-pre-wrap break-words">
             {error.message}
-            {error.stack && `\n\n${error.stack}`}
           </pre>
           {error.digest && (
             <p className="mt-2 text-xs text-red-500">Digest: {error.digest}</p>
