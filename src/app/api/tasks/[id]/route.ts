@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { updateTask, deleteTask } from '@/lib/task-api';
 import { checkAuth } from '@/lib/auth';
+import { FinancialTracker } from '@/lib/financial-tracker';
+import type { AiTask } from '@/lib/types';
+
+function inferFinancialCategory(task: AiTask): 'moved' | 'generated' | 'cut' {
+  const cat = (task.category || '').toLowerCase();
+  if (cat === 'revenue' || cat === 'temporal') return 'generated';
+  if (cat === 'finance' || cat === 'admin') return 'cut';
+  return 'moved';
+}
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   if (!checkAuth(request)) {
@@ -17,6 +26,29 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!task) {
       return NextResponse.json({ success: false, error: 'Failed to update task' }, { status: 500 });
     }
+
+    // Auto-create financial entry when a task with monetaryValue is completed
+    // Fire-and-forget: don't block the response
+    if (body.status === 'done' && task.monetaryValue && task.monetaryValue > 0) {
+      const taskTitle = task.title;
+      const monetaryValue = task.monetaryValue;
+      const category = inferFinancialCategory(task);
+      const marker = `[task:${taskId}]`;
+      (async () => {
+        try {
+          const tracker = await FinancialTracker.create();
+          const todaysEntries = tracker.getTodaysMetrics().entries;
+          const alreadyLogged = todaysEntries.some((e) => e.description.includes(marker));
+          if (!alreadyLogged) {
+            await tracker.addEntry(category, monetaryValue, `${marker} Task completed: ${taskTitle}`);
+            console.log(`Auto-created financial entry: ${category} $${monetaryValue} for "${taskTitle}"`);
+          }
+        } catch (err) {
+          console.error('Error auto-creating financial entry for completed task:', err);
+        }
+      })();
+    }
+
     return NextResponse.json({ success: true, task });
   } catch (error) {
     console.error('Error updating task:', error);

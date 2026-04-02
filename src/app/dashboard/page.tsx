@@ -6,167 +6,18 @@ import { MissionTracker } from '@/components/MissionTracker';
 import { FinancialMetricsDashboard } from '@/components/FinancialMetricsDashboard';
 import { FinancialCommandCenter } from '@/components/FinancialCommandCenter';
 import { FocusHoursTracker } from '@/components/FocusHoursTracker';
-import { AiTask, TaskStats, FocusCategory, MonarchFinancialSnapshot } from '@/lib/types';
-import { useState, useEffect } from 'react';
+import { RevenueProjectionWidget } from '@/components/RevenueProjectionWidget';
+import { enrichScorecard } from '@/lib/derive-focus';
+import { useDashboardData } from '@/hooks/useDashboardData';
 
 export default function HomePage() {
-  const [aiTasks, setAiTasks] = useState<AiTask[]>([]);
-  const [taskStats, setTaskStats] = useState<TaskStats>({ total: 0, todo: 0, doing: 0, doneToday: 0, overdue: 0 });
-  const [initiatives, setInitiatives] = useState<any[]>([]);
-  const [scorecard, setScorecard] = useState<any>(null);
-  const [financialData, setFinancialData] = useState<any>(null);
-  const [focusData, setFocusData] = useState<any>(null);
-  const [monarchData, setMonarchData] = useState<MonarchFinancialSnapshot | null>(null);
-  const [monarchError, setMonarchError] = useState<string | null>(null);
-  const [monarchLoading, setMonarchLoading] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
-
-  // Load initial data
-  useEffect(() => {
-    loadAllData();
-  }, []);
-
-  const loadAllData = async () => {
-    // Fetch each data source independently so one failure doesn't block others
-    const fetchers = [
-      async () => {
-        try {
-          const res = await fetch('/api/tasks');
-          if (res.ok) {
-            const data = await res.json();
-            setAiTasks(data.tasks || []);
-            setTaskStats(data.stats || { total: 0, todo: 0, doing: 0, doneToday: 0, overdue: 0 });
-          }
-        } catch (e) { console.error('Error loading tasks:', e); }
-      },
-      async () => {
-        try {
-          const res = await fetch('/api/workspace');
-          if (res.ok) {
-            const data = await res.json();
-            setInitiatives(data.initiatives || []);
-            setScorecard(data.scorecard);
-          }
-        } catch (e) { console.error('Error loading workspace:', e); }
-      },
-      async () => {
-        try {
-          const res = await fetch('/api/financial');
-          if (res.ok) {
-            const data = await res.json();
-            setFinancialData(data);
-          }
-        } catch (e) { console.error('Error loading financial:', e); }
-      },
-      async () => {
-        try {
-          const res = await fetch('/api/focus-hours');
-          if (res.ok) {
-            const data = await res.json();
-            setFocusData(data);
-          }
-        } catch (e) { console.error('Error loading focus hours:', e); }
-      },
-      async () => {
-        try {
-          const res = await fetch('/api/monarch');
-          const data = await res.json().catch(() => null);
-          if (data?.error) {
-            setMonarchError(data.error);
-          } else if (data) {
-            setMonarchData(data);
-            setMonarchError(null);
-          }
-        } catch (e) { console.error('Error loading Monarch:', e); }
-      },
-    ];
-
-    await Promise.allSettled(fetchers.map(f => f()));
-    setLastRefresh(new Date());
-    setIsLoading(false);
-  };
-
-  const handleCreateTask = async (data: { title: string; category?: string }) => {
-    try {
-      const response = await fetch('/api/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      if (response.ok) await loadAllData();
-    } catch (error) {
-      console.error('Error creating task:', error);
-    }
-  };
-
-  const handleUpdateTask = async (id: number, data: { status?: string; title?: string }) => {
-    try {
-      const response = await fetch(`/api/tasks/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(data)
-      });
-      if (response.ok) await loadAllData();
-    } catch (error) {
-      console.error('Error updating task:', error);
-    }
-  };
-
-  const handleDeleteTask = async (id: number) => {
-    try {
-      const response = await fetch(`/api/tasks/${id}`, { method: 'DELETE' });
-      if (response.ok) await loadAllData();
-    } catch (error) {
-      console.error('Error deleting task:', error);
-    }
-  };
-
-  const handleMonarchRefresh = async () => {
-    setMonarchLoading(true);
-    try {
-      const response = await fetch('/api/monarch', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'refresh' }),
-      });
-      const result = await response.json().catch(() => null);
-      if (result?.error) {
-        setMonarchError(result.error);
-      } else if (result) {
-        setMonarchData(result);
-        setMonarchError(null);
-      }
-    } catch (error) {
-      console.error('Error refreshing Monarch data:', error);
-    } finally {
-      setMonarchLoading(false);
-    }
-  };
-
-  const handleAddFocusSession = async (category: FocusCategory, hours: number, description: string) => {
-    try {
-      const response = await fetch('/api/focus-hours', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'addSession',
-          category,
-          hours,
-          description: description || `${hours}h ${category} focus block`
-        })
-      });
-
-      if (!response.ok) {
-        const errorBody = await response.json().catch(() => ({}));
-        throw new Error(errorBody.error || 'Failed to add focus session');
-      }
-
-      await loadAllData();
-    } catch (error) {
-      console.error('Error adding focus session:', error);
-    }
-  };
+  const {
+    aiTasks, taskStats, initiatives, scorecard, financialData, focusData,
+    monarchData, monarchError, monarchLoading, projectionData, isLoading,
+    loadAllData, handleCreateTask, handleUpdateTask, handleDeleteTask,
+    handleMonarchRefresh, handleAddProjectionAdjustment, handleRemoveProjectionAdjustment,
+    handleAddFinancialEntry, handleAddFocusSession,
+  } = useDashboardData();
 
   if (isLoading) {
     return (
@@ -197,6 +48,9 @@ export default function HomePage() {
       </div>
     );
   }
+
+  // scorecard is guaranteed non-null after the early return above
+  const enrichedScorecard = enrichScorecard(scorecard, aiTasks, initiatives);
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -255,6 +109,24 @@ export default function HomePage() {
           />
         </div>
 
+        {/* Revenue Projections */}
+        {projectionData && (
+          <div className="mb-8">
+            <RevenueProjectionWidget
+              projections={projectionData.projections ?? []}
+              adjustments={projectionData.data?.adjustments ?? []}
+              baseIncome={projectionData.data?.baseMonthlyIncome ?? monarchData?.monthlyIncome ?? 0}
+              baseExpenses={projectionData.data?.baseMonthlyExpenses ?? monarchData?.monthlyExpenses ?? 0}
+              isUsingMonarchBase={{
+                income: projectionData.data?.baseMonthlyIncome == null,
+                expenses: projectionData.data?.baseMonthlyExpenses == null,
+              }}
+              onAddAdjustment={handleAddProjectionAdjustment}
+              onRemoveAdjustment={handleRemoveProjectionAdjustment}
+            />
+          </div>
+        )}
+
         {/* Mission Tracker - Connected to real MRR from Monarch */}
         <div className="mb-8">
           <MissionTracker currentMRR={monarchData?.monthlyIncome} />
@@ -262,26 +134,12 @@ export default function HomePage() {
 
         {/* Today's Plan - Priorities, Critical Moves, Focus Blocks */}
         <div className="mb-8">
-          <FocusOptimization scorecard={scorecard} />
+          <FocusOptimization scorecard={enrichedScorecard} />
         </div>
 
-        {/* Task Dashboard - Full Width */}
-        <div className="mb-8">
-          <TaskDashboard
-            tasks={aiTasks.filter(t => t.status !== 'done')}
-            stats={taskStats}
-            onCreateTask={handleCreateTask}
-            onUpdateTask={handleUpdateTask}
-            onDeleteTask={handleDeleteTask}
-            onRefresh={loadAllData}
-            taskListUrl={process.env.NEXT_PUBLIC_AI_TASK_LIST_URL || 'https://tasklistai.vercel.app'}
-          />
-        </div>
-
-        {/* Detail Sections - 2 Column Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Focus Hours Dashboard */}
-          {focusData && (
+        {/* Focus Hours Dashboard - Full Width */}
+        {focusData && (
+          <div className="mb-8">
             <FocusHoursTracker
               todaysMetrics={focusData.todaysMetrics}
               weeklyTotals={focusData.weeklyTotals}
@@ -294,17 +152,33 @@ export default function HomePage() {
               temporalActual={scorecard.temporalActual || 0}
               onAddSession={handleAddFocusSession}
             />
-          )}
+          </div>
+        )}
 
-          {/* Financial Impact Tracking - only show if there's activity */}
-          {financialData && (
+        {/* Financial Impact Tracking - Full Width */}
+        {financialData && (
+          <div className="mb-8">
             <FinancialMetricsDashboard
               todaysMetrics={financialData.todaysMetrics}
               weeklyTotals={financialData.weeklyTotals}
               monthlyTotals={financialData.monthlyTotals}
               recentEntries={financialData.recentEntries}
+              onAddEntry={handleAddFinancialEntry}
             />
-          )}
+          </div>
+        )}
+
+        {/* Task Dashboard - Always Last */}
+        <div className="mb-8">
+          <TaskDashboard
+            tasks={aiTasks.filter(t => t.status !== 'done')}
+            stats={taskStats}
+            onCreateTask={handleCreateTask}
+            onUpdateTask={handleUpdateTask}
+            onDeleteTask={handleDeleteTask}
+            onRefresh={loadAllData}
+            taskListUrl={process.env.NEXT_PUBLIC_AI_TASK_LIST_URL || 'https://tasklistai.vercel.app'}
+          />
         </div>
       </main>
     </div>

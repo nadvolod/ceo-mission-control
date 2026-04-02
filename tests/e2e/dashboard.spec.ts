@@ -92,6 +92,7 @@ test.describe('Dashboard page rendering', () => {
       '/api/workspace',
       '/api/financial',
       '/api/focus-hours',
+      '/api/revenue-projection',
     ];
 
     for (const path of endpoints) {
@@ -107,5 +108,84 @@ test.describe('Dashboard page rendering', () => {
     expect([200, 503]).toContain(monarchResponse.status());
     const monarchData = await monarchResponse.json();
     expect(monarchData, '/api/monarch should return valid JSON').toBeTruthy();
+  });
+
+  test('revenue projection widget renders and has add button', async ({ page }) => {
+    await page.goto('/dashboard');
+    await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+    const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
+    if (hasFullDashboard) {
+      // Revenue Projections section should be visible
+      await expect(page.getByText('Revenue Projections')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Add Adjustment' })).toBeVisible();
+
+      // Projection table should render
+      await expect(page.getByText('Projection')).toBeVisible();
+      await expect(page.getByText('Adjustments')).toBeVisible();
+    }
+  });
+
+  test('financial impact tracking shows daily prompt or metrics', async ({ page }) => {
+    await page.goto('/dashboard');
+    await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+    const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
+    if (hasFullDashboard) {
+      // Financial Impact Tracking section should be visible
+      await expect(page.getByText('Financial Impact Tracking')).toBeVisible();
+
+      // Should show either the daily prompt or the metrics
+      const hasDailyPrompt = await page.getByText('How much money was moved today?').isVisible().catch(() => false);
+      const hasMetrics = await page.getByText('Money Moved').isVisible().catch(() => false);
+      expect(hasDailyPrompt || hasMetrics, 'should show daily prompt or financial metrics').toBeTruthy();
+
+      // Log Entry button should be visible
+      await expect(page.getByRole('button', { name: 'Log Entry' })).toBeVisible();
+    }
+  });
+
+  test('dashboard layout has tasks at the bottom', async ({ page }) => {
+    await page.goto('/dashboard');
+    await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+    const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
+    if (hasFullDashboard) {
+      // Verify section ordering: Financial Command Center should appear before Task Dashboard
+      const allText = await page.textContent('main');
+      if (allText) {
+        const financialPos = allText.indexOf('Financial Command Center');
+        const revenuePos = allText.indexOf('Revenue Projections');
+        const taskPos = allText.indexOf('Task Dashboard') !== -1
+          ? allText.indexOf('Task Dashboard')
+          : allText.indexOf('Active Tasks');
+
+        // Financial sections should come before tasks
+        if (financialPos !== -1 && taskPos !== -1) {
+          expect(financialPos).toBeLessThan(taskPos);
+        }
+        if (revenuePos !== -1 && taskPos !== -1) {
+          expect(revenuePos).toBeLessThan(taskPos);
+        }
+      }
+    }
+  });
+
+  test('revenue projection API validates input', async ({ request }) => {
+    // Test that invalid input is rejected
+    const badMonth = await request.post('/api/revenue-projection', {
+      data: { action: 'addAdjustment', effectiveMonth: 'invalid', amount: 1000, description: 'test', type: 'revenue_loss', recurring: false }
+    });
+    expect(badMonth.status()).toBe(400);
+
+    const badAmount = await request.post('/api/revenue-projection', {
+      data: { action: 'addAdjustment', effectiveMonth: '2026-07', amount: -100, description: 'test', type: 'revenue_loss', recurring: false }
+    });
+    expect(badAmount.status()).toBe(400);
+
+    const badType = await request.post('/api/revenue-projection', {
+      data: { action: 'addAdjustment', effectiveMonth: '2026-07', amount: 1000, description: 'test', type: 'invalid_type', recurring: false }
+    });
+    expect(badType.status()).toBe(400);
   });
 });

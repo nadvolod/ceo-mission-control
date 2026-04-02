@@ -1,6 +1,7 @@
 'use client';
 
-import { DollarSign, TrendingUp, Scissors, Calculator, ArrowUp, ArrowDown } from 'lucide-react';
+import { useState } from 'react';
+import { DollarSign, TrendingUp, Scissors, Calculator, ArrowUp, ArrowDown, Plus } from 'lucide-react';
 
 interface FinancialEntry {
   id: string;
@@ -26,15 +27,38 @@ interface FinancialMetricsDashboardProps {
   weeklyTotals: { moved: number; generated: number; cut: number; netImpact: number };
   monthlyTotals: { moved: number; generated: number; cut: number; netImpact: number };
   recentEntries: FinancialEntry[];
+  onAddEntry?: (category: 'moved' | 'generated' | 'cut', amount: number, description: string) => Promise<void>;
 }
 
 export function FinancialMetricsDashboard({
   todaysMetrics,
   weeklyTotals,
   monthlyTotals,
-  recentEntries
+  recentEntries,
+  onAddEntry
 }: FinancialMetricsDashboardProps) {
-  
+  const [isAdding, setIsAdding] = useState(false);
+  const [addCategory, setAddCategory] = useState<'moved' | 'generated' | 'cut'>('moved');
+  const [addAmount, setAddAmount] = useState('');
+  const [addDescription, setAddDescription] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleAddEntry = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addAmount.trim() || !onAddEntry) return;
+    setIsSubmitting(true);
+    try {
+      await onAddEntry(addCategory, parseFloat(addAmount), addDescription.trim() || `Manual ${addCategory} entry`);
+      setAddAmount('');
+      setAddDescription('');
+      setIsAdding(false);
+    } catch (error) {
+      console.error('Error adding financial entry:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const formatCurrency = (amount: number) => {
     if (amount >= 1000000) return `$${(amount / 1000000).toFixed(1)}M`;
     if (amount >= 1000) return `$${(amount / 1000).toFixed(0)}K`;
@@ -67,9 +91,110 @@ export function FinancialMetricsDashboard({
     <div className="bg-gradient-to-br from-green-50 to-blue-50 rounded-lg shadow-lg p-6">
       {/* Header */}
       <div className="text-center mb-6">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Financial Impact Tracking</h2>
+        <div className="flex items-center justify-center gap-3 mb-2">
+          <h2 className="text-2xl font-bold text-gray-900">Financial Impact Tracking</h2>
+          {onAddEntry && (
+            <button
+              onClick={() => setIsAdding(!isAdding)}
+              className="px-3 py-1.5 text-sm bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-1"
+            >
+              <Plus className="h-4 w-4" />
+              Log Entry
+            </button>
+          )}
+        </div>
         <p className="text-gray-600">How much $ was moved today toward $1M/month goal</p>
       </div>
+
+      {/* Daily Key Question - shows when no activity today */}
+      {todayTotal === 0 && onAddEntry && !isAdding && (
+        <div className="bg-amber-50 border-2 border-amber-300 rounded-lg p-5 mb-6">
+          <h3 className="text-lg font-bold text-amber-900 text-center mb-3">
+            How much money was moved today?
+          </h3>
+          <p className="text-sm text-amber-700 text-center mb-4">
+            Log your financial moves to track progress toward your $1M/month goal.
+          </p>
+          <div className="flex flex-wrap justify-center gap-2">
+            {[
+              { amount: 1000, cat: 'moved' as const, label: '+$1K Moved', color: 'bg-blue-100 text-blue-700 hover:bg-blue-200' },
+              { amount: 5000, cat: 'moved' as const, label: '+$5K Moved', color: 'bg-blue-100 text-blue-700 hover:bg-blue-200' },
+              { amount: 1000, cat: 'generated' as const, label: '+$1K Revenue', color: 'bg-green-100 text-green-700 hover:bg-green-200' },
+              { amount: 5000, cat: 'generated' as const, label: '+$5K Revenue', color: 'bg-green-100 text-green-700 hover:bg-green-200' },
+              { amount: 500, cat: 'cut' as const, label: '+$500 Cut', color: 'bg-purple-100 text-purple-700 hover:bg-purple-200' },
+            ].map(({ amount, cat, label, color }) => (
+              <button
+                key={`${cat}-${amount}`}
+                onClick={() => { setAddAmount(amount.toString()); setAddCategory(cat); setIsAdding(true); }}
+                className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors ${color}`}
+              >
+                {label}
+              </button>
+            ))}
+            <button
+              onClick={() => setIsAdding(true)}
+              className="px-3 py-2 text-sm font-medium rounded-lg bg-gray-100 text-gray-700 hover:bg-gray-200 transition-colors"
+            >
+              Custom amount...
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Add Entry Form */}
+      {isAdding && onAddEntry && (
+        <form onSubmit={handleAddEntry} className="bg-white rounded-lg p-4 mb-6 border border-gray-200">
+          <h4 className="font-medium text-gray-900 mb-3">Log Financial Entry</h4>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <select
+              value={addCategory}
+              onChange={(e) => setAddCategory(e.target.value as 'moved' | 'generated' | 'cut')}
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              aria-label="Category"
+            >
+              <option value="moved">Money Moved</option>
+              <option value="generated">Revenue Generated</option>
+              <option value="cut">Expense Cut</option>
+            </select>
+            <input
+              type="number"
+              value={addAmount}
+              onChange={(e) => setAddAmount(e.target.value)}
+              placeholder="Amount ($)"
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              aria-label="Amount (USD)"
+              aria-required="true"
+              min="0"
+              step="any"
+              required
+            />
+            <input
+              type="text"
+              value={addDescription}
+              onChange={(e) => setAddDescription(e.target.value)}
+              placeholder="Description (optional)"
+              className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              aria-label="Description"
+            />
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={isSubmitting || !addAmount.trim()}
+                className="flex-1 px-3 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 transition-colors disabled:opacity-50"
+              >
+                {isSubmitting ? 'Adding...' : 'Add'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setIsAdding(false); setAddAmount(''); setAddDescription(''); }}
+                className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg text-sm hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </form>
+      )}
 
       {/* Today's Metrics - Main Display */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
@@ -224,17 +349,39 @@ export function FinancialMetricsDashboard({
         </div>
       )}
 
-      {/* Usage Hint */}
-      <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
-        <div className="text-sm text-blue-800">
-          <strong>💬 Usage:</strong> In main chat, say things like:
-          <div className="mt-1 space-y-1 text-xs">
-            <div>• "Moved $12K: Artis WHO contract signed"</div>
-            <div>• "Generated $2K: Tricentis webinar booked"</div>
-            <div>• "Cut $200: cancelled Adobe subscription"</div>
+      {/* Quick Add Buttons - shown when there's already activity and form is closed */}
+      {todayTotal > 0 && onAddEntry && !isAdding && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {[
+            { amount: 1000, cat: 'moved' as const, label: '+$1K Moved', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100' },
+            { amount: 5000, cat: 'moved' as const, label: '+$5K Moved', color: 'bg-blue-50 text-blue-700 hover:bg-blue-100' },
+            { amount: 1000, cat: 'generated' as const, label: '+$1K Revenue', color: 'bg-green-50 text-green-700 hover:bg-green-100' },
+            { amount: 500, cat: 'cut' as const, label: '+$500 Cut', color: 'bg-purple-50 text-purple-700 hover:bg-purple-100' },
+          ].map(({ amount, cat, label, color }) => (
+            <button
+              key={`quick-${cat}-${amount}`}
+              onClick={() => { setAddAmount(amount.toString()); setAddCategory(cat); setIsAdding(true); }}
+              className={`px-2 py-1 text-xs font-medium rounded-lg transition-colors ${color}`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Usage Hint - shown only when there's no add capability */}
+      {!onAddEntry && (
+        <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-3">
+          <div className="text-sm text-blue-800">
+            <strong>Usage:</strong> In main chat, say things like:
+            <div className="mt-1 space-y-1 text-xs">
+              <div>&bull; &quot;Moved $12K: Artis WHO contract signed&quot;</div>
+              <div>&bull; &quot;Generated $2K: Tricentis webinar booked&quot;</div>
+              <div>&bull; &quot;Cut $200: cancelled Adobe subscription&quot;</div>
+            </div>
           </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
