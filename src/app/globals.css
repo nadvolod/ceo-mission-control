@@ -101,6 +101,10 @@ body {
   box-shadow: 0 0 40px rgba(99, 102, 241, 0.06);
 }
 
+input, select, textarea {
+  color: #171717;
+}
+
 html {
   scroll-behavior: smooth;
 }

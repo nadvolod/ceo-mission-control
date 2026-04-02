@@ -189,6 +189,38 @@ describe('RevenueProjectionService', () => {
       expect(projections[2].incomeAdjustments).toBe(5000); // Sep (recurring)
     });
 
+    it('clamps projected income to zero when adjustments exceed base', async () => {
+      await service.addAdjustment({
+        effectiveMonth: '2026-07',
+        amount: 15000,
+        description: 'Major contract ends',
+        type: 'revenue_loss',
+        recurring: false,
+      });
+
+      const projections = service.computeProjections(10000, 7000, 50000, '2026-07', '2026-07');
+
+      // 10000 - 15000 would be -5000, but should clamp to 0
+      expect(projections[0].projectedIncome).toBe(0);
+      expect(projections[0].netCashFlow).toBe(-7000); // 0 - 7000
+    });
+
+    it('clamps projected expenses to zero when decreases exceed base', async () => {
+      await service.addAdjustment({
+        effectiveMonth: '2026-07',
+        amount: 10000,
+        description: 'Massive expense cut',
+        type: 'expense_decrease',
+        recurring: false,
+      });
+
+      const projections = service.computeProjections(10000, 7000, 50000, '2026-07', '2026-07');
+
+      // 7000 - 10000 would be -3000, but should clamp to 0
+      expect(projections[0].projectedExpenses).toBe(0);
+      expect(projections[0].netCashFlow).toBe(10000); // 10000 - 0
+    });
+
     it('handles expense_increase adjustment', async () => {
       await service.addAdjustment({
         effectiveMonth: '2026-09',
