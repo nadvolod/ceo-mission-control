@@ -40,8 +40,19 @@ export class RevenueProjectionService {
   async addAdjustment(
     adj: Omit<RevenueAdjustment, 'id' | 'createdAt'>
   ): Promise<RevenueAdjustment> {
+    if (!adj.effectiveMonth || !/^\d{4}-(0[1-9]|1[0-2])$/.test(adj.effectiveMonth)) {
+      throw new Error('Invalid effectiveMonth format (expected YYYY-MM)');
+    }
+    if (!Number.isFinite(adj.amount) || adj.amount <= 0) {
+      throw new Error('Amount must be a positive finite number');
+    }
+    const validTypes = ['revenue_gain', 'revenue_loss', 'expense_increase', 'expense_decrease'];
+    if (!validTypes.includes(adj.type)) {
+      throw new Error(`Invalid type: ${adj.type}`);
+    }
     const entry: RevenueAdjustment = {
       ...adj,
+      description: (adj.description || '').trim(),
       id: `adj_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`,
       createdAt: new Date().toISOString(),
     };

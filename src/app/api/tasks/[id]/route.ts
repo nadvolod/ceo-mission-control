@@ -28,12 +28,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     // Auto-create financial entry when a task with monetaryValue is completed
+    // Deduplicate: only create if no entry already exists today for this task
     if (body.status === 'done' && task.monetaryValue && task.monetaryValue > 0) {
       try {
         const tracker = await FinancialTracker.create();
-        const category = inferFinancialCategory(task);
-        await tracker.addEntry(category, task.monetaryValue, `Task completed: ${task.title}`);
-        console.log(`Auto-created financial entry: ${category} $${task.monetaryValue} for "${task.title}"`);
+        const marker = `[task:${taskId}]`;
+        const todaysEntries = tracker.getTodaysMetrics().entries;
+        const alreadyLogged = todaysEntries.some((e) => e.description.includes(marker));
+        if (!alreadyLogged) {
+          const category = inferFinancialCategory(task);
+          await tracker.addEntry(category, task.monetaryValue, `${marker} Task completed: ${task.title}`);
+          console.log(`Auto-created financial entry: ${category} $${task.monetaryValue} for "${task.title}"`);
+        }
       } catch (err) {
         console.error('Error auto-creating financial entry for completed task:', err);
       }

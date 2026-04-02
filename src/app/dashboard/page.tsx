@@ -7,7 +7,14 @@ import { FinancialMetricsDashboard } from '@/components/FinancialMetricsDashboar
 import { FinancialCommandCenter } from '@/components/FinancialCommandCenter';
 import { FocusHoursTracker } from '@/components/FocusHoursTracker';
 import { RevenueProjectionWidget } from '@/components/RevenueProjectionWidget';
-import { AiTask, TaskStats, FocusCategory, MonarchFinancialSnapshot, AdjustmentType } from '@/lib/types';
+import { AiTask, TaskStats, FocusCategory, MonarchFinancialSnapshot, AdjustmentType, RevenueProjectionData, MonthProjection } from '@/lib/types';
+
+interface RevenueProjectionApiResponse {
+  data: RevenueProjectionData;
+  projections: MonthProjection[];
+  monarchBase: { income: number; expenses: number; cashPosition: number };
+  timestamp: string;
+}
 import { enrichScorecard } from '@/lib/derive-focus';
 import { useState, useEffect } from 'react';
 
@@ -21,7 +28,7 @@ export default function HomePage() {
   const [monarchData, setMonarchData] = useState<MonarchFinancialSnapshot | null>(null);
   const [monarchError, setMonarchError] = useState<string | null>(null);
   const [monarchLoading, setMonarchLoading] = useState(false);
-  const [projectionData, setProjectionData] = useState<any>(null);
+  const [projectionData, setProjectionData] = useState<RevenueProjectionApiResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
@@ -165,7 +172,12 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'addAdjustment', ...adj })
       });
-      if (response.ok) await loadAllData();
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        console.error('Failed to add projection adjustment:', err.error || response.statusText);
+        return;
+      }
+      await loadAllData();
     } catch (error) {
       console.error('Error adding projection adjustment:', error);
     }
@@ -178,7 +190,12 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'removeAdjustment', id })
       });
-      if (response.ok) await loadAllData();
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        console.error('Failed to remove projection adjustment:', err.error || response.statusText);
+        return;
+      }
+      await loadAllData();
     } catch (error) {
       console.error('Error removing projection adjustment:', error);
     }
@@ -191,7 +208,12 @@ export default function HomePage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'addEntry', category, amount, description })
       });
-      if (response.ok) await loadAllData();
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        console.error('Failed to add financial entry:', err.error || response.statusText);
+        return;
+      }
+      await loadAllData();
     } catch (error) {
       console.error('Error adding financial entry:', error);
     }
@@ -320,8 +342,6 @@ export default function HomePage() {
               adjustments={projectionData.data?.adjustments ?? []}
               baseIncome={projectionData.data?.baseMonthlyIncome ?? monarchData?.monthlyIncome ?? 0}
               baseExpenses={projectionData.data?.baseMonthlyExpenses ?? monarchData?.monthlyExpenses ?? 0}
-              monarchIncome={monarchData?.monthlyIncome ?? 0}
-              monarchExpenses={monarchData?.monthlyExpenses ?? 0}
               isUsingMonarchBase={{
                 income: projectionData.data?.baseMonthlyIncome == null,
                 expenses: projectionData.data?.baseMonthlyExpenses == null,

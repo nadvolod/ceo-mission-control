@@ -2,6 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { RevenueProjectionService } from '@/lib/revenue-projection';
 import { checkAuth } from '@/lib/auth';
 import { loadJSON } from '@/lib/storage';
+import type { AdjustmentType } from '@/lib/types';
+
+const VALID_TYPES = new Set<AdjustmentType>(['revenue_gain', 'revenue_loss', 'expense_increase', 'expense_decrease']);
+const MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+
+function validateAmount(amount: unknown): number | null {
+  const n = Number(amount);
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+function validateBaseAmount(amount: unknown): number | null {
+  if (amount === null) return null;
+  const n = Number(amount);
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
 
 export async function GET() {
   try {
@@ -62,10 +77,23 @@ export async function POST(request: NextRequest) {
     switch (action) {
       case 'addAdjustment': {
         const { effectiveMonth, amount, description, type, recurring } = data;
+        if (!effectiveMonth || !MONTH_RE.test(effectiveMonth)) {
+          return NextResponse.json({ error: 'Invalid effectiveMonth (expected YYYY-MM)' }, { status: 400 });
+        }
+        const validAmount = validateAmount(amount);
+        if (validAmount === null) {
+          return NextResponse.json({ error: 'Amount must be a positive number' }, { status: 400 });
+        }
+        if (!type || !VALID_TYPES.has(type)) {
+          return NextResponse.json({ error: `Invalid type. Must be one of: ${[...VALID_TYPES].join(', ')}` }, { status: 400 });
+        }
+        if (!description || typeof description !== 'string' || !description.trim()) {
+          return NextResponse.json({ error: 'Description is required' }, { status: 400 });
+        }
         const adj = await service.addAdjustment({
           effectiveMonth,
-          amount,
-          description,
+          amount: validAmount,
+          description: description.trim(),
           type,
           recurring: recurring ?? false,
         });
@@ -90,12 +118,28 @@ export async function POST(request: NextRequest) {
       }
 
       case 'setBaseIncome': {
-        await service.setBaseIncome(data.amount);
+        if (data.amount !== null) {
+          const valid = validateBaseAmount(data.amount);
+          if (valid === null) {
+            return NextResponse.json({ error: 'Amount must be a non-negative number or null' }, { status: 400 });
+          }
+          await service.setBaseIncome(valid);
+        } else {
+          await service.setBaseIncome(null);
+        }
         return NextResponse.json({ data: service.getData() });
       }
 
       case 'setBaseExpenses': {
-        await service.setBaseExpenses(data.amount);
+        if (data.amount !== null) {
+          const valid = validateBaseAmount(data.amount);
+          if (valid === null) {
+            return NextResponse.json({ error: 'Amount must be a non-negative number or null' }, { status: 400 });
+          }
+          await service.setBaseExpenses(valid);
+        } else {
+          await service.setBaseExpenses(null);
+        }
         return NextResponse.json({ data: service.getData() });
       }
 

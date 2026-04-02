@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { TrendingUp, TrendingDown, Plus, Trash2, Edit2, Check, X, CalendarDays } from 'lucide-react';
+import { TrendingDown, Plus, Trash2, CalendarDays } from 'lucide-react';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend, Line, ComposedChart,
+  Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, Legend, Line, ComposedChart,
 } from 'recharts';
 import type { RevenueAdjustment, MonthProjection, AdjustmentType } from '@/lib/types';
 
@@ -12,8 +12,6 @@ interface RevenueProjectionWidgetProps {
   adjustments: RevenueAdjustment[];
   baseIncome: number;
   baseExpenses: number;
-  monarchIncome: number;
-  monarchExpenses: number;
   isUsingMonarchBase: { income: boolean; expenses: boolean };
   onAddAdjustment: (adj: {
     effectiveMonth: string;
@@ -68,8 +66,6 @@ export function RevenueProjectionWidget({
   adjustments,
   baseIncome,
   baseExpenses,
-  monarchIncome,
-  monarchExpenses,
   isUsingMonarchBase,
   onAddAdjustment,
   onRemoveAdjustment,
@@ -88,11 +84,13 @@ export function RevenueProjectionWidget({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formMonth || !formAmount || !formDescription) return;
+    const parsed = parseFloat(formAmount);
+    if (!Number.isFinite(parsed) || parsed <= 0) return;
     setIsSubmitting(true);
     try {
       await onAddAdjustment({
         effectiveMonth: formMonth,
-        amount: parseFloat(formAmount),
+        amount: parsed,
         description: formDescription,
         type: formType,
         recurring: formRecurring,
