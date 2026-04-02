@@ -173,6 +173,44 @@ export interface MonarchFinancialSnapshot {
   lastSynced: string;
 }
 
+// Revenue Projection types
+export type AdjustmentType =
+  | 'revenue_gain'
+  | 'revenue_loss'
+  | 'expense_increase'
+  | 'expense_decrease';
+
+export interface RevenueAdjustment {
+  id: string;
+  effectiveMonth: string; // "2026-07" (YYYY-MM)
+  amount: number; // always positive; sign determined by type
+  description: string;
+  type: AdjustmentType;
+  recurring: boolean; // true = applies from this month onward
+  createdAt: string; // ISO datetime
+}
+
+export interface RevenueProjectionData {
+  baseMonthlyIncome: number | null; // null = use Monarch live data
+  baseMonthlyExpenses: number | null; // null = use Monarch live data
+  adjustments: RevenueAdjustment[];
+  lastUpdated: string;
+}
+
+export interface MonthProjection {
+  month: string; // "2026-07"
+  monthLabel: string; // "Jul 2026"
+  baseIncome: number;
+  incomeAdjustments: number; // net of revenue_gain - revenue_loss
+  projectedIncome: number;
+  baseExpenses: number;
+  expenseAdjustments: number; // net of expense_increase - expense_decrease
+  projectedExpenses: number;
+  netCashFlow: number; // projectedIncome - projectedExpenses
+  cumulativeCashImpact: number; // running total
+  adjustmentDetails: RevenueAdjustment[]; // adjustments active in this month
+}
+
 // Task sync types — bidirectional sync between local OpenClaw and production dashboard
 
 export interface LocalTask {

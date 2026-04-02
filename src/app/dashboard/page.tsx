@@ -6,7 +6,9 @@ import { MissionTracker } from '@/components/MissionTracker';
 import { FinancialMetricsDashboard } from '@/components/FinancialMetricsDashboard';
 import { FinancialCommandCenter } from '@/components/FinancialCommandCenter';
 import { FocusHoursTracker } from '@/components/FocusHoursTracker';
-import { AiTask, TaskStats, FocusCategory, MonarchFinancialSnapshot } from '@/lib/types';
+import { RevenueProjectionWidget } from '@/components/RevenueProjectionWidget';
+import { AiTask, TaskStats, FocusCategory, MonarchFinancialSnapshot, AdjustmentType } from '@/lib/types';
+import { enrichScorecard } from '@/lib/derive-focus';
 import { useState, useEffect } from 'react';
 
 export default function HomePage() {
@@ -19,6 +21,7 @@ export default function HomePage() {
   const [monarchData, setMonarchData] = useState<MonarchFinancialSnapshot | null>(null);
   const [monarchError, setMonarchError] = useState<string | null>(null);
   const [monarchLoading, setMonarchLoading] = useState(false);
+  const [projectionData, setProjectionData] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
 
@@ -79,6 +82,15 @@ export default function HomePage() {
             setMonarchError(null);
           }
         } catch (e) { console.error('Error loading Monarch:', e); }
+      },
+      async () => {
+        try {
+          const res = await fetch('/api/revenue-projection');
+          if (res.ok) {
+            const data = await res.json();
+            setProjectionData(data);
+          }
+        } catch (e) { console.error('Error loading projections:', e); }
       },
     ];
 
@@ -144,6 +156,47 @@ export default function HomePage() {
     }
   };
 
+  const handleAddProjectionAdjustment = async (adj: {
+    effectiveMonth: string; amount: number; description: string; type: AdjustmentType; recurring: boolean;
+  }) => {
+    try {
+      const response = await fetch('/api/revenue-projection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'addAdjustment', ...adj })
+      });
+      if (response.ok) await loadAllData();
+    } catch (error) {
+      console.error('Error adding projection adjustment:', error);
+    }
+  };
+
+  const handleRemoveProjectionAdjustment = async (id: string) => {
+    try {
+      const response = await fetch('/api/revenue-projection', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'removeAdjustment', id })
+      });
+      if (response.ok) await loadAllData();
+    } catch (error) {
+      console.error('Error removing projection adjustment:', error);
+    }
+  };
+
+  const handleAddFinancialEntry = async (category: 'moved' | 'generated' | 'cut', amount: number, description: string) => {
+    try {
+      const response = await fetch('/api/financial', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'addEntry', category, amount, description })
+      });
+      if (response.ok) await loadAllData();
+    } catch (error) {
+      console.error('Error adding financial entry:', error);
+    }
+  };
+
   const handleAddFocusSession = async (category: FocusCategory, hours: number, description: string) => {
     try {
       const response = await fetch('/api/focus-hours', {
@@ -178,6 +231,10 @@ export default function HomePage() {
       </div>
     );
   }
+
+  const enrichedScorecard = scorecard
+    ? enrichScorecard(scorecard, aiTasks, initiatives)
+    : scorecard;
 
   if (!scorecard) {
     return (
@@ -255,6 +312,26 @@ export default function HomePage() {
           />
         </div>
 
+        {/* Revenue Projections */}
+        {projectionData && (
+          <div className="mb-8">
+            <RevenueProjectionWidget
+              projections={projectionData.projections ?? []}
+              adjustments={projectionData.data?.adjustments ?? []}
+              baseIncome={projectionData.data?.baseMonthlyIncome ?? monarchData?.monthlyIncome ?? 0}
+              baseExpenses={projectionData.data?.baseMonthlyExpenses ?? monarchData?.monthlyExpenses ?? 0}
+              monarchIncome={monarchData?.monthlyIncome ?? 0}
+              monarchExpenses={monarchData?.monthlyExpenses ?? 0}
+              isUsingMonarchBase={{
+                income: projectionData.data?.baseMonthlyIncome == null,
+                expenses: projectionData.data?.baseMonthlyExpenses == null,
+              }}
+              onAddAdjustment={handleAddProjectionAdjustment}
+              onRemoveAdjustment={handleRemoveProjectionAdjustment}
+            />
+          </div>
+        )}
+
         {/* Mission Tracker - Connected to real MRR from Monarch */}
         <div className="mb-8">
           <MissionTracker currentMRR={monarchData?.monthlyIncome} />
@@ -262,26 +339,12 @@ export default function HomePage() {
 
         {/* Today's Plan - Priorities, Critical Moves, Focus Blocks */}
         <div className="mb-8">
-          <FocusOptimization scorecard={scorecard} />
+          <FocusOptimization scorecard={enrichedScorecard} />
         </div>
 
-        {/* Task Dashboard - Full Width */}
-        <div className="mb-8">
-          <TaskDashboard
-            tasks={aiTasks.filter(t => t.status !== 'done')}
-            stats={taskStats}
-            onCreateTask={handleCreateTask}
-            onUpdateTask={handleUpdateTask}
-            onDeleteTask={handleDeleteTask}
-            onRefresh={loadAllData}
-            taskListUrl={process.env.NEXT_PUBLIC_AI_TASK_LIST_URL || 'https://tasklistai.vercel.app'}
-          />
-        </div>
-
-        {/* Detail Sections - 2 Column Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* Focus Hours Dashboard */}
-          {focusData && (
+        {/* Focus Hours Dashboard - Full Width */}
+        {focusData && (
+          <div className="mb-8">
             <FocusHoursTracker
               todaysMetrics={focusData.todaysMetrics}
               weeklyTotals={focusData.weeklyTotals}
@@ -294,17 +357,33 @@ export default function HomePage() {
               temporalActual={scorecard.temporalActual || 0}
               onAddSession={handleAddFocusSession}
             />
-          )}
+          </div>
+        )}
 
-          {/* Financial Impact Tracking - only show if there's activity */}
-          {financialData && (
+        {/* Financial Impact Tracking - Full Width */}
+        {financialData && (
+          <div className="mb-8">
             <FinancialMetricsDashboard
               todaysMetrics={financialData.todaysMetrics}
               weeklyTotals={financialData.weeklyTotals}
               monthlyTotals={financialData.monthlyTotals}
               recentEntries={financialData.recentEntries}
+              onAddEntry={handleAddFinancialEntry}
             />
-          )}
+          </div>
+        )}
+
+        {/* Task Dashboard - Always Last */}
+        <div className="mb-8">
+          <TaskDashboard
+            tasks={aiTasks.filter(t => t.status !== 'done')}
+            stats={taskStats}
+            onCreateTask={handleCreateTask}
+            onUpdateTask={handleUpdateTask}
+            onDeleteTask={handleDeleteTask}
+            onRefresh={loadAllData}
+            taskListUrl={process.env.NEXT_PUBLIC_AI_TASK_LIST_URL || 'https://tasklistai.vercel.app'}
+          />
         </div>
       </main>
     </div>
