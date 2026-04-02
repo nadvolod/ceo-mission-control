@@ -190,12 +190,12 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
       });
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        console.error('Failed to add projection adjustment:', err.error || response.statusText);
-        return;
+        throw new Error(err.error || response.statusText || 'Failed to add projection adjustment');
       }
       await loadAllData();
     } catch (error) {
       console.error('Error adding projection adjustment:', error);
+      throw error;
     }
   }, [loadAllData]);
 
@@ -208,12 +208,12 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
       });
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        console.error('Failed to remove projection adjustment:', err.error || response.statusText);
-        return;
+        throw new Error(err.error || response.statusText || 'Failed to remove projection adjustment');
       }
       await loadAllData();
     } catch (error) {
       console.error('Error removing projection adjustment:', error);
+      throw error;
     }
   }, [loadAllData]);
 
@@ -226,12 +226,12 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
       });
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));
-        console.error('Failed to add financial entry:', err.error || response.statusText);
-        return;
+        throw new Error(err.error || response.statusText || 'Failed to add financial entry');
       }
       await loadAllData();
     } catch (error) {
       console.error('Error adding financial entry:', error);
+      throw error;
     }
   }, [loadAllData]);
 

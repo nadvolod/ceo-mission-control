@@ -150,6 +150,7 @@ export function FinancialMetricsDashboard({
               value={addCategory}
               onChange={(e) => setAddCategory(e.target.value as 'moved' | 'generated' | 'cut')}
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              aria-label="Category"
             >
               <option value="moved">Money Moved</option>
               <option value="generated">Revenue Generated</option>
@@ -161,6 +162,8 @@ export function FinancialMetricsDashboard({
               onChange={(e) => setAddAmount(e.target.value)}
               placeholder="Amount ($)"
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              aria-label="Amount (USD)"
+              aria-required="true"
               min="0"
               step="any"
               required
@@ -171,6 +174,7 @@ export function FinancialMetricsDashboard({
               onChange={(e) => setAddDescription(e.target.value)}
               placeholder="Description (optional)"
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              aria-label="Description"
             />
             <div className="flex gap-2">
               <button

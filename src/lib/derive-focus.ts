@@ -118,14 +118,15 @@ function deriveRiskMove(tasks: AiTask[]): string {
 
   // Fallback: most overdue task
   const now = new Date();
+  const todayLocal = new Date(now.getFullYear(), now.getMonth(), now.getDate());
   const overdueTasks = tasks
-    .filter((t) => t.dueDate && new Date(t.dueDate) < now)
-    .sort((a, b) => new Date(a.dueDate!).getTime() - new Date(b.dueDate!).getTime());
+    .filter((t) => t.dueDate && parseLocalDate(t.dueDate) < todayLocal)
+    .sort((a, b) => parseLocalDate(a.dueDate!).getTime() - parseLocalDate(b.dueDate!).getTime());
 
   if (overdueTasks.length > 0) {
     const t = overdueTasks[0];
     const daysOverdue = Math.ceil(
-      (now.getTime() - new Date(t.dueDate!).getTime()) / (1000 * 60 * 60 * 24)
+      (todayLocal.getTime() - parseLocalDate(t.dueDate!).getTime()) / (1000 * 60 * 60 * 24)
     );
     return `${t.title} (overdue by ${daysOverdue} day${daysOverdue !== 1 ? 's' : ''})`;
   }
@@ -145,6 +146,12 @@ function deriveFocusBlocks(priorities: string[]): string[] {
     const slot = timeSlots[i];
     return `${slot.start}–${slot.end} — ${priority}`;
   });
+}
+
+/** Parse YYYY-MM-DD as local date to avoid UTC timezone shifts */
+function parseLocalDate(dateStr: string): Date {
+  const [y, m, d] = dateStr.split('-').map(Number);
+  return new Date(y, m - 1, d);
 }
 
 /** Format a task as a readable label */

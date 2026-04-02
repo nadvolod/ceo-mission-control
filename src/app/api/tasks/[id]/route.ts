@@ -28,21 +28,25 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     }
 
     // Auto-create financial entry when a task with monetaryValue is completed
-    // Deduplicate: only create if no entry already exists today for this task
+    // Fire-and-forget: don't block the response
     if (body.status === 'done' && task.monetaryValue && task.monetaryValue > 0) {
-      try {
-        const tracker = await FinancialTracker.create();
-        const marker = `[task:${taskId}]`;
-        const todaysEntries = tracker.getTodaysMetrics().entries;
-        const alreadyLogged = todaysEntries.some((e) => e.description.includes(marker));
-        if (!alreadyLogged) {
-          const category = inferFinancialCategory(task);
-          await tracker.addEntry(category, task.monetaryValue, `${marker} Task completed: ${task.title}`);
-          console.log(`Auto-created financial entry: ${category} $${task.monetaryValue} for "${task.title}"`);
+      const taskTitle = task.title;
+      const monetaryValue = task.monetaryValue;
+      const category = inferFinancialCategory(task);
+      const marker = `[task:${taskId}]`;
+      (async () => {
+        try {
+          const tracker = await FinancialTracker.create();
+          const todaysEntries = tracker.getTodaysMetrics().entries;
+          const alreadyLogged = todaysEntries.some((e) => e.description.includes(marker));
+          if (!alreadyLogged) {
+            await tracker.addEntry(category, monetaryValue, `${marker} Task completed: ${taskTitle}`);
+            console.log(`Auto-created financial entry: ${category} $${monetaryValue} for "${taskTitle}"`);
+          }
+        } catch (err) {
+          console.error('Error auto-creating financial entry for completed task:', err);
         }
-      } catch (err) {
-        console.error('Error auto-creating financial entry for completed task:', err);
-      }
+      })();
     }
 
     return NextResponse.json({ success: true, task });

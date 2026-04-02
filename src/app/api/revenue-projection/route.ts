@@ -102,7 +102,37 @@ export async function POST(request: NextRequest) {
 
       case 'updateAdjustment': {
         const { id, ...updates } = data;
-        const adj = await service.updateAdjustment(id, updates);
+        // Validate provided fields
+        const sanitized: Record<string, unknown> = {};
+        if ('effectiveMonth' in updates) {
+          if (!updates.effectiveMonth || !MONTH_RE.test(updates.effectiveMonth)) {
+            return NextResponse.json({ error: 'Invalid effectiveMonth (expected YYYY-MM)' }, { status: 400 });
+          }
+          sanitized.effectiveMonth = updates.effectiveMonth;
+        }
+        if ('amount' in updates) {
+          const valid = validateAmount(updates.amount);
+          if (valid === null) {
+            return NextResponse.json({ error: 'Amount must be a positive number' }, { status: 400 });
+          }
+          sanitized.amount = valid;
+        }
+        if ('type' in updates) {
+          if (!updates.type || !VALID_TYPES.has(updates.type)) {
+            return NextResponse.json({ error: `Invalid type` }, { status: 400 });
+          }
+          sanitized.type = updates.type;
+        }
+        if ('description' in updates) {
+          if (!updates.description || typeof updates.description !== 'string' || !updates.description.trim()) {
+            return NextResponse.json({ error: 'Description is required' }, { status: 400 });
+          }
+          sanitized.description = updates.description.trim();
+        }
+        if ('recurring' in updates) {
+          sanitized.recurring = Boolean(updates.recurring);
+        }
+        const adj = await service.updateAdjustment(id, sanitized);
         if (!adj) {
           return NextResponse.json({ error: 'Adjustment not found' }, { status: 404 });
         }

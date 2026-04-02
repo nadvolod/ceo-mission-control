@@ -50,9 +50,10 @@ function generateMonthOptions(): { value: string; label: string }[] {
   const options: { value: string; label: string }[] = [];
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-  for (let y = now.getFullYear(); y <= now.getFullYear() + 1; y++) {
-    const startMonth = y === now.getFullYear() ? now.getMonth() : 0;
-    const endMonth = y === now.getFullYear() + 1 ? 11 : 11;
+  // Only generate months through Dec of current year to match projection horizon
+  for (let y = now.getFullYear(); y <= now.getFullYear(); y++) {
+    const startMonth = now.getMonth();
+    const endMonth = 11;
     for (let m = startMonth; m <= endMonth; m++) {
       const value = `${y}-${String(m + 1).padStart(2, '0')}`;
       options.push({ value, label: `${monthNames[m]} ${y}` });
@@ -77,6 +78,7 @@ export function RevenueProjectionWidget({
   const [formType, setFormType] = useState<AdjustmentType>('revenue_loss');
   const [formRecurring, setFormRecurring] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'projection' | 'adjustments'>('projection');
 
   const monthOptions = generateMonthOptions();
@@ -103,6 +105,17 @@ export function RevenueProjectionWidget({
       console.error('Error adding adjustment:', error);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const handleRemoveAdjustment = async (id: string) => {
+    setDeletingId(id);
+    try {
+      await onRemoveAdjustment(id);
+    } catch (error) {
+      console.error('Error removing adjustment:', error);
+    } finally {
+      setDeletingId(null);
     }
   };
 
@@ -166,6 +179,7 @@ export function RevenueProjectionWidget({
               value={formMonth}
               onChange={(e) => setFormMonth(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              aria-label="Effective month"
               required
             >
               <option value="">Select month...</option>
@@ -179,6 +193,7 @@ export function RevenueProjectionWidget({
               value={formType}
               onChange={(e) => setFormType(e.target.value as AdjustmentType)}
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              aria-label="Adjustment type"
             >
               <option value="revenue_loss">Revenue Loss (e.g., contract ends)</option>
               <option value="revenue_gain">Revenue Gain (e.g., new client)</option>
@@ -193,6 +208,8 @@ export function RevenueProjectionWidget({
               onChange={(e) => setFormAmount(e.target.value)}
               placeholder="Amount per month ($)"
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+              aria-label="Amount per month (USD)"
+              aria-required="true"
               min="0"
               step="any"
               required
@@ -203,6 +220,8 @@ export function RevenueProjectionWidget({
               onChange={(e) => setFormDescription(e.target.value)}
               placeholder="Description (e.g., WHO contract ends)"
               className="px-3 py-2 border border-gray-300 rounded-lg text-sm md:col-span-2"
+              aria-label="Description"
+              aria-required="true"
               required
             />
           </div>
@@ -393,9 +412,11 @@ export function RevenueProjectionWidget({
                       </div>
                     </div>
                     <button
-                      onClick={() => onRemoveAdjustment(adj.id)}
-                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      onClick={() => handleRemoveAdjustment(adj.id)}
+                      disabled={deletingId === adj.id}
+                      className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors disabled:opacity-50"
                       title="Remove adjustment"
+                      aria-busy={deletingId === adj.id}
                     >
                       <Trash2 className="h-4 w-4" />
                     </button>
