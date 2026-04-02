@@ -5,13 +5,34 @@ import type { MonarchAccount, MonarchFinancialSnapshot } from './types';
 const CACHE_KEY = 'monarch-financial-data.json';
 const CACHE_TTL_MS = 15 * 60 * 1000; // 15 minutes
 
+const MONTH_NAMES = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * Get date range for the previous full calendar month.
+ * Handles year rollover (January → December of previous year).
+ */
+export function getPreviousMonthRange(): { startDate: string; endDate: string; label: string } {
+  const now = new Date();
+  const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+  const lastDay = new Date(now.getFullYear(), now.getMonth(), 0); // day 0 = last day of prev month
+  // Use local date components (not toISOString) to avoid UTC timezone shift
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return {
+    startDate: `${prevMonth.getFullYear()}-${pad(prevMonth.getMonth() + 1)}-${pad(prevMonth.getDate())}`,
+    endDate: `${lastDay.getFullYear()}-${pad(lastDay.getMonth() + 1)}-${pad(lastDay.getDate())}`,
+    label: `${MONTH_NAMES[prevMonth.getMonth()]} ${prevMonth.getFullYear()}`,
+  };
+}
+
 /**
  * Build a financial snapshot from raw Monarch data.
  * Pure computation — no API calls or side effects.
  */
 export function buildSnapshot(
   accounts: MonarchAccount[],
-  cashflowSummary: { sumIncome: number; sumExpense: number; savings: number; savingsRate: number }
+  cashflowSummary: { sumIncome: number; sumExpense: number; savings: number; savingsRate: number },
+  previousMonthCashflow?: { sumIncome: number; sumExpense: number } | null,
+  previousMonthLabel?: string
 ): Omit<MonarchFinancialSnapshot, 'lastSynced'> {
   // Filter to visible, active accounts
   const visibleAccounts = accounts.filter(
@@ -58,6 +79,9 @@ export function buildSnapshot(
     netWorth,
     monthlyIncome,
     monthlyExpenses,
+    previousMonthIncome: previousMonthCashflow ? previousMonthCashflow.sumIncome : monthlyIncome,
+    previousMonthExpenses: previousMonthCashflow ? Math.abs(previousMonthCashflow.sumExpense) : monthlyExpenses,
+    previousMonthLabel: previousMonthLabel ?? '',
     burnRate,
     runwayMonths,
     savingsRate: cashflowSummary.savingsRate,
@@ -84,14 +108,19 @@ export async function getFinancialSnapshot(
     }
   }
 
-  // Fetch fresh data from Monarch
-  const [accounts, cashflowSummary] = await Promise.all([
+  // Fetch fresh data from Monarch (current month + previous month for projections)
+  const { startDate, endDate, label } = getPreviousMonthRange();
+  const [accounts, cashflowSummary, previousMonthCashflow] = await Promise.all([
     fetchAccounts(),
     fetchCashflowSummary(),
+    fetchCashflowSummary(startDate, endDate).catch((err) => {
+      console.error('Failed to fetch previous month cashflow:', err);
+      return null;
+    }),
   ]);
 
   const snapshot: MonarchFinancialSnapshot = {
-    ...buildSnapshot(accounts, cashflowSummary),
+    ...buildSnapshot(accounts, cashflowSummary, previousMonthCashflow, label),
     lastSynced: new Date().toISOString(),
   };
 

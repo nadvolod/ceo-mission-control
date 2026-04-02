@@ -6,7 +6,7 @@ import type { AiTask, TaskStats, FocusCategory, MonarchFinancialSnapshot, Adjust
 export interface RevenueProjectionApiResponse {
   data: RevenueProjectionData;
   projections: MonthProjection[];
-  monarchBase: { income: number; expenses: number; cashPosition: number };
+  monarchBase: { income: number; expenses: number; cashPosition: number; label?: string };
   timestamp: string;
 }
 

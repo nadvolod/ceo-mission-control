@@ -24,19 +24,27 @@ export async function GET() {
     const data = service.getData();
 
     // Get Monarch base values for projection computation
+    // Use previous full month (not current month-to-date) for accurate projections
     const monarchCache = await loadJSON<{
       cashPosition?: number;
       monthlyIncome?: number;
       monthlyExpenses?: number;
+      previousMonthIncome?: number;
+      previousMonthExpenses?: number;
+      previousMonthLabel?: string;
     } | null>('monarch-financial-data.json', null);
 
-    const monarchIncome = monarchCache?.monthlyIncome ?? 0;
-    const monarchExpenses = monarchCache?.monthlyExpenses ?? 0;
+    // Prefer previous full month data; fall back to current month, then 0
+    const monarchIncome = monarchCache?.previousMonthIncome ?? monarchCache?.monthlyIncome ?? 0;
+    const monarchExpenses = monarchCache?.previousMonthExpenses ?? monarchCache?.monthlyExpenses ?? 0;
     const cashPosition = monarchCache?.cashPosition ?? 0;
 
+    // Start projections from NEXT month (current month is incomplete)
     const now = new Date();
-    const startMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
-    const endMonth = `${now.getFullYear()}-12`;
+    const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+    const startMonth = `${nextMonth.getFullYear()}-${String(nextMonth.getMonth() + 1).padStart(2, '0')}`;
+    // End at December of whichever year the start falls in
+    const endMonth = `${nextMonth.getFullYear()}-12`;
 
     const projections = service.computeProjections(
       monarchIncome,
@@ -53,6 +61,7 @@ export async function GET() {
         income: monarchIncome,
         expenses: monarchExpenses,
         cashPosition,
+        label: monarchCache?.previousMonthLabel || undefined,
       },
       timestamp: new Date().toISOString(),
     });

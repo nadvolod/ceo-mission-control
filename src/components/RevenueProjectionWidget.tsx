@@ -13,6 +13,7 @@ interface RevenueProjectionWidgetProps {
   baseIncome: number;
   baseExpenses: number;
   isUsingMonarchBase: { income: boolean; expenses: boolean };
+  monarchBaseLabel?: string;
   onAddAdjustment: (adj: {
     effectiveMonth: string;
     amount: number;
@@ -45,19 +46,30 @@ function formatCurrency(amount: number): string {
   return `${sign}$${abs.toFixed(0)}`;
 }
 
+const preciseCurrencyFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
+
+/** Precise dollar formatting for table cells where rounding hides changes */
+function formatCurrencyPrecise(amount: number): string {
+  return preciseCurrencyFormatter.format(amount);
+}
+
 function generateMonthOptions(): { value: string; label: string }[] {
   const now = new Date();
   const options: { value: string; label: string }[] = [];
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-  // Only generate months through Dec of current year to match projection horizon
-  for (let y = now.getFullYear(); y <= now.getFullYear(); y++) {
-    const startMonth = now.getMonth();
-    const endMonth = 11;
-    for (let m = startMonth; m <= endMonth; m++) {
-      const value = `${y}-${String(m + 1).padStart(2, '0')}`;
-      options.push({ value, label: `${monthNames[m]} ${y}` });
-    }
+  // Start from next month to match projection range (current month is excluded)
+  const nextMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  const endYear = nextMonth.getFullYear();
+  const endMonth = 11;
+  for (let m = nextMonth.getMonth(); m <= endMonth; m++) {
+    const value = `${endYear}-${String(m + 1).padStart(2, '0')}`;
+    options.push({ value, label: `${monthNames[m]} ${endYear}` });
   }
   return options;
 }
@@ -68,6 +80,7 @@ export function RevenueProjectionWidget({
   baseIncome,
   baseExpenses,
   isUsingMonarchBase,
+  monarchBaseLabel,
   onAddAdjustment,
   onRemoveAdjustment,
 }: RevenueProjectionWidgetProps) {
@@ -155,14 +168,18 @@ export function RevenueProjectionWidget({
           <div className="text-xs text-gray-500">Base Monthly Income</div>
           <div className="text-lg font-bold text-green-600">{formatCurrency(baseIncome)}</div>
           <div className="text-xs text-gray-400">
-            {isUsingMonarchBase.income ? 'From Monarch' : 'Manual override'}
+            {isUsingMonarchBase.income
+              ? `From Monarch${monarchBaseLabel ? ` (${monarchBaseLabel})` : ''}`
+              : 'Manual override'}
           </div>
         </div>
         <div className="bg-white rounded-lg p-3">
           <div className="text-xs text-gray-500">Base Monthly Expenses</div>
           <div className="text-lg font-bold text-red-500">{formatCurrency(baseExpenses)}</div>
           <div className="text-xs text-gray-400">
-            {isUsingMonarchBase.expenses ? 'From Monarch' : 'Manual override'}
+            {isUsingMonarchBase.expenses
+              ? `From Monarch${monarchBaseLabel ? ` (${monarchBaseLabel})` : ''}`
+              : 'Manual override'}
           </div>
         </div>
       </div>
@@ -352,10 +369,10 @@ export function RevenueProjectionWidget({
                         </td>
                         <td className="px-3 py-2 text-right font-medium text-red-600">{formatCurrency(p.projectedExpenses)}</td>
                         <td className={`px-3 py-2 text-right font-bold ${p.netCashFlow >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                          {p.netCashFlow >= 0 ? '+' : ''}{formatCurrency(p.netCashFlow)}
+                          {p.netCashFlow >= 0 ? '+' : ''}{formatCurrencyPrecise(p.netCashFlow)}
                         </td>
                         <td className={`px-3 py-2 text-right ${p.cumulativeCashImpact >= 0 ? 'text-gray-700' : 'text-red-600'}`}>
-                          {formatCurrency(p.cumulativeCashImpact)}
+                          {formatCurrencyPrecise(p.cumulativeCashImpact)}
                         </td>
                       </tr>
                     );
