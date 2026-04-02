@@ -12,7 +12,7 @@ jest.mock('./monarch-client', () => ({
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { buildSnapshot } = require('./monarch-service');
+const { buildSnapshot, getPreviousMonthRange } = require('./monarch-service');
 
 function makeAccount(overrides: Partial<MonarchAccount> = {}): MonarchAccount {
   return {
@@ -175,5 +175,62 @@ describe('buildSnapshot', () => {
 
     expect(result.monthlyIncome).toBe(12000);
     expect(result.savingsRate).toBe(0.5);
+  });
+
+  it('populates previous month fields from previous month cashflow', () => {
+    const currentCashflow = makeCashflow({ sumIncome: 500, sumExpense: -200 });
+    const previousCashflow = { sumIncome: 8000, sumExpense: -5000 };
+    const result = buildSnapshot([makeAccount()], currentCashflow, previousCashflow, 'Mar 2026');
+
+    expect(result.monthlyIncome).toBe(500);     // Current month-to-date
+    expect(result.monthlyExpenses).toBe(200);
+    expect(result.previousMonthIncome).toBe(8000);   // Previous full month
+    expect(result.previousMonthExpenses).toBe(5000);  // Math.abs(-5000)
+    expect(result.previousMonthLabel).toBe('Mar 2026');
+  });
+
+  it('falls back to current month when previous month cashflow is null', () => {
+    const currentCashflow = makeCashflow({ sumIncome: 500, sumExpense: -200 });
+    const result = buildSnapshot([makeAccount()], currentCashflow, null);
+
+    expect(result.previousMonthIncome).toBe(500);   // Falls back to current
+    expect(result.previousMonthExpenses).toBe(200);
+    expect(result.previousMonthLabel).toBe('');
+  });
+
+  it('falls back to current month when previous month cashflow is omitted', () => {
+    const currentCashflow = makeCashflow({ sumIncome: 3000, sumExpense: -1500 });
+    const result = buildSnapshot([makeAccount()], currentCashflow);
+
+    expect(result.previousMonthIncome).toBe(3000);
+    expect(result.previousMonthExpenses).toBe(1500);
+  });
+});
+
+describe('getPreviousMonthRange', () => {
+  it('returns previous month date range and label', () => {
+    const result = getPreviousMonthRange();
+
+    // Should return valid date strings
+    expect(result.startDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(result.endDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(result.label).toMatch(/^\w{3} \d{4}$/);
+
+    // Start should be first of month (YYYY-MM-01)
+    expect(result.startDate).toMatch(/-01$/);
+
+    // End day should be >= 28 (valid last day of any month)
+    const endDay = parseInt(result.endDate.split('-')[2], 10);
+    expect(endDay).toBeGreaterThanOrEqual(28);
+  });
+
+  it('returns a month before the current month', () => {
+    const result = getPreviousMonthRange();
+    const now = new Date();
+
+    // Parse month from the YYYY-MM-DD string (avoid timezone issues)
+    const startMonth = parseInt(result.startDate.split('-')[1], 10); // 1-based
+    const expectedMonth = now.getMonth() === 0 ? 12 : now.getMonth(); // 1-based previous month
+    expect(startMonth).toBe(expectedMonth);
   });
 });

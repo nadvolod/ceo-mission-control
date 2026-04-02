@@ -115,12 +115,13 @@ export default function HomePage() {
             <RevenueProjectionWidget
               projections={projectionData.projections ?? []}
               adjustments={projectionData.data?.adjustments ?? []}
-              baseIncome={projectionData.data?.baseMonthlyIncome ?? monarchData?.monthlyIncome ?? 0}
-              baseExpenses={projectionData.data?.baseMonthlyExpenses ?? monarchData?.monthlyExpenses ?? 0}
+              baseIncome={projectionData.data?.baseMonthlyIncome ?? projectionData.monarchBase?.income ?? 0}
+              baseExpenses={projectionData.data?.baseMonthlyExpenses ?? projectionData.monarchBase?.expenses ?? 0}
               isUsingMonarchBase={{
                 income: projectionData.data?.baseMonthlyIncome == null,
                 expenses: projectionData.data?.baseMonthlyExpenses == null,
               }}
+              monarchBaseLabel={projectionData.monarchBase?.label}
               onAddAdjustment={handleAddProjectionAdjustment}
               onRemoveAdjustment={handleRemoveProjectionAdjustment}
             />

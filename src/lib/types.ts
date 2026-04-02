@@ -165,8 +165,11 @@ export interface MonarchFinancialSnapshot {
   totalAssets: number;
   totalLiabilities: number;
   netWorth: number;
-  monthlyIncome: number;
-  monthlyExpenses: number;
+  monthlyIncome: number;       // Current month-to-date
+  monthlyExpenses: number;     // Current month-to-date
+  previousMonthIncome: number; // Last full calendar month (for projections)
+  previousMonthExpenses: number;
+  previousMonthLabel: string;  // e.g., "Mar 2026"
   burnRate: number;
   runwayMonths: number;
   savingsRate: number;
