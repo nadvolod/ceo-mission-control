@@ -122,7 +122,7 @@ export function RevenueProjectionWidget({
   const chartData = projections.map((p) => ({
     month: p.monthLabel.split(' ')[0], // "Apr"
     income: p.projectedIncome,
-    expenses: p.projectedExpenses,
+    expenses: -p.projectedExpenses, // Negate so expenses render below $0 line
     net: p.netCashFlow,
     cumulative: p.cumulativeCashImpact,
   }));
@@ -292,10 +292,13 @@ export function RevenueProjectionWidget({
                   <XAxis dataKey="month" fontSize={12} />
                   <YAxis fontSize={12} tickFormatter={(v) => formatCurrency(v)} />
                   <Tooltip
-                    formatter={(value, name) => [
-                      formatCurrency(Number(value ?? 0)),
-                      name === 'income' ? 'Income' : name === 'expenses' ? 'Expenses' : 'Net',
-                    ]}
+                    formatter={(value, name) => {
+                      const v = Number(value ?? 0);
+                      const label = name === 'income' ? 'Income' : name === 'expenses' ? 'Expenses' : 'Net Cash Flow';
+                      // Show absolute value for expenses since they're negated in chart data
+                      const displayValue = name === 'expenses' ? Math.abs(v) : v;
+                      return [formatCurrency(displayValue), label];
+                    }}
                   />
                   <Legend />
                   <Bar dataKey="income" name="Income" fill="#22c55e" radius={[2, 2, 0, 0]} />

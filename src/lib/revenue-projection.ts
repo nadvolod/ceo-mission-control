@@ -149,8 +149,8 @@ export class RevenueProjectionService {
         }
       }
 
-      const projectedIncome = baseIncome + incomeAdj;
-      const projectedExpenses = baseExpenses + expenseAdj;
+      const projectedIncome = Math.max(0, baseIncome + incomeAdj);
+      const projectedExpenses = Math.max(0, baseExpenses + expenseAdj);
       const netCashFlow = projectedIncome - projectedExpenses;
       cumulative += netCashFlow;
 
