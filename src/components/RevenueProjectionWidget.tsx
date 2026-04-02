@@ -46,14 +46,16 @@ function formatCurrency(amount: number): string {
   return `${sign}$${abs.toFixed(0)}`;
 }
 
+const preciseCurrencyFormatter = new Intl.NumberFormat('en-US', {
+  style: 'currency',
+  currency: 'USD',
+  minimumFractionDigits: 0,
+  maximumFractionDigits: 0,
+});
+
 /** Precise dollar formatting for table cells where rounding hides changes */
 function formatCurrencyPrecise(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(amount);
+  return preciseCurrencyFormatter.format(amount);
 }
 
 function generateMonthOptions(): { value: string; label: string }[] {

@@ -15,9 +15,11 @@ export function getPreviousMonthRange(): { startDate: string; endDate: string; l
   const now = new Date();
   const prevMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
   const lastDay = new Date(now.getFullYear(), now.getMonth(), 0); // day 0 = last day of prev month
+  // Use local date components (not toISOString) to avoid UTC timezone shift
+  const pad = (n: number) => String(n).padStart(2, '0');
   return {
-    startDate: prevMonth.toISOString().split('T')[0],
-    endDate: lastDay.toISOString().split('T')[0],
+    startDate: `${prevMonth.getFullYear()}-${pad(prevMonth.getMonth() + 1)}-${pad(prevMonth.getDate())}`,
+    endDate: `${lastDay.getFullYear()}-${pad(lastDay.getMonth() + 1)}-${pad(lastDay.getDate())}`,
     label: `${MONTH_NAMES[prevMonth.getMonth()]} ${prevMonth.getFullYear()}`,
   };
 }

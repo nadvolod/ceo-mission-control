@@ -208,29 +208,41 @@ describe('buildSnapshot', () => {
 });
 
 describe('getPreviousMonthRange', () => {
-  it('returns previous month date range and label', () => {
-    const result = getPreviousMonthRange();
-
-    // Should return valid date strings
-    expect(result.startDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(result.endDate).toMatch(/^\d{4}-\d{2}-\d{2}$/);
-    expect(result.label).toMatch(/^\w{3} \d{4}$/);
-
-    // Start should be first of month (YYYY-MM-01)
-    expect(result.startDate).toMatch(/-01$/);
-
-    // End day should be >= 28 (valid last day of any month)
-    const endDay = parseInt(result.endDate.split('-')[2], 10);
-    expect(endDay).toBeGreaterThanOrEqual(28);
+  beforeEach(() => {
+    jest.useFakeTimers();
   });
 
-  it('returns a month before the current month', () => {
-    const result = getPreviousMonthRange();
-    const now = new Date();
+  afterEach(() => {
+    jest.useRealTimers();
+  });
 
-    // Parse month from the YYYY-MM-DD string (avoid timezone issues)
-    const startMonth = parseInt(result.startDate.split('-')[1], 10); // 1-based
-    const expectedMonth = now.getMonth() === 0 ? 12 : now.getMonth(); // 1-based previous month
-    expect(startMonth).toBe(expectedMonth);
+  it('returns previous month date range and label for a mid-month date', () => {
+    jest.setSystemTime(new Date(2026, 2, 15)); // March 15, 2026 local time
+
+    const result = getPreviousMonthRange();
+
+    expect(result.startDate).toBe('2026-02-01');
+    expect(result.endDate).toBe('2026-02-28');
+    expect(result.label).toBe('Feb 2026');
+  });
+
+  it('handles year rollover from January to previous December', () => {
+    jest.setSystemTime(new Date(2026, 0, 15)); // January 15, 2026 local time
+
+    const result = getPreviousMonthRange();
+
+    expect(result.startDate).toBe('2025-12-01');
+    expect(result.endDate).toBe('2025-12-31');
+    expect(result.label).toBe('Dec 2025');
+  });
+
+  it('returns correct last day for months with 31 days', () => {
+    jest.setSystemTime(new Date(2026, 3, 10)); // April 10, 2026 → previous month is March
+
+    const result = getPreviousMonthRange();
+
+    expect(result.startDate).toBe('2026-03-01');
+    expect(result.endDate).toBe('2026-03-31');
+    expect(result.label).toBe('Mar 2026');
   });
 });
