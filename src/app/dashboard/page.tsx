@@ -7,16 +7,17 @@ import { FinancialMetricsDashboard } from '@/components/FinancialMetricsDashboar
 import { FinancialCommandCenter } from '@/components/FinancialCommandCenter';
 import { FocusHoursTracker } from '@/components/FocusHoursTracker';
 import { RevenueProjectionWidget } from '@/components/RevenueProjectionWidget';
+import { WeeklyPerformanceTracker } from '@/components/WeeklyPerformanceTracker';
 import { enrichScorecard } from '@/lib/derive-focus';
 import { useDashboardData } from '@/hooks/useDashboardData';
 
 export default function HomePage() {
   const {
     aiTasks, taskStats, initiatives, scorecard, financialData, focusData,
-    monarchData, monarchError, monarchLoading, projectionData, isLoading,
+    monarchData, monarchError, monarchLoading, projectionData, weeklyTrackerData, isLoading,
     loadAllData, handleCreateTask, handleUpdateTask, handleDeleteTask,
     handleMonarchRefresh, handleAddProjectionAdjustment, handleRemoveProjectionAdjustment,
-    handleAddFinancialEntry, handleAddFocusSession,
+    handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleSubmitWeeklyReview,
   } = useDashboardData();
 
   if (isLoading) {
@@ -124,6 +125,21 @@ export default function HomePage() {
               monarchBaseLabel={projectionData.monarchBase?.label}
               onAddAdjustment={handleAddProjectionAdjustment}
               onRemoveAdjustment={handleRemoveProjectionAdjustment}
+            />
+          </div>
+        )}
+
+        {/* Weekly Performance Tracker */}
+        {weeklyTrackerData && (
+          <div className="mb-8">
+            <WeeklyPerformanceTracker
+              todaysEntry={weeklyTrackerData.todaysEntry}
+              currentWeekSummary={weeklyTrackerData.currentWeekSummary}
+              previousWeekSummary={weeklyTrackerData.previousWeekSummary}
+              dailyTrend={weeklyTrackerData.dailyTrend}
+              recentReviews={weeklyTrackerData.recentReviews}
+              onLogDay={handleLogDay}
+              onSubmitReview={handleSubmitWeeklyReview}
             />
           </div>
         )}

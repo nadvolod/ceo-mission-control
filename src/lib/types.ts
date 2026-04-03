@@ -261,3 +261,44 @@ export interface SyncResult {
   merged: number;
   timestamp: string;
 }
+
+// High-Performance Weekly Tracker types
+
+export interface PerformanceDayEntry {
+  date: string;              // YYYY-MM-DD
+  deepWorkHours: number;     // 0-8, target 3+
+  pipelineActions: number;   // integer >= 0, target 2-5
+  trained: boolean;          // did training or not
+  timestamp: string;         // ISO datetime of last update
+}
+
+export interface WeeklyReview {
+  id: string;
+  weekStartDate: string;     // Monday YYYY-MM-DD
+  weekEndDate: string;       // Sunday YYYY-MM-DD
+  revenue: number;           // $ weekly total
+  slipAnalysis: string;      // "Where/why did I slip?"
+  systemAdjustment: string;  // "What system do I adjust?"
+  nextWeekTargets: string;
+  bottleneck: string;        // 1 bottleneck
+  createdAt: string;
+}
+
+export interface WeeklySummary {
+  weekStartDate: string;
+  weekEndDate: string;
+  revenue: number;
+  pipelineTotal: number;
+  deepWorkTotal: number;
+  consistencyScore: number;  // % days with 3+ DW AND trained
+  daysTracked: number;
+  zeroDays: number;          // days with DW=0 OR pipeline=0
+  goodDays: number;          // days with 3+ DW, 2+ pipeline, trained
+  dailyEntries: PerformanceDayEntry[];
+}
+
+export interface WeeklyTrackerData {
+  dailyEntries: Record<string, PerformanceDayEntry>;
+  weeklyReviews: WeeklyReview[];
+  lastUpdated: string;
+}
