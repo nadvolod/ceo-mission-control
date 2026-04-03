@@ -1,12 +1,22 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import type { AiTask, TaskStats, FocusCategory, MonarchFinancialSnapshot, AdjustmentType, RevenueProjectionData, MonthProjection, Initiative, DailyScorecard } from '@/lib/types';
+import type { AiTask, TaskStats, FocusCategory, MonarchFinancialSnapshot, AdjustmentType, RevenueProjectionData, MonthProjection, Initiative, DailyScorecard, PerformanceDayEntry, WeeklySummary, WeeklyReview } from '@/lib/types';
 
 export interface RevenueProjectionApiResponse {
   data: RevenueProjectionData;
   projections: MonthProjection[];
   monarchBase: { income: number; expenses: number; cashPosition: number; label?: string };
+  timestamp: string;
+}
+
+export interface WeeklyTrackerApiResponse {
+  success: boolean;
+  todaysEntry: PerformanceDayEntry | null;
+  currentWeekSummary: WeeklySummary;
+  previousWeekSummary: WeeklySummary;
+  dailyTrend: Array<PerformanceDayEntry & { isEmpty: boolean }>;
+  recentReviews: WeeklyReview[];
   timestamp: string;
 }
 
@@ -21,6 +31,7 @@ export interface DashboardData {
   monarchError: string | null;
   monarchLoading: boolean;
   projectionData: RevenueProjectionApiResponse | null;
+  weeklyTrackerData: WeeklyTrackerApiResponse | null;
   isLoading: boolean;
 }
 
@@ -36,6 +47,10 @@ export interface DashboardHandlers {
   handleRemoveProjectionAdjustment: (id: string) => Promise<void>;
   handleAddFinancialEntry: (category: 'moved' | 'generated' | 'cut', amount: number, description: string) => Promise<void>;
   handleAddFocusSession: (category: FocusCategory, hours: number, description: string) => Promise<void>;
+  handleLogDay: (deepWorkHours: number, pipelineActions: number, trained: boolean) => Promise<void>;
+  handleSubmitWeeklyReview: (review: {
+    revenue: number; slipAnalysis: string; systemAdjustment: string; nextWeekTargets: string; bottleneck: string;
+  }) => Promise<void>;
 }
 
 export function useDashboardData(): DashboardData & DashboardHandlers {
@@ -49,6 +64,7 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
   const [monarchError, setMonarchError] = useState<string | null>(null);
   const [monarchLoading, setMonarchLoading] = useState(false);
   const [projectionData, setProjectionData] = useState<RevenueProjectionApiResponse | null>(null);
+  const [weeklyTrackerData, setWeeklyTrackerData] = useState<WeeklyTrackerApiResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadAllData = useCallback(async () => {
@@ -111,6 +127,15 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
             setProjectionData(data);
           }
         } catch (e) { console.error('Error loading projections:', e); }
+      },
+      async () => {
+        try {
+          const res = await fetch('/api/weekly-tracker');
+          if (res.ok) {
+            const data = await res.json();
+            setWeeklyTrackerData(data);
+          }
+        } catch (e) { console.error('Error loading weekly tracker:', e); }
       },
     ];
 
@@ -257,11 +282,49 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
     }
   }, [loadAllData]);
 
+  const handleLogDay = useCallback(async (deepWorkHours: number, pipelineActions: number, trained: boolean) => {
+    try {
+      const response = await fetch('/api/weekly-tracker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'logDay', deepWorkHours, pipelineActions, trained })
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to log day');
+      }
+      await loadAllData();
+    } catch (error) {
+      console.error('Error logging day:', error);
+      throw error;
+    }
+  }, [loadAllData]);
+
+  const handleSubmitWeeklyReview = useCallback(async (review: {
+    revenue: number; slipAnalysis: string; systemAdjustment: string; nextWeekTargets: string; bottleneck: string;
+  }) => {
+    try {
+      const response = await fetch('/api/weekly-tracker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'submitReview', ...review })
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to submit review');
+      }
+      await loadAllData();
+    } catch (error) {
+      console.error('Error submitting weekly review:', error);
+      throw error;
+    }
+  }, [loadAllData]);
+
   return {
     aiTasks, taskStats, initiatives, scorecard, financialData, focusData,
-    monarchData, monarchError, monarchLoading, projectionData, isLoading,
+    monarchData, monarchError, monarchLoading, projectionData, weeklyTrackerData, isLoading,
     loadAllData, handleCreateTask, handleUpdateTask, handleDeleteTask,
     handleMonarchRefresh, handleAddProjectionAdjustment, handleRemoveProjectionAdjustment,
-    handleAddFinancialEntry, handleAddFocusSession,
+    handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleSubmitWeeklyReview,
   };
 }

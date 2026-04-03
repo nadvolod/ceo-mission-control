@@ -12,6 +12,7 @@ import { GET as focusGet, POST as focusPost } from '@/app/api/focus-hours/route'
 import { GET as temporalGet, POST as temporalPost } from '@/app/api/temporal/route';
 import { POST as syncPost } from '@/app/api/sync/route';
 import { GET as workspaceGet } from '@/app/api/workspace/route';
+import { GET as weeklyTrackerGet, POST as weeklyTrackerPost } from '@/app/api/weekly-tracker/route';
 
 // Do NOT mock storage — these tests use the real DB
 const REQUIRED_ENV = 'DATABASE_URL';
@@ -352,6 +353,125 @@ describe('/api/sync (real DB)', () => {
     const data = await response.json();
 
     expect(data.synced.length).toBe(2);
+  });
+});
+
+// --- Weekly Tracker API tests ---
+
+describe('/api/weekly-tracker (real DB)', () => {
+  let savedTrackerData: unknown = null;
+
+  beforeAll(async () => {
+    savedTrackerData = await loadJSON('weekly-tracker.json', null);
+  });
+
+  afterAll(async () => {
+    await ensureDbReady();
+    const db = getDb();
+    if (savedTrackerData) {
+      await saveJSON('weekly-tracker.json', savedTrackerData);
+    } else if (db) {
+      await db`DELETE FROM data_store WHERE key = 'weekly-tracker.json'`;
+    }
+    if (db) {
+      await db`DELETE FROM audit_log WHERE entry_type = 'weekly-tracker' AND content LIKE ${'%Integration test%'}`;
+    }
+  });
+
+  it('GET should return dashboard data structure', async () => {
+    const response = await weeklyTrackerGet();
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(data).toHaveProperty('todaysEntry');
+    expect(data).toHaveProperty('currentWeekSummary');
+    expect(data).toHaveProperty('previousWeekSummary');
+    expect(data).toHaveProperty('dailyTrend');
+    expect(data).toHaveProperty('recentReviews');
+  });
+
+  it('POST logDay should persist and be retrievable', async () => {
+    const request = new NextRequest('http://localhost/api/weekly-tracker', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'logDay',
+        deepWorkHours: 3.5,
+        pipelineActions: 2,
+        trained: true,
+      }),
+    });
+
+    const response = await weeklyTrackerPost(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(data.entry.deepWorkHours).toBe(3.5);
+    expect(data.entry.pipelineActions).toBe(2);
+    expect(data.entry.trained).toBe(true);
+    expect(data.currentWeekSummary).toBeDefined();
+
+    // Verify persistence via GET
+    const getResponse = await weeklyTrackerGet();
+    const getData = await getResponse.json();
+    expect(getData.todaysEntry).not.toBeNull();
+    expect(getData.todaysEntry.deepWorkHours).toBe(3.5);
+  });
+
+  it('POST logDay should reject invalid input', async () => {
+    const request = new NextRequest('http://localhost/api/weekly-tracker', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'logDay',
+        deepWorkHours: 10,
+        pipelineActions: 2,
+        trained: true,
+      }),
+    });
+
+    const response = await weeklyTrackerPost(request);
+    expect(response.status).toBe(400);
+  });
+
+  it('POST submitReview should persist review', async () => {
+    const request = new NextRequest('http://localhost/api/weekly-tracker', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'submitReview',
+        revenue: 5000,
+        slipAnalysis: 'Integration test slip',
+        systemAdjustment: 'Integration test adjustment',
+        nextWeekTargets: 'Integration test targets',
+        bottleneck: 'Integration test bottleneck',
+      }),
+    });
+
+    const response = await weeklyTrackerPost(request);
+    const data = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(data.success).toBe(true);
+    expect(data.review.revenue).toBe(5000);
+
+    // Verify persistence via GET
+    const getResponse = await weeklyTrackerGet();
+    const getData = await getResponse.json();
+    expect(getData.recentReviews.length).toBeGreaterThanOrEqual(1);
+    expect(getData.recentReviews.some((r: { revenue: number }) => r.revenue === 5000)).toBe(true);
+  });
+
+  it('POST submitReview should reject negative revenue', async () => {
+    const request = new NextRequest('http://localhost/api/weekly-tracker', {
+      method: 'POST',
+      body: JSON.stringify({
+        action: 'submitReview',
+        revenue: -100,
+      }),
+    });
+
+    const response = await weeklyTrackerPost(request);
+    expect(response.status).toBe(400);
   });
 });
 

@@ -93,6 +93,7 @@ test.describe('Dashboard page rendering', () => {
       '/api/financial',
       '/api/focus-hours',
       '/api/revenue-projection',
+      '/api/weekly-tracker',
     ];
 
     for (const path of endpoints) {
@@ -169,6 +170,54 @@ test.describe('Dashboard page rendering', () => {
         }
       }
     }
+  });
+
+  test('weekly performance tracker renders on dashboard', async ({ page }) => {
+    await page.goto('/dashboard');
+    await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+    const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
+    if (hasFullDashboard) {
+      // Weekly Performance Tracker should be visible
+      await expect(page.getByText('Weekly Performance Tracker')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Log Today' })).toBeVisible();
+
+      // Verify it appears between Revenue Projections and Mission Tracker
+      const allText = await page.textContent('main');
+      if (allText) {
+        const trackerPos = allText.indexOf('Weekly Performance Tracker');
+        const missionPos = allText.indexOf('Mission Progress');
+        if (trackerPos !== -1 && missionPos !== -1) {
+          expect(trackerPos).toBeLessThan(missionPos);
+        }
+      }
+    }
+  });
+
+  test('weekly tracker Log Today button opens form', async ({ page }) => {
+    await page.goto('/dashboard');
+    await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+    const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
+    if (hasFullDashboard) {
+      const logButton = page.getByRole('button', { name: 'Log Today' });
+      await expect(logButton).toBeVisible();
+      await logButton.click();
+
+      // Form fields should be visible after clicking
+      await expect(page.getByLabel(/Deep Work Hours/)).toBeVisible();
+      await expect(page.getByLabel(/Pipeline Actions/)).toBeVisible();
+    }
+  });
+
+  test('weekly tracker API returns valid structure', async ({ request }) => {
+    const response = await request.get('/api/weekly-tracker');
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    expect(data.success).toBe(true);
+    expect(data).toHaveProperty('currentWeekSummary');
+    expect(data).toHaveProperty('dailyTrend');
+    expect(data).toHaveProperty('recentReviews');
   });
 
   test('revenue projection API validates input', async ({ request }) => {
