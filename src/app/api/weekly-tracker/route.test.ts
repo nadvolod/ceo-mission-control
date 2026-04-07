@@ -2,6 +2,7 @@
  * @jest-environment node
  */
 import { NextRequest } from 'next/server';
+import { format } from 'date-fns';
 import { GET, POST } from './route';
 
 jest.mock('@/lib/storage', () => {
@@ -42,7 +43,7 @@ describe('/api/weekly-tracker', () => {
     });
 
     it('should return data when entries exist', async () => {
-      const today = new Date().toISOString().split('T')[0];
+      const today = format(new Date(), 'yyyy-MM-dd');
       const existingData = {
         dailyEntries: {
           [today]: {
@@ -176,6 +177,69 @@ describe('/api/weekly-tracker', () => {
       });
       const response = await POST(request);
       expect(response.status).toBe(400);
+    });
+  });
+
+  describe('POST logDay with client-sent date', () => {
+    it('should use the client-provided date', async () => {
+      const request = new NextRequest('http://localhost/api/weekly-tracker', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'logDay', deepWorkHours: 3, pipelineActions: 2, trained: true, date: '2026-04-06' }),
+      });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.entry.date).toBe('2026-04-06');
+    });
+
+    it('should reject invalid date format', async () => {
+      const request = new NextRequest('http://localhost/api/weekly-tracker', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'logDay', deepWorkHours: 3, pipelineActions: 2, trained: true, date: 'not-a-date' }),
+      });
+      const response = await POST(request);
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.error).toContain('date');
+    });
+
+    it('should reject invalid calendar date', async () => {
+      const request = new NextRequest('http://localhost/api/weekly-tracker', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'logDay', deepWorkHours: 3, pipelineActions: 2, trained: true, date: '2026-13-99' }),
+      });
+      const response = await POST(request);
+      expect(response.status).toBe(400);
+    });
+
+    it('should preserve entries for different dates', async () => {
+      const req1 = new NextRequest('http://localhost/api/weekly-tracker', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'logDay', deepWorkHours: 3, pipelineActions: 2, trained: true, date: '2026-04-06' }),
+      });
+      await POST(req1);
+
+      const req2 = new NextRequest('http://localhost/api/weekly-tracker', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'logDay', deepWorkHours: 5, pipelineActions: 4, trained: false, date: '2026-04-08' }),
+      });
+      await POST(req2);
+
+      const getResponse = await GET();
+      const data = await getResponse.json();
+
+      // Both entries should be present in the week summary
+      const entries = data.currentWeekSummary.dailyEntries;
+      const mondayEntry = entries[0]; // 2026-04-06 is Monday
+      const wednesdayEntry = entries[2]; // 2026-04-08 is Wednesday
+
+      expect(mondayEntry).not.toBeNull();
+      expect(mondayEntry.deepWorkHours).toBe(3);
+      expect(wednesdayEntry).not.toBeNull();
+      expect(wednesdayEntry.deepWorkHours).toBe(5);
+      // Tuesday should be null
+      expect(entries[1]).toBeNull();
     });
   });
 

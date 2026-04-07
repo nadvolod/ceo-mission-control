@@ -44,7 +44,7 @@ export class WeeklyTracker {
       throw new Error('trained must be a boolean');
     }
 
-    const entryDate = date || new Date().toISOString().split('T')[0];
+    const entryDate = date || format(new Date(), 'yyyy-MM-dd');
     const now = new Date().toISOString();
 
     const entry: PerformanceDayEntry = {
@@ -96,7 +96,12 @@ export class WeeklyTracker {
       createdAt: now.toISOString(),
     };
 
-    this.data.weeklyReviews.push(fullReview);
+    const existingIdx = this.data.weeklyReviews.findIndex(r => r.weekStartDate === weekStart);
+    if (existingIdx >= 0) {
+      this.data.weeklyReviews[existingIdx] = fullReview;
+    } else {
+      this.data.weeklyReviews.push(fullReview);
+    }
     await this.saveData();
 
     await appendAuditLog(
@@ -111,22 +116,21 @@ export class WeeklyTracker {
   }
 
   getTodaysEntry(): PerformanceDayEntry | null {
-    const today = new Date().toISOString().split('T')[0];
+    const today = format(new Date(), 'yyyy-MM-dd');
     return this.data.dailyEntries[today] || null;
   }
 
-  getCurrentWeekEntries(): PerformanceDayEntry[] {
+  getCurrentWeekEntries(): (PerformanceDayEntry | null)[] {
     return this.getWeekEntries(new Date());
   }
 
-  private getWeekEntries(dateInWeek: Date): PerformanceDayEntry[] {
+  private getWeekEntries(dateInWeek: Date): (PerformanceDayEntry | null)[] {
     const weekStart = startOfWeek(dateInWeek, { weekStartsOn: 1 });
-    const entries: PerformanceDayEntry[] = [];
+    const entries: (PerformanceDayEntry | null)[] = [];
 
     for (let i = 0; i < 7; i++) {
       const date = format(addDays(weekStart, i), 'yyyy-MM-dd');
-      const entry = this.data.dailyEntries[date];
-      if (entry) entries.push(entry);
+      entries.push(this.data.dailyEntries[date] || null);
     }
 
     return entries;
@@ -148,7 +152,8 @@ export class WeeklyTracker {
     const weekEndStr = format(weekEnd, 'yyyy-MM-dd');
 
     const entries = this.getWeekEntries(dateInWeek);
-    const daysTracked = entries.length;
+    const filledEntries = entries.filter((e): e is PerformanceDayEntry => e !== null);
+    const daysTracked = filledEntries.length;
 
     let pipelineTotal = 0;
     let deepWorkTotal = 0;
@@ -156,7 +161,7 @@ export class WeeklyTracker {
     let goodDays = 0;
     let consistentDays = 0;
 
-    for (const entry of entries) {
+    for (const entry of filledEntries) {
       pipelineTotal += entry.pipelineActions;
       deepWorkTotal += entry.deepWorkHours;
 

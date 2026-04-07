@@ -18,7 +18,8 @@ const storage = require('./storage');
 import { WeeklyTracker } from './weekly-tracker';
 import { format, startOfWeek, addDays } from 'date-fns';
 
-const TODAY = new Date().toISOString().split('T')[0];
+// Use local date (consistent with date-fns format) — not UTC toISOString
+const TODAY = format(new Date(), 'yyyy-MM-dd');
 
 // Helper: get a date string for a specific day of the current week (0=Mon)
 function weekDay(offset: number): string {
@@ -299,8 +300,9 @@ describe('WeeklyTracker', () => {
   describe('getWeeklyReviews', () => {
     it('returns reviews in reverse chronological order', async () => {
       const tracker = await WeeklyTracker.create();
-      await tracker.submitWeeklyReview({ revenue: 1000, slipAnalysis: 'first', systemAdjustment: '', nextWeekTargets: '', bottleneck: '' });
-      await tracker.submitWeeklyReview({ revenue: 2000, slipAnalysis: 'second', systemAdjustment: '', nextWeekTargets: '', bottleneck: '' });
+      // Use different weekStartDate values so upsert doesn't collapse them
+      await tracker.submitWeeklyReview({ revenue: 1000, slipAnalysis: 'first', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', weekStartDate: '2026-03-23', weekEndDate: '2026-03-29' });
+      await tracker.submitWeeklyReview({ revenue: 2000, slipAnalysis: 'second', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', weekStartDate: '2026-03-30', weekEndDate: '2026-04-05' });
 
       const reviews = tracker.getWeeklyReviews(5);
       expect(reviews.length).toBe(2);
@@ -308,11 +310,22 @@ describe('WeeklyTracker', () => {
       expect(reviews[1].revenue).toBe(1000);
     });
 
+    it('upserts review for the same week', async () => {
+      const tracker = await WeeklyTracker.create();
+      await tracker.submitWeeklyReview({ revenue: 1000, slipAnalysis: 'first', systemAdjustment: '', nextWeekTargets: '', bottleneck: '' });
+      await tracker.submitWeeklyReview({ revenue: 2000, slipAnalysis: 'updated', systemAdjustment: '', nextWeekTargets: '', bottleneck: '' });
+
+      const reviews = tracker.getWeeklyReviews(5);
+      expect(reviews.length).toBe(1);
+      expect(reviews[0].revenue).toBe(2000);
+      expect(reviews[0].slipAnalysis).toBe('updated');
+    });
+
     it('respects limit', async () => {
       const tracker = await WeeklyTracker.create();
-      await tracker.submitWeeklyReview({ revenue: 1000, slipAnalysis: '', systemAdjustment: '', nextWeekTargets: '', bottleneck: '' });
-      await tracker.submitWeeklyReview({ revenue: 2000, slipAnalysis: '', systemAdjustment: '', nextWeekTargets: '', bottleneck: '' });
-      await tracker.submitWeeklyReview({ revenue: 3000, slipAnalysis: '', systemAdjustment: '', nextWeekTargets: '', bottleneck: '' });
+      await tracker.submitWeeklyReview({ revenue: 1000, slipAnalysis: '', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', weekStartDate: '2026-03-16', weekEndDate: '2026-03-22' });
+      await tracker.submitWeeklyReview({ revenue: 2000, slipAnalysis: '', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', weekStartDate: '2026-03-23', weekEndDate: '2026-03-29' });
+      await tracker.submitWeeklyReview({ revenue: 3000, slipAnalysis: '', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', weekStartDate: '2026-03-30', weekEndDate: '2026-04-05' });
 
       const reviews = tracker.getWeeklyReviews(2);
       expect(reviews.length).toBe(2);
@@ -332,6 +345,59 @@ describe('WeeklyTracker', () => {
 
       const latest = tracker.getLatestReview();
       expect(latest?.revenue).toBe(5000);
+    });
+  });
+
+  describe('week entries alignment', () => {
+    it('returns 7-element array with nulls for missing days', async () => {
+      const tracker = await WeeklyTracker.create();
+      // Log only Monday (offset 0)
+      await tracker.logDay(3, 2, true, weekDay(0));
+
+      const summary = tracker.getCurrentWeekSummary();
+      expect(summary.dailyEntries).toHaveLength(7);
+      expect(summary.dailyEntries[0]).not.toBeNull();
+      expect(summary.dailyEntries[0]?.date).toBe(weekDay(0));
+      for (let i = 1; i < 7; i++) {
+        expect(summary.dailyEntries[i]).toBeNull();
+      }
+    });
+
+    it('places sparse entries at correct day positions', async () => {
+      const tracker = await WeeklyTracker.create();
+      // Log Monday (0) and Wednesday (2) only
+      await tracker.logDay(3, 2, true, weekDay(0));
+      await tracker.logDay(4, 3, false, weekDay(2));
+
+      const summary = tracker.getCurrentWeekSummary();
+      expect(summary.dailyEntries[0]?.deepWorkHours).toBe(3);  // Monday
+      expect(summary.dailyEntries[1]).toBeNull();                // Tuesday empty
+      expect(summary.dailyEntries[2]?.deepWorkHours).toBe(4);  // Wednesday
+      expect(summary.dailyEntries[3]).toBeNull();                // Thursday empty
+    });
+
+    it('preserves existing day entries when logging a new day', async () => {
+      const tracker = await WeeklyTracker.create();
+      await tracker.logDay(3, 2, true, weekDay(0));
+      await tracker.logDay(4, 1, false, weekDay(2));
+
+      const summary = tracker.getCurrentWeekSummary();
+      expect(summary.daysTracked).toBe(2);
+      expect(summary.dailyEntries[0]?.deepWorkHours).toBe(3);
+      expect(summary.dailyEntries[2]?.deepWorkHours).toBe(4);
+    });
+
+    it('correctly aggregates only non-null entries', async () => {
+      const tracker = await WeeklyTracker.create();
+      await tracker.logDay(3, 2, true, weekDay(0));
+      await tracker.logDay(5, 4, true, weekDay(3));
+
+      const summary = tracker.getCurrentWeekSummary();
+      expect(summary.daysTracked).toBe(2);
+      expect(summary.deepWorkTotal).toBe(8);
+      expect(summary.pipelineTotal).toBe(6);
+      expect(summary.goodDays).toBe(2);
+      expect(summary.zeroDays).toBe(0);
     });
   });
 

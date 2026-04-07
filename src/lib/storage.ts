@@ -47,25 +47,17 @@ export async function saveJSON(filename: string, data: unknown): Promise<void> {
   if (hasDb()) {
     await ensureDbReady();
     const db = getDb()!;
-    try {
-      await db`INSERT INTO data_store (key, data, updated_at)
-               VALUES (${filename}, ${JSON.stringify(data)}, NOW())
-               ON CONFLICT (key) DO UPDATE SET data = ${JSON.stringify(data)}, updated_at = NOW()`;
-    } catch (error) {
-      console.error(`DB saveJSON error for ${filename}:`, error);
-    }
+    await db`INSERT INTO data_store (key, data, updated_at)
+             VALUES (${filename}, ${JSON.stringify(data)}, NOW())
+             ON CONFLICT (key) DO UPDATE SET data = ${JSON.stringify(data)}, updated_at = NOW()`;
     return;
   }
 
   // Filesystem fallback
   ensureWorkspaceReady();
-  try {
-    const filePath = join(WORKSPACE_PATH, filename);
-    mkdirSync(dirname(filePath), { recursive: true });
-    writeFileSync(filePath, JSON.stringify(data, null, 2));
-  } catch (error) {
-    console.error(`File saveJSON error for ${filename}:`, error);
-  }
+  const filePath = join(WORKSPACE_PATH, filename);
+  mkdirSync(dirname(filePath), { recursive: true });
+  writeFileSync(filePath, JSON.stringify(data, null, 2));
 }
 
 // --- Text content (INITIATIVES.md, DAILY_SCORECARD.md, etc.) ---
@@ -99,28 +91,22 @@ export async function saveText(filename: string, content: string): Promise<void>
   if (hasDb()) {
     await ensureDbReady();
     const db = getDb()!;
-    try {
-      await db`INSERT INTO text_store (key, content, updated_at)
-               VALUES (${filename}, ${content}, NOW())
-               ON CONFLICT (key) DO UPDATE SET content = ${content}, updated_at = NOW()`;
-    } catch (error) {
-      console.error(`DB saveText error for ${filename}:`, error);
-    }
+    await db`INSERT INTO text_store (key, content, updated_at)
+             VALUES (${filename}, ${content}, NOW())
+             ON CONFLICT (key) DO UPDATE SET content = ${content}, updated_at = NOW()`;
     return;
   }
 
   // Filesystem fallback
   ensureWorkspaceReady();
-  try {
-    const filePath = join(WORKSPACE_PATH, filename);
-    mkdirSync(dirname(filePath), { recursive: true });
-    writeFileSync(filePath, content);
-  } catch (error) {
-    console.error(`File saveText error for ${filename}:`, error);
-  }
+  const filePath = join(WORKSPACE_PATH, filename);
+  mkdirSync(dirname(filePath), { recursive: true });
+  writeFileSync(filePath, content);
 }
 
 // --- Audit log (replaces memory/{date}.md) ---
+// Note: appendAuditLog intentionally catches errors so audit failures
+// don't break data operations (saveJSON/saveText propagate errors).
 
 export async function appendAuditLog(date: string, entryType: string, content: string): Promise<void> {
   if (hasDb()) {

@@ -220,6 +220,59 @@ test.describe('Dashboard page rendering', () => {
     expect(data).toHaveProperty('recentReviews');
   });
 
+  test('weekly tracker API returns 7-element dailyEntries array', async ({ request }) => {
+    // Log an entry for a specific date (Wednesday of current week)
+    const logResponse = await request.post('/api/weekly-tracker', {
+      data: { action: 'logDay', deepWorkHours: 3, pipelineActions: 2, trained: true, date: '2026-04-08' },
+    });
+    expect(logResponse.status()).toBe(200);
+
+    // GET should return 7-element dailyEntries with entry at correct position
+    const response = await request.get('/api/weekly-tracker');
+    const data = await response.json();
+    const entries = data.currentWeekSummary.dailyEntries;
+
+    expect(entries).toHaveLength(7);
+    // 2026-04-08 is a Wednesday (index 2 in Mon-Sun week)
+    expect(entries[2]).not.toBeNull();
+    expect(entries[2].date).toBe('2026-04-08');
+    expect(entries[2].deepWorkHours).toBe(3);
+  });
+
+  test('weekly tracker preserves entries for different days', async ({ request }) => {
+    // Log Monday
+    await request.post('/api/weekly-tracker', {
+      data: { action: 'logDay', deepWorkHours: 2, pipelineActions: 1, trained: false, date: '2026-04-06' },
+    });
+    // Log Friday
+    await request.post('/api/weekly-tracker', {
+      data: { action: 'logDay', deepWorkHours: 5, pipelineActions: 4, trained: true, date: '2026-04-10' },
+    });
+
+    const response = await request.get('/api/weekly-tracker');
+    const data = await response.json();
+    const entries = data.currentWeekSummary.dailyEntries;
+
+    // Monday (index 0) and Friday (index 4) should have data
+    expect(entries[0]).not.toBeNull();
+    expect(entries[0].deepWorkHours).toBe(2);
+    expect(entries[4]).not.toBeNull();
+    expect(entries[4].deepWorkHours).toBe(5);
+    // Tuesday-Thursday should be null
+    expect(entries[1]).toBeNull();
+    expect(entries[2]).toBeNull();
+    expect(entries[3]).toBeNull();
+  });
+
+  test('weekly tracker rejects invalid date format', async ({ request }) => {
+    const response = await request.post('/api/weekly-tracker', {
+      data: { action: 'logDay', deepWorkHours: 3, pipelineActions: 2, trained: true, date: 'bad-date' },
+    });
+    expect(response.status()).toBe(400);
+    const data = await response.json();
+    expect(data.error).toContain('date');
+  });
+
   test('revenue projection API validates input', async ({ request }) => {
     // Test that invalid input is rejected
     const badMonth = await request.post('/api/revenue-projection', {
