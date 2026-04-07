@@ -140,6 +140,10 @@ export default function HomePage() {
               recentReviews={weeklyTrackerData.recentReviews}
               onLogDay={handleLogDay}
               onSubmitReview={handleSubmitWeeklyReview}
+              onAddFocusSession={handleAddFocusSession}
+              temporalActual={focusData?.weeklyTotals?.Temporal ?? scorecard.temporalActual ?? 0}
+              todaysFocusTotal={focusData?.todaysMetrics?.totalHours ?? 0}
+              todaysTemporalHours={focusData?.todaysMetrics?.byCategory?.Temporal ?? 0}
             />
           </div>
         )}

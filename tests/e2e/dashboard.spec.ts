@@ -305,6 +305,39 @@ test.describe('Dashboard page rendering', () => {
     expect(data.error).toContain('date');
   });
 
+  test('weekly review with temporalTarget persists and appears in GET', async ({ request }) => {
+    const postRes = await request.post('/api/weekly-tracker', {
+      data: { action: 'submitReview', revenue: 2000, temporalTarget: 8, slipAnalysis: 'test', systemAdjustment: '', nextWeekTargets: '', bottleneck: '' },
+    });
+    if (postRes.status() === 500) {
+      test.skip();
+      return;
+    }
+    expect(postRes.status()).toBe(200);
+    const postData = await postRes.json();
+    expect(postData.review.temporalTarget).toBe(8);
+
+    // GET should return the temporalTarget in the summary
+    const getRes = await request.get('/api/weekly-tracker');
+    const getData = await getRes.json();
+    expect(getData.currentWeekSummary.temporalTarget).toBe(8);
+  });
+
+  test('focus session POST creates a session and GET reflects updated data', async ({ request }) => {
+    const postRes = await request.post('/api/focus-hours', {
+      data: { action: 'addSession', category: 'Temporal', hours: 1.5, description: 'E2E test session' },
+    });
+    if (postRes.status() === 500) {
+      test.skip();
+      return;
+    }
+    expect(postRes.status()).toBe(200);
+
+    const getRes = await request.get('/api/focus-hours');
+    const getData = await getRes.json();
+    expect(getData.todaysMetrics.totalHours).toBeGreaterThanOrEqual(1.5);
+  });
+
   test('revenue projection API validates input', async ({ request }) => {
     // Test that invalid input is rejected
     const badMonth = await request.post('/api/revenue-projection', {

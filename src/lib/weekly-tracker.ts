@@ -93,6 +93,7 @@ export class WeeklyTracker {
       systemAdjustment: review.systemAdjustment || '',
       nextWeekTargets: review.nextWeekTargets || '',
       bottleneck: review.bottleneck || '',
+      temporalTarget: typeof review.temporalTarget === 'number' && isFinite(review.temporalTarget) ? review.temporalTarget : 5,
       createdAt: now.toISOString(),
     };
 
@@ -180,6 +181,7 @@ export class WeeklyTracker {
       r => r.weekStartDate === weekStartStr
     );
     const revenue = review?.revenue ?? 0;
+    const temporalTarget = review?.temporalTarget ?? 5;
 
     return {
       weekStartDate: weekStartStr,
@@ -192,6 +194,7 @@ export class WeeklyTracker {
       zeroDays,
       goodDays,
       dailyEntries: entries,
+      temporalTarget,
     };
   }
 

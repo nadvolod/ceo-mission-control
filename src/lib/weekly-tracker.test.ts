@@ -401,6 +401,42 @@ describe('WeeklyTracker', () => {
     });
   });
 
+  describe('temporalTarget', () => {
+    it('includes temporalTarget in weekly review', async () => {
+      const tracker = await WeeklyTracker.create();
+      const review = await tracker.submitWeeklyReview({
+        revenue: 1000, slipAnalysis: '', systemAdjustment: '',
+        nextWeekTargets: '', bottleneck: '', temporalTarget: 8,
+      });
+      expect(review.temporalTarget).toBe(8);
+    });
+
+    it('defaults temporalTarget to 5 when not provided', async () => {
+      const tracker = await WeeklyTracker.create();
+      const review = await tracker.submitWeeklyReview({
+        revenue: 1000, slipAnalysis: '', systemAdjustment: '',
+        nextWeekTargets: '', bottleneck: '', temporalTarget: undefined as unknown as number,
+      });
+      expect(review.temporalTarget).toBe(5);
+    });
+
+    it('surfaces temporalTarget in week summary', async () => {
+      const tracker = await WeeklyTracker.create();
+      await tracker.submitWeeklyReview({
+        revenue: 1000, slipAnalysis: '', systemAdjustment: '',
+        nextWeekTargets: '', bottleneck: '', temporalTarget: 10,
+      });
+      const summary = tracker.getCurrentWeekSummary();
+      expect(summary.temporalTarget).toBe(10);
+    });
+
+    it('defaults summary temporalTarget to 5 with no review', async () => {
+      const tracker = await WeeklyTracker.create();
+      const summary = tracker.getCurrentWeekSummary();
+      expect(summary.temporalTarget).toBe(5);
+    });
+  });
+
   describe('data persistence', () => {
     it('should load existing data on create', async () => {
       const existingData = {
