@@ -110,6 +110,7 @@ describe('WeeklyTracker', () => {
         systemAdjustment: 'Block mornings',
         nextWeekTargets: '4h daily',
         bottleneck: 'Context switching',
+        temporalTarget: 5,
       });
 
       expect(review.id).toMatch(/^review_/);
@@ -128,6 +129,7 @@ describe('WeeklyTracker', () => {
         systemAdjustment: '',
         nextWeekTargets: '',
         bottleneck: '',
+        temporalTarget: 5,
       })).rejects.toThrow('revenue must be a non-negative number');
     });
 
@@ -139,6 +141,7 @@ describe('WeeklyTracker', () => {
         systemAdjustment: '',
         nextWeekTargets: '',
         bottleneck: '',
+        temporalTarget: 5,
       });
       expect(review.revenue).toBe(0);
     });
@@ -227,6 +230,7 @@ describe('WeeklyTracker', () => {
         systemAdjustment: '',
         nextWeekTargets: '',
         bottleneck: '',
+        temporalTarget: 5,
       });
 
       const summary2 = tracker.getCurrentWeekSummary();
@@ -301,8 +305,8 @@ describe('WeeklyTracker', () => {
     it('returns reviews in reverse chronological order', async () => {
       const tracker = await WeeklyTracker.create();
       // Use different weekStartDate values so upsert doesn't collapse them
-      await tracker.submitWeeklyReview({ revenue: 1000, slipAnalysis: 'first', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', weekStartDate: '2026-03-23', weekEndDate: '2026-03-29' });
-      await tracker.submitWeeklyReview({ revenue: 2000, slipAnalysis: 'second', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', weekStartDate: '2026-03-30', weekEndDate: '2026-04-05' });
+      await tracker.submitWeeklyReview({ revenue: 1000, slipAnalysis: 'first', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', temporalTarget: 5, weekStartDate: '2026-03-23', weekEndDate: '2026-03-29' });
+      await tracker.submitWeeklyReview({ revenue: 2000, slipAnalysis: 'second', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', temporalTarget: 5, weekStartDate: '2026-03-30', weekEndDate: '2026-04-05' });
 
       const reviews = tracker.getWeeklyReviews(5);
       expect(reviews.length).toBe(2);
@@ -312,8 +316,8 @@ describe('WeeklyTracker', () => {
 
     it('upserts review for the same week', async () => {
       const tracker = await WeeklyTracker.create();
-      await tracker.submitWeeklyReview({ revenue: 1000, slipAnalysis: 'first', systemAdjustment: '', nextWeekTargets: '', bottleneck: '' });
-      await tracker.submitWeeklyReview({ revenue: 2000, slipAnalysis: 'updated', systemAdjustment: '', nextWeekTargets: '', bottleneck: '' });
+      await tracker.submitWeeklyReview({ revenue: 1000, slipAnalysis: 'first', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', temporalTarget: 5 });
+      await tracker.submitWeeklyReview({ revenue: 2000, slipAnalysis: 'updated', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', temporalTarget: 5 });
 
       const reviews = tracker.getWeeklyReviews(5);
       expect(reviews.length).toBe(1);
@@ -323,9 +327,9 @@ describe('WeeklyTracker', () => {
 
     it('respects limit', async () => {
       const tracker = await WeeklyTracker.create();
-      await tracker.submitWeeklyReview({ revenue: 1000, slipAnalysis: '', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', weekStartDate: '2026-03-16', weekEndDate: '2026-03-22' });
-      await tracker.submitWeeklyReview({ revenue: 2000, slipAnalysis: '', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', weekStartDate: '2026-03-23', weekEndDate: '2026-03-29' });
-      await tracker.submitWeeklyReview({ revenue: 3000, slipAnalysis: '', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', weekStartDate: '2026-03-30', weekEndDate: '2026-04-05' });
+      await tracker.submitWeeklyReview({ revenue: 1000, slipAnalysis: '', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', temporalTarget: 5, weekStartDate: '2026-03-16', weekEndDate: '2026-03-22' });
+      await tracker.submitWeeklyReview({ revenue: 2000, slipAnalysis: '', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', temporalTarget: 5, weekStartDate: '2026-03-23', weekEndDate: '2026-03-29' });
+      await tracker.submitWeeklyReview({ revenue: 3000, slipAnalysis: '', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', temporalTarget: 5, weekStartDate: '2026-03-30', weekEndDate: '2026-04-05' });
 
       const reviews = tracker.getWeeklyReviews(2);
       expect(reviews.length).toBe(2);
@@ -340,8 +344,8 @@ describe('WeeklyTracker', () => {
 
     it('returns the most recent review', async () => {
       const tracker = await WeeklyTracker.create();
-      await tracker.submitWeeklyReview({ revenue: 1000, slipAnalysis: '', systemAdjustment: '', nextWeekTargets: '', bottleneck: '' });
-      await tracker.submitWeeklyReview({ revenue: 5000, slipAnalysis: '', systemAdjustment: '', nextWeekTargets: '', bottleneck: '' });
+      await tracker.submitWeeklyReview({ revenue: 1000, slipAnalysis: '', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', temporalTarget: 5 });
+      await tracker.submitWeeklyReview({ revenue: 5000, slipAnalysis: '', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', temporalTarget: 5 });
 
       const latest = tracker.getLatestReview();
       expect(latest?.revenue).toBe(5000);
