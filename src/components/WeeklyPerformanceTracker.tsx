@@ -74,13 +74,27 @@ export function WeeklyPerformanceTracker({
     }
   }, [todaysEntry, isLogging]);
 
-  // Review form state
-  const [reviewRevenue, setReviewRevenue] = useState('');
-  const [reviewSlip, setReviewSlip] = useState('');
-  const [reviewSystem, setReviewSystem] = useState('');
-  const [reviewTargets, setReviewTargets] = useState('');
-  const [reviewBottleneck, setReviewBottleneck] = useState('');
+  // Review form state — pre-populate from existing review if available
+  const existingReview = recentReviews.find(
+    r => r.weekStartDate === currentWeekSummary.weekStartDate
+  );
+  const [reviewRevenue, setReviewRevenue] = useState(existingReview?.revenue?.toString() ?? '');
+  const [reviewSlip, setReviewSlip] = useState(existingReview?.slipAnalysis ?? '');
+  const [reviewSystem, setReviewSystem] = useState(existingReview?.systemAdjustment ?? '');
+  const [reviewTargets, setReviewTargets] = useState(existingReview?.nextWeekTargets ?? '');
+  const [reviewBottleneck, setReviewBottleneck] = useState(existingReview?.bottleneck ?? '');
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  // Sync review form when existing review data changes (e.g. after submit)
+  useEffect(() => {
+    if (existingReview) {
+      setReviewRevenue(existingReview.revenue?.toString() ?? '');
+      setReviewSlip(existingReview.slipAnalysis ?? '');
+      setReviewSystem(existingReview.systemAdjustment ?? '');
+      setReviewTargets(existingReview.nextWeekTargets ?? '');
+      setReviewBottleneck(existingReview.bottleneck ?? '');
+    }
+  }, [existingReview?.id]);
 
   const dayStatus = getDayStatusLabel(todaysEntry);
 
