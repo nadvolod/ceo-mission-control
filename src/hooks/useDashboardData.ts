@@ -133,7 +133,13 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
           const res = await fetch('/api/weekly-tracker');
           if (res.ok) {
             const data = await res.json();
-            setWeeklyTrackerData(data);
+            // Derive todaysEntry client-side using local date to avoid server timezone mismatch
+            const now = new Date();
+            const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            const localEntry = data.currentWeekSummary?.dailyEntries?.find(
+              (e: PerformanceDayEntry | null) => e?.date === localDate
+            ) ?? null;
+            setWeeklyTrackerData({ ...data, todaysEntry: localEntry });
           }
         } catch (e) { console.error('Error loading weekly tracker:', e); }
       },
@@ -284,10 +290,13 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
 
   const handleLogDay = useCallback(async (deepWorkHours: number, pipelineActions: number, trained: boolean) => {
     try {
+      // Use local date to avoid UTC/timezone mismatch on the server
+      const now = new Date();
+      const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
       const response = await fetch('/api/weekly-tracker', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'logDay', deepWorkHours, pipelineActions, trained })
+        body: JSON.stringify({ action: 'logDay', deepWorkHours, pipelineActions, trained, date })
       });
       if (!response.ok) {
         const err = await response.json().catch(() => ({}));

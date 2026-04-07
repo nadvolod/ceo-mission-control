@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Flame, Plus, TrendingUp, TrendingDown, CheckCircle2, XCircle,
   AlertTriangle, BarChart3, Activity, ClipboardList, Target
@@ -64,13 +64,37 @@ export function WeeklyPerformanceTracker({
   const [pipeline, setPipeline] = useState(todaysEntry?.pipelineActions?.toString() ?? '');
   const [trained, setTrained] = useState(todaysEntry?.trained ?? false);
 
-  // Review form state
-  const [reviewRevenue, setReviewRevenue] = useState('');
-  const [reviewSlip, setReviewSlip] = useState('');
-  const [reviewSystem, setReviewSystem] = useState('');
-  const [reviewTargets, setReviewTargets] = useState('');
-  const [reviewBottleneck, setReviewBottleneck] = useState('');
+  // Sync form state when todaysEntry prop changes (e.g. after logging),
+  // but only when the user is NOT actively editing the form
+  useEffect(() => {
+    if (!isLogging) {
+      setDeepWork(todaysEntry?.deepWorkHours?.toString() ?? '');
+      setPipeline(todaysEntry?.pipelineActions?.toString() ?? '');
+      setTrained(todaysEntry?.trained ?? false);
+    }
+  }, [todaysEntry, isLogging]);
+
+  // Review form state — pre-populate from existing review if available
+  const existingReview = recentReviews.find(
+    r => r.weekStartDate === currentWeekSummary.weekStartDate
+  );
+  const [reviewRevenue, setReviewRevenue] = useState(existingReview?.revenue?.toString() ?? '');
+  const [reviewSlip, setReviewSlip] = useState(existingReview?.slipAnalysis ?? '');
+  const [reviewSystem, setReviewSystem] = useState(existingReview?.systemAdjustment ?? '');
+  const [reviewTargets, setReviewTargets] = useState(existingReview?.nextWeekTargets ?? '');
+  const [reviewBottleneck, setReviewBottleneck] = useState(existingReview?.bottleneck ?? '');
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  // Sync review form when existing review data changes (e.g. after submit)
+  useEffect(() => {
+    if (existingReview) {
+      setReviewRevenue(existingReview.revenue?.toString() ?? '');
+      setReviewSlip(existingReview.slipAnalysis ?? '');
+      setReviewSystem(existingReview.systemAdjustment ?? '');
+      setReviewTargets(existingReview.nextWeekTargets ?? '');
+      setReviewBottleneck(existingReview.bottleneck ?? '');
+    }
+  }, [existingReview?.id]);
 
   const dayStatus = getDayStatusLabel(todaysEntry);
 
@@ -611,7 +635,7 @@ export function WeeklyPerformanceTracker({
                     <span className="ml-2 font-semibold text-gray-900">
                       {currentWeekSummary.daysTracked > 0
                         ? Math.round(
-                            (weekEntries.filter(e => e.trained).length / currentWeekSummary.daysTracked) * 100
+                            (weekEntries.filter((e): e is PerformanceDayEntry => e !== null && e.trained).length / currentWeekSummary.daysTracked) * 100
                           )
                         : 0}%
                     </span>
@@ -636,7 +660,7 @@ export function WeeklyPerformanceTracker({
             {/* Review Form */}
             <div>
               <h4 className="text-sm font-medium text-gray-700 mb-3">
-                {hasCurrentWeekReview ? 'Submit Another Review' : 'Weekly Review'}
+                {hasCurrentWeekReview ? 'Update Weekly Review' : 'Weekly Review'}
               </h4>
               <form onSubmit={handleReviewSubmit} className="space-y-3">
                 <div>

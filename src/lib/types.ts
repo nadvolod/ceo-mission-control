@@ -294,7 +294,7 @@ export interface WeeklySummary {
   daysTracked: number;
   zeroDays: number;          // days with DW=0 OR pipeline=0
   goodDays: number;          // days with 3+ DW, 2+ pipeline, trained
-  dailyEntries: PerformanceDayEntry[];
+  dailyEntries: (PerformanceDayEntry | null)[];
 }
 
 export interface WeeklyTrackerData {

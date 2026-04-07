@@ -220,6 +220,91 @@ test.describe('Dashboard page rendering', () => {
     expect(data).toHaveProperty('recentReviews');
   });
 
+  test('weekly tracker API returns 7-element dailyEntries array', async ({ request }) => {
+    // Compute Wednesday of the current week dynamically
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0=Sun, 1=Mon, ...
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + mondayOffset);
+    const wednesday = new Date(monday);
+    wednesday.setDate(monday.getDate() + 2);
+    const wedDate = wednesday.toISOString().split('T')[0];
+
+    const logResponse = await request.post('/api/weekly-tracker', {
+      data: { action: 'logDay', deepWorkHours: 3, pipelineActions: 2, trained: true, date: wedDate },
+    });
+    // Skip assertions if storage backend unavailable in CI
+    if (logResponse.status() !== 200) {
+      test.skip();
+      return;
+    }
+
+    const response = await request.get('/api/weekly-tracker');
+    const data = await response.json();
+    const entries = data.currentWeekSummary.dailyEntries;
+
+    expect(entries).toHaveLength(7);
+    // Wednesday is index 2 in Mon-Sun week
+    expect(entries[2]).not.toBeNull();
+    expect(entries[2].date).toBe(wedDate);
+    expect(entries[2].deepWorkHours).toBe(3);
+  });
+
+  test('weekly tracker preserves entries for different days', async ({ request }) => {
+    // Compute Monday and Friday of the current week dynamically
+    const now = new Date();
+    const dayOfWeek = now.getDay();
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+    const monday = new Date(now);
+    monday.setDate(now.getDate() + mondayOffset);
+    const friday = new Date(monday);
+    friday.setDate(monday.getDate() + 4);
+    const monDate = monday.toISOString().split('T')[0];
+    const friDate = friday.toISOString().split('T')[0];
+
+    const monRes = await request.post('/api/weekly-tracker', {
+      data: { action: 'logDay', deepWorkHours: 2, pipelineActions: 1, trained: false, date: monDate },
+    });
+    // Skip if storage backend unavailable in CI
+    if (monRes.status() !== 200) {
+      test.skip();
+      return;
+    }
+
+    await request.post('/api/weekly-tracker', {
+      data: { action: 'logDay', deepWorkHours: 5, pipelineActions: 4, trained: true, date: friDate },
+    });
+
+    const response = await request.get('/api/weekly-tracker');
+    const data = await response.json();
+    const entries = data.currentWeekSummary.dailyEntries;
+
+    // Monday (index 0) and Friday (index 4) should have data
+    expect(entries[0]).not.toBeNull();
+    expect(entries[0].deepWorkHours).toBe(2);
+    expect(entries[4]).not.toBeNull();
+    expect(entries[4].deepWorkHours).toBe(5);
+    // Tuesday-Thursday should be null
+    expect(entries[1]).toBeNull();
+    expect(entries[2]).toBeNull();
+    expect(entries[3]).toBeNull();
+  });
+
+  test('weekly tracker rejects invalid date format', async ({ request }) => {
+    const response = await request.post('/api/weekly-tracker', {
+      data: { action: 'logDay', deepWorkHours: 3, pipelineActions: 2, trained: true, date: 'bad-date' },
+    });
+    // If storage fails (500), that's a different error — only check date validation if we can reach the endpoint
+    if (response.status() === 500) {
+      test.skip();
+      return;
+    }
+    expect(response.status()).toBe(400);
+    const data = await response.json();
+    expect(data.error).toContain('date');
+  });
+
   test('revenue projection API validates input', async ({ request }) => {
     // Test that invalid input is rejected
     const badMonth = await request.post('/api/revenue-projection', {

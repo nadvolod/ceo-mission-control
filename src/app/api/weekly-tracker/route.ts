@@ -59,6 +59,13 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        if (date !== undefined && (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(new Date(date + 'T00:00:00').getTime()))) {
+          return NextResponse.json(
+            { success: false, error: 'date must be a valid YYYY-MM-DD string' },
+            { status: 400 }
+          );
+        }
+
         const entry = await tracker.logDay(deepWorkHours, pipelineActions, trained, date);
 
         console.log('Weekly tracker day logged via API:', { date: entry.date, deepWorkHours, pipelineActions, trained });
