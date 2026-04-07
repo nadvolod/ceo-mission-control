@@ -78,11 +78,18 @@ export async function POST(request: NextRequest) {
       }
 
       case 'submitReview': {
-        const { revenue, slipAnalysis, systemAdjustment, nextWeekTargets, bottleneck, weekStartDate, weekEndDate } = data;
+        const { revenue, slipAnalysis, systemAdjustment, nextWeekTargets, bottleneck, temporalTarget, weekStartDate, weekEndDate } = data;
 
         if (typeof revenue !== 'number' || !isFinite(revenue) || revenue < 0) {
           return NextResponse.json(
             { success: false, error: 'revenue must be a non-negative number' },
+            { status: 400 }
+          );
+        }
+
+        if (temporalTarget !== undefined && (typeof temporalTarget !== 'number' || !isFinite(temporalTarget) || temporalTarget < 0)) {
+          return NextResponse.json(
+            { success: false, error: 'temporalTarget must be a non-negative number' },
             { status: 400 }
           );
         }
@@ -93,6 +100,7 @@ export async function POST(request: NextRequest) {
           systemAdjustment: systemAdjustment || '',
           nextWeekTargets: nextWeekTargets || '',
           bottleneck: bottleneck || '',
+          temporalTarget: temporalTarget ?? 5,
           weekStartDate,
           weekEndDate,
         });

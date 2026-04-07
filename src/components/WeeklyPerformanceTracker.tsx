@@ -9,7 +9,16 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line, ReferenceLine
 } from 'recharts';
-import type { PerformanceDayEntry, WeeklySummary, WeeklyReview } from '@/lib/types';
+import type { PerformanceDayEntry, WeeklySummary, WeeklyReview, FocusCategory } from '@/lib/types';
+
+const QUICK_ADD_BUTTONS: Array<{ hours: number; category: FocusCategory; color: string; borderColor: string }> = [
+  { hours: 0.5, category: 'Temporal', color: 'text-blue-600', borderColor: 'border-blue-300 hover:bg-blue-50' },
+  { hours: 1, category: 'Temporal', color: 'text-blue-600', borderColor: 'border-blue-300 hover:bg-blue-50' },
+  { hours: 2, category: 'Temporal', color: 'text-blue-600', borderColor: 'border-blue-300 hover:bg-blue-50' },
+  { hours: 1, category: 'Finance', color: 'text-emerald-600', borderColor: 'border-emerald-300 hover:bg-emerald-50' },
+  { hours: 1, category: 'Revenue', color: 'text-violet-600', borderColor: 'border-violet-300 hover:bg-violet-50' },
+  { hours: 1, category: 'Tax', color: 'text-red-600', borderColor: 'border-red-300 hover:bg-red-50' },
+];
 
 interface WeeklyPerformanceTrackerProps {
   todaysEntry: PerformanceDayEntry | null;
@@ -24,7 +33,10 @@ interface WeeklyPerformanceTrackerProps {
     systemAdjustment: string;
     nextWeekTargets: string;
     bottleneck: string;
+    temporalTarget: number;
   }) => Promise<void>;
+  onAddFocusSession?: (category: FocusCategory, hours: number, description: string) => Promise<void>;
+  temporalActual?: number;
 }
 
 type TabId = 'daily' | 'weekly' | 'trends' | 'review';
@@ -54,10 +66,14 @@ export function WeeklyPerformanceTracker({
   recentReviews,
   onLogDay,
   onSubmitReview,
+  onAddFocusSession,
+  temporalActual = 0,
 }: WeeklyPerformanceTrackerProps) {
   const [activeTab, setActiveTab] = useState<TabId>('daily');
   const [isLogging, setIsLogging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [isAddingFocus, setIsAddingFocus] = useState(false);
 
   // Daily entry form state
   const [deepWork, setDeepWork] = useState(todaysEntry?.deepWorkHours?.toString() ?? '');
@@ -83,6 +99,7 @@ export function WeeklyPerformanceTracker({
   const [reviewSystem, setReviewSystem] = useState(existingReview?.systemAdjustment ?? '');
   const [reviewTargets, setReviewTargets] = useState(existingReview?.nextWeekTargets ?? '');
   const [reviewBottleneck, setReviewBottleneck] = useState(existingReview?.bottleneck ?? '');
+  const [reviewTemporalTarget, setReviewTemporalTarget] = useState(existingReview?.temporalTarget?.toString() ?? '5');
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   // Sync review form when existing review data changes (e.g. after submit)
@@ -93,6 +110,7 @@ export function WeeklyPerformanceTracker({
       setReviewSystem(existingReview.systemAdjustment ?? '');
       setReviewTargets(existingReview.nextWeekTargets ?? '');
       setReviewBottleneck(existingReview.bottleneck ?? '');
+      setReviewTemporalTarget(existingReview.temporalTarget?.toString() ?? '5');
     }
   }, [existingReview?.id]);
 
@@ -134,12 +152,14 @@ export function WeeklyPerformanceTracker({
 
     setIsSubmittingReview(true);
     try {
+      const tt = parseFloat(reviewTemporalTarget);
       await onSubmitReview({
         revenue: rev,
         slipAnalysis: reviewSlip,
         systemAdjustment: reviewSystem,
         nextWeekTargets: reviewTargets,
         bottleneck: reviewBottleneck,
+        temporalTarget: isNaN(tt) || tt < 0 ? 5 : tt,
       });
       setReviewRevenue('');
       setReviewSlip('');
@@ -225,7 +245,7 @@ export function WeeklyPerformanceTracker({
         </div>
 
         {/* Today's Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           <div className="text-center p-3 bg-blue-50 rounded-lg">
             <div className="text-2xl font-bold text-blue-600">
               {todaysEntry?.deepWorkHours ?? '--'}
@@ -261,6 +281,23 @@ export function WeeklyPerformanceTracker({
             </div>
             <div className="text-xs text-gray-500">Trained</div>
           </div>
+          <div className="text-center p-3 bg-indigo-50 rounded-lg">
+            <div className="text-2xl font-bold text-indigo-600">
+              {temporalActual}/{currentWeekSummary.temporalTarget}
+              <span className="text-sm font-normal">h</span>
+            </div>
+            <div className="text-xs text-gray-500">Temporal Target</div>
+            <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1.5">
+              <div
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  currentWeekSummary.temporalTarget > 0 && temporalActual >= currentWeekSummary.temporalTarget
+                    ? 'bg-green-500'
+                    : 'bg-indigo-500'
+                }`}
+                style={{ width: `${Math.min(100, currentWeekSummary.temporalTarget > 0 ? (temporalActual / currentWeekSummary.temporalTarget) * 100 : 0)}%` }}
+              />
+            </div>
+          </div>
           <div className={`text-center p-3 rounded-lg ${dayStatus.bgColor}`}>
             <div className={`text-sm font-bold ${dayStatus.color}`}>{dayStatus.label}</div>
             <div className="text-xs text-gray-500 mt-1">Day Status</div>
@@ -272,6 +309,31 @@ export function WeeklyPerformanceTracker({
             )}
           </div>
         </div>
+
+        {/* Quick-Add Focus Buttons */}
+        {onAddFocusSession && (
+          <div className="flex flex-wrap gap-2 mt-4">
+            {QUICK_ADD_BUTTONS.map(({ hours, category, color, borderColor }) => (
+              <button
+                key={`${hours}-${category}`}
+                disabled={isAddingFocus}
+                onClick={async () => {
+                  setIsAddingFocus(true);
+                  try {
+                    await onAddFocusSession(category, hours, `${hours}h ${category} focus block`);
+                  } catch (error) {
+                    console.error('Error adding focus session:', error);
+                  } finally {
+                    setIsAddingFocus(false);
+                  }
+                }}
+                className={`px-3 py-1.5 text-sm font-medium border rounded-full ${color} ${borderColor} bg-white transition-colors disabled:opacity-50`}
+              >
+                +{hours}h {category}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Log Form */}
@@ -663,6 +725,21 @@ export function WeeklyPerformanceTracker({
                 {hasCurrentWeekReview ? 'Update Weekly Review' : 'Weekly Review'}
               </h4>
               <form onSubmit={handleReviewSubmit} className="space-y-3">
+                <div>
+                  <label htmlFor="wt-temporal-target" className="block text-sm font-medium text-gray-700 mb-1">
+                    Temporal Target (hours/week)
+                  </label>
+                  <input
+                    id="wt-temporal-target"
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    value={reviewTemporalTarget}
+                    onChange={(e) => setReviewTemporalTarget(e.target.value)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900"
+                    placeholder="e.g., 5"
+                  />
+                </div>
                 <div>
                   <label htmlFor="wt-revenue" className="block text-sm font-medium text-gray-700 mb-1">
                     Revenue This Week ($)

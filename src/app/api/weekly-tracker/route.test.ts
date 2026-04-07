@@ -165,6 +165,36 @@ describe('/api/weekly-tracker', () => {
       expect(data.review.id).toMatch(/^review_/);
     });
 
+    it('should accept and persist temporalTarget', async () => {
+      const request = new NextRequest('http://localhost/api/weekly-tracker', {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'submitReview', revenue: 3000, temporalTarget: 8,
+        }),
+      });
+      const response = await POST(request);
+      const data = await response.json();
+
+      expect(response.status).toBe(200);
+      expect(data.review.temporalTarget).toBe(8);
+
+      // Verify it appears in GET response
+      const getResponse = await GET();
+      const getData = await getResponse.json();
+      expect(getData.currentWeekSummary.temporalTarget).toBe(8);
+    });
+
+    it('should reject negative temporalTarget', async () => {
+      const request = new NextRequest('http://localhost/api/weekly-tracker', {
+        method: 'POST',
+        body: JSON.stringify({ action: 'submitReview', revenue: 1000, temporalTarget: -5 }),
+      });
+      const response = await POST(request);
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.error).toContain('temporalTarget');
+    });
+
     it('should reject negative revenue', async () => {
       const request = new NextRequest('http://localhost/api/weekly-tracker', {
         method: 'POST',

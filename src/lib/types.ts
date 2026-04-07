@@ -281,6 +281,7 @@ export interface WeeklyReview {
   systemAdjustment: string;  // "What system do I adjust?"
   nextWeekTargets: string;
   bottleneck: string;        // 1 bottleneck
+  temporalTarget: number;    // Weekly Temporal hours target (default 5)
   createdAt: string;
 }
 
@@ -295,6 +296,7 @@ export interface WeeklySummary {
   zeroDays: number;          // days with DW=0 OR pipeline=0
   goodDays: number;          // days with 3+ DW, 2+ pipeline, trained
   dailyEntries: (PerformanceDayEntry | null)[];
+  temporalTarget: number;    // From the week's review (default 5)
 }
 
 export interface WeeklyTrackerData {
