@@ -37,8 +37,6 @@ interface WeeklyPerformanceTrackerProps {
   }) => Promise<void>;
   onAddFocusSession?: (category: FocusCategory, hours: number, description: string) => Promise<void>;
   temporalActual?: number;
-  todaysFocusTotal?: number;
-  todaysTemporalHours?: number;
 }
 
 type TabId = 'daily' | 'weekly' | 'trends' | 'review';
@@ -70,12 +68,12 @@ export function WeeklyPerformanceTracker({
   onSubmitReview,
   onAddFocusSession,
   temporalActual = 0,
-  todaysFocusTotal = 0,
-  todaysTemporalHours = 0,
 }: WeeklyPerformanceTrackerProps) {
   const [activeTab, setActiveTab] = useState<TabId>('daily');
   const [isLogging, setIsLogging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const [isAddingFocus, setIsAddingFocus] = useState(false);
 
   // Daily entry form state
   const [deepWork, setDeepWork] = useState(todaysEntry?.deepWorkHours?.toString() ?? '');
@@ -318,14 +316,18 @@ export function WeeklyPerformanceTracker({
             {QUICK_ADD_BUTTONS.map(({ hours, category, color, borderColor }) => (
               <button
                 key={`${hours}-${category}`}
+                disabled={isAddingFocus}
                 onClick={async () => {
+                  setIsAddingFocus(true);
                   try {
                     await onAddFocusSession(category, hours, `${hours}h ${category} focus block`);
                   } catch (error) {
                     console.error('Error adding focus session:', error);
+                  } finally {
+                    setIsAddingFocus(false);
                   }
                 }}
-                className={`px-3 py-1.5 text-sm font-medium border rounded-full ${color} ${borderColor} bg-white transition-colors`}
+                className={`px-3 py-1.5 text-sm font-medium border rounded-full ${color} ${borderColor} bg-white transition-colors disabled:opacity-50`}
               >
                 +{hours}h {category}
               </button>

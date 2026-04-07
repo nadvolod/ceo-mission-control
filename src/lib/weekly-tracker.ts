@@ -21,6 +21,12 @@ export class WeeklyTracker {
 
   private async loadData(): Promise<void> {
     this.data = await loadJSON(STORAGE_KEY, defaultData());
+    // Backfill temporalTarget for reviews created before this field existed
+    for (const review of this.data.weeklyReviews) {
+      if (typeof review.temporalTarget !== 'number') {
+        review.temporalTarget = 5;
+      }
+    }
   }
 
   private async saveData(): Promise<void> {
@@ -72,9 +78,10 @@ export class WeeklyTracker {
     return entry;
   }
 
-  async submitWeeklyReview(review: Omit<WeeklyReview, 'id' | 'createdAt' | 'weekStartDate' | 'weekEndDate'> & {
+  async submitWeeklyReview(review: Omit<WeeklyReview, 'id' | 'createdAt' | 'weekStartDate' | 'weekEndDate' | 'temporalTarget'> & {
     weekStartDate?: string;
     weekEndDate?: string;
+    temporalTarget?: number;
   }): Promise<WeeklyReview> {
     if (typeof review.revenue !== 'number' || !isFinite(review.revenue) || review.revenue < 0) {
       throw new Error('revenue must be a non-negative number');
@@ -93,7 +100,7 @@ export class WeeklyTracker {
       systemAdjustment: review.systemAdjustment || '',
       nextWeekTargets: review.nextWeekTargets || '',
       bottleneck: review.bottleneck || '',
-      temporalTarget: typeof review.temporalTarget === 'number' && isFinite(review.temporalTarget) ? review.temporalTarget : 5,
+      temporalTarget: typeof review.temporalTarget === 'number' && isFinite(review.temporalTarget) && review.temporalTarget >= 0 ? review.temporalTarget : 5,
       createdAt: now.toISOString(),
     };
 

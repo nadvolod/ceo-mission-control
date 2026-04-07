@@ -419,7 +419,7 @@ describe('WeeklyTracker', () => {
       const tracker = await WeeklyTracker.create();
       const review = await tracker.submitWeeklyReview({
         revenue: 1000, slipAnalysis: '', systemAdjustment: '',
-        nextWeekTargets: '', bottleneck: '', temporalTarget: undefined as unknown as number,
+        nextWeekTargets: '', bottleneck: '',
       });
       expect(review.temporalTarget).toBe(5);
     });

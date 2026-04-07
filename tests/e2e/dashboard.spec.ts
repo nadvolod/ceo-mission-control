@@ -323,7 +323,12 @@ test.describe('Dashboard page rendering', () => {
     expect(getData.currentWeekSummary.temporalTarget).toBe(8);
   });
 
-  test('focus session POST creates a session and GET reflects updated data', async ({ request }) => {
+  test('focus session POST creates a session and GET reflects increased hours', async ({ request }) => {
+    // Capture before state
+    const beforeRes = await request.get('/api/focus-hours');
+    const beforeData = await beforeRes.json();
+    const hoursBefore = beforeData.todaysMetrics?.totalHours ?? 0;
+
     const postRes = await request.post('/api/focus-hours', {
       data: { action: 'addSession', category: 'Temporal', hours: 1.5, description: 'E2E test session' },
     });
@@ -333,9 +338,10 @@ test.describe('Dashboard page rendering', () => {
     }
     expect(postRes.status()).toBe(200);
 
-    const getRes = await request.get('/api/focus-hours');
-    const getData = await getRes.json();
-    expect(getData.todaysMetrics.totalHours).toBeGreaterThanOrEqual(1.5);
+    // Verify hours increased
+    const afterRes = await request.get('/api/focus-hours');
+    const afterData = await afterRes.json();
+    expect(afterData.todaysMetrics.totalHours).toBeGreaterThan(hoursBefore);
   });
 
   test('revenue projection API validates input', async ({ request }) => {
