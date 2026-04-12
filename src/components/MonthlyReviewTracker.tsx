@@ -56,7 +56,7 @@ function currentMonth(): string {
 
 function todayDate(): string {
   const d = new Date();
-  return d.toISOString().slice(0, 10);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 function formatMonthLabel(m: string): string {
@@ -99,6 +99,7 @@ export function MonthlyReviewTracker({
 }: MonthlyReviewTrackerProps) {
   const [activeTab, setActiveTab] = useState<TabId>('new');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingReview, setEditingReview] = useState<MonthlyReview | null>(null);
 
@@ -178,6 +179,7 @@ export function MonthlyReviewTracker({
     if (!month || isNaN(hw) || isNaN(th)) return;
 
     setIsSubmitting(true);
+    setSubmitError(null);
     try {
       await onSubmitReview({
         month,
@@ -203,6 +205,8 @@ export function MonthlyReviewTracker({
         setEditingReview(null);
       }
     } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to save review';
+      setSubmitError(message);
       console.error('Error submitting review:', err);
     } finally {
       setIsSubmitting(false);
@@ -563,6 +567,11 @@ export function MonthlyReviewTracker({
             </fieldset>
 
             {/* Submit row */}
+            {submitError && (
+              <div className="bg-red-50 border border-red-200 rounded-lg px-4 py-3 text-sm text-red-700">
+                {submitError}
+              </div>
+            )}
             <div className="flex gap-3">
               <button
                 type="submit"
@@ -594,7 +603,7 @@ export function MonthlyReviewTracker({
         {activeTab === 'history' && (
           <div className="space-y-3">
             {recentReviews.length === 0 ? (
-              <p className="text-sm text-gray-400 text-center py-8">No reviews yet. Start with your first monthly review!</p>
+              <p className="text-sm text-gray-400 text-center py-8">No monthly reviews yet. Start with your first monthly review!</p>
             ) : (
               recentReviews.map(review => {
                 const isExpanded = expandedId === review.id;

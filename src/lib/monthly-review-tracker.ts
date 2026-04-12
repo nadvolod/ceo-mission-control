@@ -41,6 +41,11 @@ export class MonthlyReviewTracker {
       throw new Error('month must be a valid YYYY-MM string');
     }
 
+    // Validate date format
+    if (!/^\d{4}-(0[1-9]|1[0-2])-(0[1-9]|[12]\d|3[01])$/.test(input.date)) {
+      throw new Error('date must be a valid YYYY-MM-DD string');
+    }
+
     // Validate numeric fields
     if (typeof input.hoursWorked !== 'number' || !isFinite(input.hoursWorked) || input.hoursWorked < 0) {
       throw new Error('hoursWorked must be a non-negative number');

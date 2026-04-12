@@ -94,6 +94,7 @@ test.describe('Dashboard page rendering', () => {
       '/api/focus-hours',
       '/api/revenue-projection',
       '/api/weekly-tracker',
+      '/api/monthly-review',
     ];
 
     for (const path of endpoints) {
