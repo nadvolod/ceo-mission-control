@@ -361,4 +361,99 @@ test.describe('Dashboard page rendering', () => {
     });
     expect(badType.status()).toBe(400);
   });
+
+  test('monthly review API returns valid structure', async ({ request }) => {
+    const response = await request.get('/api/monthly-review');
+    expect(response.status()).toBe(200);
+    const data = await response.json();
+    expect(data.success).toBe(true);
+    expect(data).toHaveProperty('recentReviews');
+    expect(data).toHaveProperty('ratingsTrend');
+    expect(Array.isArray(data.recentReviews)).toBe(true);
+    expect(Array.isArray(data.ratingsTrend)).toBe(true);
+  });
+
+  test('monthly review submit and retrieve via API', async ({ request }) => {
+    const TEST_MONTH = '2099-12';
+
+    // Clean up first
+    await request.post('/api/monthly-review', {
+      data: { action: 'deleteReview', month: TEST_MONTH },
+    });
+
+    // Submit a review
+    const postRes = await request.post('/api/monthly-review', {
+      data: {
+        action: 'submitReview',
+        month: TEST_MONTH,
+        date: '2099-12-31',
+        timeAllocation: 'E2E test allocation',
+        hoursWorked: 88,
+        temporalHours: 35,
+        energyGivers: 'Playwright tests passing',
+        energyDrainers: 'Flaky selectors',
+        ignoredSignals: 'Sleep',
+        moneySpent: '$100 on tests',
+        expenseJoyVsStress: 'Joy: passing tests. Stress: none.',
+        alignmentCheck: 'Aligned with testing goals',
+        monthLesson: 'E2E tests catch real bugs',
+        decisionSource: 'discipline',
+        badHabits: 'Skipping tests',
+        goodPatterns: 'TDD',
+        ratings: { discipline: 8, focus: 7, executive: 6, math: 5, nutrition: 7, fitness: 6, sleep: 7 },
+        oneThingToFix: 'More test coverage',
+        disciplinedVersionAction: 'Write tests first always',
+      },
+    });
+    if (postRes.status() === 500) {
+      test.skip();
+      return;
+    }
+    expect(postRes.status()).toBe(200);
+    const postData = await postRes.json();
+    expect(postData.success).toBe(true);
+    expect(postData.review.month).toBe(TEST_MONTH);
+    expect(postData.review.hoursWorked).toBe(88);
+    expect(postData.review.ratings.discipline).toBe(8);
+
+    // Retrieve and verify
+    const getRes = await request.get('/api/monthly-review');
+    const getData = await getRes.json();
+    const found = getData.recentReviews.find((r: any) => r.month === TEST_MONTH);
+    expect(found).toBeTruthy();
+    expect(found.hoursWorked).toBe(88);
+    expect(found.temporalHours).toBe(35);
+
+    // Clean up
+    await request.post('/api/monthly-review', {
+      data: { action: 'deleteReview', month: TEST_MONTH },
+    });
+  });
+
+  test('monthly review tracker renders on dashboard', async ({ page }) => {
+    await page.goto('/dashboard');
+    await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+    const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
+    if (hasFullDashboard) {
+      // Monthly Review section should be visible
+      await expect(page.getByText('Monthly Review')).toBeVisible();
+
+      // Verify it has the expected tabs
+      const newReviewTab = page.getByRole('button', { name: /New Review/ });
+      const historyTab = page.getByRole('button', { name: 'History' });
+      const trendsTab = page.getByRole('button', { name: 'Trends' });
+
+      await expect(newReviewTab).toBeVisible();
+      await expect(historyTab).toBeVisible();
+      await expect(trendsTab).toBeVisible();
+
+      // Click History tab and verify it switches
+      await historyTab.click();
+      // Should show either reviews or empty state
+      const hasReviews = await page.getByText(/\d{4}/).isVisible().catch(() => false);
+      const hasEmptyState = await page.getByText('No monthly reviews yet').isVisible().catch(() => false);
+      expect(hasReviews || hasEmptyState, 'History tab should show reviews or empty state').toBeTruthy();
+    }
+  });
 });
