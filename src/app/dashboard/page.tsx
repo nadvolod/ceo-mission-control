@@ -8,6 +8,7 @@ import { FinancialCommandCenter } from '@/components/FinancialCommandCenter';
 import { FocusHoursTracker } from '@/components/FocusHoursTracker';
 import { RevenueProjectionWidget } from '@/components/RevenueProjectionWidget';
 import { WeeklyPerformanceTracker } from '@/components/WeeklyPerformanceTracker';
+import { MonthlyReviewTracker } from '@/components/MonthlyReviewTracker';
 import { enrichScorecard } from '@/lib/derive-focus';
 import { useDashboardData } from '@/hooks/useDashboardData';
 
@@ -18,6 +19,7 @@ export default function HomePage() {
     loadAllData, handleCreateTask, handleUpdateTask, handleDeleteTask,
     handleMonarchRefresh, handleAddProjectionAdjustment, handleRemoveProjectionAdjustment,
     handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleSubmitWeeklyReview,
+    monthlyReviewData, handleSubmitMonthlyReview, handleDeleteMonthlyReview,
   } = useDashboardData();
 
   if (isLoading) {
@@ -142,6 +144,19 @@ export default function HomePage() {
               onSubmitReview={handleSubmitWeeklyReview}
               onAddFocusSession={handleAddFocusSession}
               temporalActual={focusData?.weeklyTotals?.Temporal ?? scorecard.temporalActual ?? 0}
+            />
+          </div>
+        )}
+
+        {/* Monthly Review */}
+        {monthlyReviewData && (
+          <div className="mb-8">
+            <MonthlyReviewTracker
+              currentMonthReview={monthlyReviewData.currentMonthReview}
+              recentReviews={monthlyReviewData.recentReviews}
+              ratingsTrend={monthlyReviewData.ratingsTrend}
+              onSubmitReview={handleSubmitMonthlyReview}
+              onDeleteReview={handleDeleteMonthlyReview}
             />
           </div>
         )}
