@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import type { AiTask, TaskStats, FocusCategory, MonarchFinancialSnapshot, AdjustmentType, RevenueProjectionData, MonthProjection, Initiative, DailyScorecard, PerformanceDayEntry, WeeklySummary, WeeklyReview } from '@/lib/types';
+import type { AiTask, TaskStats, FocusCategory, MonarchFinancialSnapshot, AdjustmentType, RevenueProjectionData, MonthProjection, Initiative, DailyScorecard, PerformanceDayEntry, WeeklySummary, WeeklyReview, MonthlyReview, MonthlyReviewRatings } from '@/lib/types';
 
 export interface RevenueProjectionApiResponse {
   data: RevenueProjectionData;
@@ -20,6 +20,14 @@ export interface WeeklyTrackerApiResponse {
   timestamp: string;
 }
 
+export interface MonthlyReviewApiResponse {
+  success: boolean;
+  currentMonthReview: MonthlyReview | null;
+  recentReviews: MonthlyReview[];
+  ratingsTrend: Array<MonthlyReviewRatings & { month: string }>;
+  timestamp: string;
+}
+
 export interface DashboardData {
   aiTasks: AiTask[];
   taskStats: TaskStats;
@@ -32,6 +40,7 @@ export interface DashboardData {
   monarchLoading: boolean;
   projectionData: RevenueProjectionApiResponse | null;
   weeklyTrackerData: WeeklyTrackerApiResponse | null;
+  monthlyReviewData: MonthlyReviewApiResponse | null;
   isLoading: boolean;
 }
 
@@ -51,6 +60,8 @@ export interface DashboardHandlers {
   handleSubmitWeeklyReview: (review: {
     revenue: number; slipAnalysis: string; systemAdjustment: string; nextWeekTargets: string; bottleneck: string; temporalTarget: number;
   }) => Promise<void>;
+  handleSubmitMonthlyReview: (review: Omit<MonthlyReview, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  handleDeleteMonthlyReview: (month: string) => Promise<void>;
 }
 
 export function useDashboardData(): DashboardData & DashboardHandlers {
@@ -65,6 +76,7 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
   const [monarchLoading, setMonarchLoading] = useState(false);
   const [projectionData, setProjectionData] = useState<RevenueProjectionApiResponse | null>(null);
   const [weeklyTrackerData, setWeeklyTrackerData] = useState<WeeklyTrackerApiResponse | null>(null);
+  const [monthlyReviewData, setMonthlyReviewData] = useState<MonthlyReviewApiResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadAllData = useCallback(async () => {
@@ -142,6 +154,15 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
             setWeeklyTrackerData({ ...data, todaysEntry: localEntry });
           }
         } catch (e) { console.error('Error loading weekly tracker:', e); }
+      },
+      async () => {
+        try {
+          const res = await fetch('/api/monthly-review');
+          if (res.ok) {
+            const data = await res.json();
+            setMonthlyReviewData(data);
+          }
+        } catch (e) { console.error('Error loading monthly reviews:', e); }
       },
     ];
 
@@ -329,11 +350,49 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
     }
   }, [loadAllData]);
 
+  const handleSubmitMonthlyReview = useCallback(async (review: Omit<MonthlyReview, 'id' | 'createdAt' | 'updatedAt'>) => {
+    try {
+      const response = await fetch('/api/monthly-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'submitReview', ...review })
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to submit monthly review');
+      }
+      await loadAllData();
+    } catch (error) {
+      console.error('Error submitting monthly review:', error);
+      throw error;
+    }
+  }, [loadAllData]);
+
+  const handleDeleteMonthlyReview = useCallback(async (month: string) => {
+    try {
+      const response = await fetch('/api/monthly-review', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'deleteReview', month })
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to delete monthly review');
+      }
+      await loadAllData();
+    } catch (error) {
+      console.error('Error deleting monthly review:', error);
+      throw error;
+    }
+  }, [loadAllData]);
+
   return {
     aiTasks, taskStats, initiatives, scorecard, financialData, focusData,
-    monarchData, monarchError, monarchLoading, projectionData, weeklyTrackerData, isLoading,
+    monarchData, monarchError, monarchLoading, projectionData, weeklyTrackerData,
+    monthlyReviewData, isLoading,
     loadAllData, handleCreateTask, handleUpdateTask, handleDeleteTask,
     handleMonarchRefresh, handleAddProjectionAdjustment, handleRemoveProjectionAdjustment,
     handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleSubmitWeeklyReview,
+    handleSubmitMonthlyReview, handleDeleteMonthlyReview,
   };
 }
