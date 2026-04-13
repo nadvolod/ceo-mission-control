@@ -118,6 +118,15 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      case 'applyGarminTraining': {
+        const { date, activeMinutes, threshold } = data;
+        if (!date || typeof activeMinutes !== 'number') {
+          return NextResponse.json({ success: false, error: 'date and activeMinutes required' }, { status: 400 });
+        }
+        const result = await tracker.applyGarminTraining(date, activeMinutes, threshold);
+        return NextResponse.json({ success: true, trained: result });
+      }
+
       default:
         return NextResponse.json(
           { success: false, error: `Unknown action: ${action}` },

@@ -246,6 +246,19 @@ export class WeeklyTracker {
     return { isZeroDay, isGoodDay };
   }
 
+  async applyGarminTraining(date: string, activeMinutes: number, threshold: number = 30): Promise<boolean> {
+    const entry = this.data.dailyEntries[date];
+    if (!entry) return false;
+
+    const autoTrained = activeMinutes >= threshold;
+    entry.trained = autoTrained;
+    entry.timestamp = new Date().toISOString();
+    await this.saveData();
+
+    await appendAuditLog(date, 'weekly-tracker', `Auto-training from Garmin: ${activeMinutes} active min (threshold: ${threshold}) → trained=${autoTrained}`);
+    return autoTrained;
+  }
+
   getAllData(): WeeklyTrackerData {
     return this.data;
   }
