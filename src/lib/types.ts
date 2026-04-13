@@ -353,3 +353,68 @@ export interface MonthlyReviewData {
   reviews: MonthlyReview[];
   lastUpdated: string;
 }
+
+// Garmin Health Integration types
+
+export interface GarminDayMetrics {
+  date: string;                    // YYYY-MM-DD
+  sleepScore: number | null;
+  sleepDurationMinutes: number | null;
+  sleepStartTime: string | null;
+  sleepEndTime: string | null;
+  deepSleepMinutes: number | null;
+  lightSleepMinutes: number | null;
+  remSleepMinutes: number | null;
+  awakeDuringMinutes: number | null;
+  restingHeartRate: number | null;
+  hrvStatus: number | null;
+  averageStressLevel: number | null;
+  bodyBatteryHigh: number | null;
+  bodyBatteryLow: number | null;
+  steps: number | null;
+  activeMinutes: number | null;
+  weight: number | null;
+  syncedAt: string;
+}
+
+export interface GarminHealthData {
+  metrics: Record<string, GarminDayMetrics>;
+  lastSyncedAt: string;
+  syncStatus: 'idle' | 'syncing' | 'error';
+  syncError: string | null;
+}
+
+export interface SleepEnvironment {
+  temperatureF: number | null;
+  fanRunning: boolean;
+  dogInRoom: boolean;
+  customFields: Record<string, boolean>;
+}
+
+export interface SupplementEntry {
+  name: string;
+  dosageMg: number;
+  taken: boolean;
+}
+
+export interface HabitEntry {
+  name: string;
+  done: boolean;
+}
+
+export interface DailyHealthNote {
+  date: string;
+  sleepEnvironment: SleepEnvironment;
+  supplements: SupplementEntry[];
+  habits: HabitEntry[];
+  freeformNote: string;
+  loggedAt: string;
+}
+
+export interface HealthNotesData {
+  notes: Record<string, DailyHealthNote>;
+  supplementTemplate: Array<{ name: string; defaultDosageMg: number }>;
+  habitTemplate: Array<{ name: string }>;
+  environmentTemplate: { customFieldNames: string[] };
+  lastUpdated: string;
+}
