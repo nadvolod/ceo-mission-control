@@ -55,7 +55,10 @@ export function useHealthData() {
     }
   }, []);
 
-  useEffect(() => { loadData(); }, [loadData]);
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
+    void loadData();
+  }, [loadData]);
 
   const logNote = useCallback(async (note: {
     date: string;

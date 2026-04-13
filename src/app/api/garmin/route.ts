@@ -3,7 +3,7 @@ import { GarminTracker } from '@/lib/garmin-tracker';
 import { HealthNotesTracker } from '@/lib/health-notes-tracker';
 import { checkAuth } from '@/lib/auth';
 
-export async function GET(_request: NextRequest) {
+export async function GET() {
   try {
     const garmin = await GarminTracker.create();
     const notes = await HealthNotesTracker.create();

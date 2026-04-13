@@ -45,7 +45,7 @@ describe('/api/garmin', () => {
 
   describe('GET', () => {
     it('returns garmin metrics and health notes', async () => {
-      const response = await GET(makeRequest('GET'));
+      const response = await GET();
       const data = await response.json();
 
       expect(response.status).toBe(200);
