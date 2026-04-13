@@ -9,6 +9,7 @@ import { FocusHoursTracker } from '@/components/FocusHoursTracker';
 import { RevenueProjectionWidget } from '@/components/RevenueProjectionWidget';
 import { WeeklyPerformanceTracker } from '@/components/WeeklyPerformanceTracker';
 import { MonthlyReviewTracker } from '@/components/MonthlyReviewTracker';
+import { HealthIntelligenceDashboard } from '@/components/HealthIntelligenceDashboard';
 import { enrichScorecard } from '@/lib/derive-focus';
 import { useDashboardData } from '@/hooks/useDashboardData';
 
@@ -147,6 +148,11 @@ export default function HomePage() {
             />
           </div>
         )}
+
+        {/* Health Intelligence */}
+        <div className="mb-8">
+          <HealthIntelligenceDashboard />
+        </div>
 
         {/* Monthly Review */}
         {monthlyReviewData && (
