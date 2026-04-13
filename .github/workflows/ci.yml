@@ -24,6 +24,12 @@ jobs:
           if [ -z "${{ secrets.MONARCH_TOKEN }}" ]; then
             missing+=("MONARCH_TOKEN")
           fi
+          if [ -z "${{ secrets.GARMIN_EMAIL }}" ]; then
+            missing+=("GARMIN_EMAIL")
+          fi
+          if [ -z "${{ secrets.GARMIN_PASSWORD }}" ]; then
+            missing+=("GARMIN_PASSWORD")
+          fi
           if [ ${#missing[@]} -gt 0 ]; then
             echo "::error::Missing required secrets: ${missing[*]}"
             echo "Configure these in GitHub repo Settings > Secrets and variables > Actions"
