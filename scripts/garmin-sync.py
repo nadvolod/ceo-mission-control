@@ -87,6 +87,34 @@ def connectapi(garth_client, path: str):
 # Per-metric fetchers
 # ---------------------------------------------------------------------------
 
+
+def _to_hhmm(value) -> str:
+    """Convert an epoch-ms timestamp, ISO string, or existing HH:MM to HH:MM format."""
+    if value is None:
+        return ""
+    s = str(value).strip()
+    # Already in HH:MM format
+    if len(s) == 5 and s[2] == ":":
+        return s
+    # Epoch milliseconds (numeric or numeric string)
+    try:
+        epoch_ms = int(s)
+        dt = datetime.fromtimestamp(epoch_ms / 1000, tz=timezone.utc)
+        return dt.strftime("%H:%M")
+    except (ValueError, TypeError, OSError):
+        pass
+    # ISO 8601 string (e.g. "2026-04-13T22:30:00.000")
+    for fmt in ("%Y-%m-%dT%H:%M:%S.%f", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M:%S%z"):
+        try:
+            dt = datetime.strptime(s, fmt)
+            return dt.strftime("%H:%M")
+        except ValueError:
+            continue
+    # Fallback: return as-is (best effort)
+    log.warning("Could not parse sleep timestamp to HH:MM: %s", value)
+    return s
+
+
 def fetch_sleep(garth_client, date_str: str) -> dict:
     """Fetch sleep data for the given date."""
     data = connectapi(
@@ -128,13 +156,13 @@ def fetch_sleep(garth_client, date_str: str) -> dict:
     if awake is not None:
         result["awakeDuringMinutes"] = seconds_to_minutes(awake)
 
-    # Optional start/end times
+    # Optional start/end times — normalize to HH:MM format
     start = daily.get("sleepStartTimestampGMT") or daily.get("sleepStartTimestampLocal")
     end = daily.get("sleepEndTimestampGMT") or daily.get("sleepEndTimestampLocal")
     if start:
-        result["sleepStartTime"] = str(start)
+        result["sleepStartTime"] = _to_hhmm(start)
     if end:
-        result["sleepEndTime"] = str(end)
+        result["sleepEndTime"] = _to_hhmm(end)
 
     return result
 
@@ -288,7 +316,7 @@ def post_metrics(api_url: str, api_key: str, metrics_list: list) -> bool:
     payload = {"action": "sync", "metrics": metrics_list}
     headers = {"Content-Type": "application/json"}
     if api_key:
-        headers["x-api-key"] = api_key
+        headers["x-sync-api-key"] = api_key
 
     try:
         resp = requests.post(api_url, json=payload, headers=headers, timeout=30)
@@ -334,12 +362,18 @@ def parse_args():
             "Reads GARMIN_EMAIL and GARMIN_PASSWORD from environment."
         ),
     )
+    def positive_int(value):
+        ivalue = int(value)
+        if ivalue <= 0:
+            raise argparse.ArgumentTypeError(f"--days must be a positive integer, got {value}")
+        return ivalue
+
     parser.add_argument(
         "--days",
-        type=int,
+        type=positive_int,
         default=7,
         metavar="N",
-        help="Number of past days to sync (default: 7).",
+        help="Number of past days to sync (default: 7). Must be positive.",
     )
     parser.add_argument(
         "--api-url",

@@ -56,6 +56,10 @@ export async function POST(request: NextRequest) {
       case 'update-templates': {
         const { operation, name, defaultDosageMg } = data;
 
+        if (typeof name !== 'string' || name.trim().length === 0) {
+          return NextResponse.json({ success: false, error: 'name must be a non-empty string' }, { status: 400 });
+        }
+
         switch (operation) {
           case 'addSupplement':
             await tracker.addSupplement(name, defaultDosageMg || 0);
@@ -97,7 +101,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error processing health notes request:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to process request', details: (error as Error).message },
+      { success: false, error: 'Failed to process request' },
       { status: 500 }
     );
   }

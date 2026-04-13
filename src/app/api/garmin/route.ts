@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error processing garmin request:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to process request', details: (error as Error).message },
+      { success: false, error: 'Failed to process request' },
       { status: 500 }
     );
   }

@@ -13,7 +13,7 @@ jest.mock('@/lib/storage', () => ({
 
 jest.mock('@/lib/auth', () => ({
   checkAuth: jest.fn((req: NextRequest) => {
-    return req.headers.get('x-api-key') === 'test-key';
+    return req.headers.get('x-sync-api-key') === 'test-key';
   }),
 }));
 
@@ -65,7 +65,7 @@ describe('/api/health-notes', () => {
         supplements: [{ name: 'Guanfacine', dosageMg: 1, taken: true }],
         habits: [{ name: 'Red light therapy', done: true }],
         freeformNote: 'Slept well',
-      }, { 'x-api-key': 'test-key' }));
+      }, { 'x-sync-api-key': 'test-key' }));
 
       const data = await response.json();
       expect(response.status).toBe(200);
@@ -86,7 +86,7 @@ describe('/api/health-notes', () => {
         operation: 'addSupplement',
         name: 'Melatonin',
         defaultDosageMg: 3,
-      }, { 'x-api-key': 'test-key' }));
+      }, { 'x-sync-api-key': 'test-key' }));
 
       const data = await response.json();
       expect(response.status).toBe(200);
@@ -98,7 +98,7 @@ describe('/api/health-notes', () => {
         action: 'update-templates',
         operation: 'addHabit',
         name: 'Meditation',
-      }, { 'x-api-key': 'test-key' }));
+      }, { 'x-sync-api-key': 'test-key' }));
 
       const data = await response.json();
       expect(response.status).toBe(200);

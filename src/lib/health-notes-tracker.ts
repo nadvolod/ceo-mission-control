@@ -32,7 +32,12 @@ export class HealthNotesTracker {
   }
 
   private async loadData(): Promise<void> {
-    this.data = await loadJSON(STORAGE_KEY, defaultData());
+    const stored = await loadJSON(STORAGE_KEY, defaultData());
+    this.data = {
+      ...defaultData(),
+      ...stored,
+      environmentTemplate: { ...defaultData().environmentTemplate, ...(stored.environmentTemplate || {}) },
+    };
   }
 
   private async saveData(): Promise<void> {
@@ -108,7 +113,7 @@ export class HealthNotesTracker {
   }
 
   async addEnvironmentField(name: string): Promise<void> {
-    if (this.data.environmentTemplate.customFieldNames.includes(name)) {
+    if (this.data.environmentTemplate.customFieldNames.some(f => f.toLowerCase() === name.toLowerCase())) {
       throw new Error(`Environment field "${name}" already exists`);
     }
     this.data.environmentTemplate.customFieldNames.push(name);

@@ -25,7 +25,8 @@ export class GarminTracker {
   }
 
   private async loadData(): Promise<void> {
-    this.data = await loadJSON(STORAGE_KEY, defaultData());
+    const stored = await loadJSON(STORAGE_KEY, defaultData());
+    this.data = { ...defaultData(), ...stored };
   }
 
   private async saveData(): Promise<void> {

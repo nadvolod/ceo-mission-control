@@ -120,9 +120,28 @@ export async function POST(request: NextRequest) {
 
       case 'applyGarminTraining': {
         const { date, activeMinutes, threshold } = data;
-        if (!date || typeof activeMinutes !== 'number') {
-          return NextResponse.json({ success: false, error: 'date and activeMinutes required' }, { status: 400 });
+
+        if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(new Date(date + 'T00:00:00').getTime())) {
+          return NextResponse.json(
+            { success: false, error: 'date must be a valid YYYY-MM-DD string' },
+            { status: 400 }
+          );
         }
+
+        if (typeof activeMinutes !== 'number' || !isFinite(activeMinutes) || activeMinutes < 0) {
+          return NextResponse.json(
+            { success: false, error: 'activeMinutes must be a non-negative number' },
+            { status: 400 }
+          );
+        }
+
+        if (threshold !== undefined && (typeof threshold !== 'number' || !isFinite(threshold) || threshold < 0)) {
+          return NextResponse.json(
+            { success: false, error: 'threshold must be a non-negative number when provided' },
+            { status: 400 }
+          );
+        }
+
         const result = await tracker.applyGarminTraining(date, activeMinutes, threshold);
         return NextResponse.json({ success: true, trained: result });
       }
@@ -136,7 +155,7 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error processing weekly tracker request:', error);
     return NextResponse.json(
-      { success: false, error: 'Failed to process request', details: (error as Error).message },
+      { success: false, error: 'Failed to process request' },
       { status: 500 }
     );
   }

@@ -13,7 +13,7 @@ jest.mock('@/lib/storage', () => ({
 
 jest.mock('@/lib/auth', () => ({
   checkAuth: jest.fn((req: NextRequest) => {
-    return req.headers.get('x-api-key') === 'test-key';
+    return req.headers.get('x-sync-api-key') === 'test-key';
   }),
 }));
 
@@ -74,7 +74,7 @@ describe('/api/garmin', () => {
         syncedAt: '2026-04-13T07:42:00Z',
       }];
 
-      const response = await POST(makeRequest('POST', { action: 'sync', metrics }, { 'x-api-key': 'test-key' }));
+      const response = await POST(makeRequest('POST', { action: 'sync', metrics }, { 'x-sync-api-key': 'test-key' }));
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -83,14 +83,14 @@ describe('/api/garmin', () => {
     });
 
     it('rejects sync with missing metrics', async () => {
-      const response = await POST(makeRequest('POST', { action: 'sync' }, { 'x-api-key': 'test-key' }));
+      const response = await POST(makeRequest('POST', { action: 'sync' }, { 'x-sync-api-key': 'test-key' }));
       expect(response.status).toBe(400);
     });
   });
 
   describe('POST unknown action', () => {
     it('returns 400 for unknown action', async () => {
-      const response = await POST(makeRequest('POST', { action: 'bad' }, { 'x-api-key': 'test-key' }));
+      const response = await POST(makeRequest('POST', { action: 'bad' }, { 'x-sync-api-key': 'test-key' }));
       expect(response.status).toBe(400);
     });
   });

@@ -38,7 +38,10 @@ export function DayDetailCard({ date, metrics, note, onClose }: DayDetailCardPro
                 <div className="text-[10px] text-indigo-400">Sleep Score</div>
               </div>
               <div className="text-center p-2 bg-purple-50 rounded-lg">
-                <div className="text-lg font-bold text-purple-700">{metrics.hrvStatus ?? '—'}<span className="text-xs font-normal">ms</span></div>
+                <div className="text-lg font-bold text-purple-700">
+                  {metrics.hrvStatus ?? '—'}
+                  {metrics.hrvStatus != null && <span className="text-xs font-normal">ms</span>}
+                </div>
                 <div className="text-[10px] text-purple-400">HRV</div>
               </div>
               <div className="text-center p-2 bg-amber-50 rounded-lg">
@@ -50,11 +53,17 @@ export function DayDetailCard({ date, metrics, note, onClose }: DayDetailCardPro
                 <div className="text-[10px] text-emerald-400">Avg Stress</div>
               </div>
               <div className="text-center p-2 bg-red-50 rounded-lg">
-                <div className="text-lg font-bold text-red-600">{metrics.restingHeartRate ?? '—'}<span className="text-xs font-normal">bpm</span></div>
+                <div className="text-lg font-bold text-red-600">
+                  {metrics.restingHeartRate ?? '—'}
+                  {metrics.restingHeartRate != null && <span className="text-xs font-normal">bpm</span>}
+                </div>
                 <div className="text-[10px] text-red-400">Resting HR</div>
               </div>
               <div className="text-center p-2 bg-gray-50 rounded-lg">
-                <div className="text-lg font-bold text-gray-700">{metrics.weight ?? '—'}<span className="text-xs font-normal">lb</span></div>
+                <div className="text-lg font-bold text-gray-700">
+                  {metrics.weight ?? '—'}
+                  {metrics.weight != null && <span className="text-xs font-normal">lb</span>}
+                </div>
                 <div className="text-[10px] text-gray-400">Weight</div>
               </div>
             </div>
