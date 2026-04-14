@@ -26,7 +26,7 @@ export function DayDetailCard({ date, metrics, note, onClose }: DayDetailCardPro
             </svg>
             <span className="text-sm font-semibold text-indigo-800">{displayDate}</span>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-xs">✕ Close</button>
+          <button onClick={onClose} aria-label="Close day detail" className="text-gray-400 hover:text-gray-600 text-xs">✕ Close</button>
         </div>
 
         <div className="p-4">

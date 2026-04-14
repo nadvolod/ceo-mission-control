@@ -37,6 +37,8 @@ interface WeeklyPerformanceTrackerProps {
   }) => Promise<void>;
   onAddFocusSession?: (category: FocusCategory, hours: number, description: string) => Promise<void>;
   temporalActual?: number;
+  todaysFocusSessions?: Array<{ category: string; hours: number; description: string; timestamp: string }>;
+  todaysFocusTotal?: number;
 }
 
 type TabId = 'daily' | 'weekly' | 'trends' | 'review';
@@ -68,12 +70,22 @@ export function WeeklyPerformanceTracker({
   onSubmitReview,
   onAddFocusSession,
   temporalActual = 0,
+  todaysFocusSessions = [],
+  todaysFocusTotal = 0,
 }: WeeklyPerformanceTrackerProps) {
   const [activeTab, setActiveTab] = useState<TabId>('daily');
   const [isLogging, setIsLogging] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [isAddingFocus, setIsAddingFocus] = useState(false);
+  const [lastAdded, setLastAdded] = useState<{ category: string; hours: number } | null>(null);
+
+  // Auto-clear success confirmation after 2 seconds
+  useEffect(() => {
+    if (!lastAdded) return;
+    const timer = setTimeout(() => setLastAdded(null), 2000);
+    return () => clearTimeout(timer);
+  }, [lastAdded]);
 
   // Daily entry form state
   const [deepWork, setDeepWork] = useState(todaysEntry?.deepWorkHours?.toString() ?? '');
@@ -321,6 +333,7 @@ export function WeeklyPerformanceTracker({
                   setIsAddingFocus(true);
                   try {
                     await onAddFocusSession(category, hours, `${hours}h ${category} focus block`);
+                    setLastAdded({ category, hours });
                   } catch (error) {
                     console.error('Error adding focus session:', error);
                   } finally {
@@ -332,6 +345,33 @@ export function WeeklyPerformanceTracker({
                 +{hours}h {category}
               </button>
             ))}
+          </div>
+        )}
+
+        {/* Today's Focus Sessions */}
+        {onAddFocusSession && (
+          <div className="mt-3">
+            {lastAdded && (
+              <div className="text-sm text-green-600 font-medium mb-1">
+                Added! +{lastAdded.hours}h {lastAdded.category}
+              </div>
+            )}
+            {todaysFocusTotal > 0 && (
+              <div className="text-xs text-gray-500 mb-2">
+                Today: {todaysFocusTotal}h focus logged
+              </div>
+            )}
+            {todaysFocusSessions.length > 0 && (
+              <div className="space-y-1">
+                {todaysFocusSessions.slice(0, 5).map((s, i) => (
+                  <div key={i} className="flex items-center text-xs text-gray-600 gap-2">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 flex-shrink-0" />
+                    <span>{s.description}</span>
+                    <span className="text-gray-400 ml-auto">{s.hours}h</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

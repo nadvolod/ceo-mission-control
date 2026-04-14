@@ -43,8 +43,8 @@ test.describe('Dashboard page rendering', () => {
       await expect(page.getByText('Total Tasks')).toBeVisible();
       await expect(page.getByText('Done Today', { exact: true })).toBeVisible();
       await expect(page.getByText('Overdue')).toBeVisible();
-      await expect(page.getByText('System Status')).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Refresh Data' })).toBeVisible();
+      await expect(page.getByText('Focus Hours')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Refresh' })).toBeVisible();
     } else {
       // Workspace data unavailable — verify graceful fallback (not a crash)
       const hasErrorState = await page.getByText('Cannot Load Workspace Data').isVisible().catch(() => false);
@@ -114,19 +114,14 @@ test.describe('Dashboard page rendering', () => {
     expect(monarchData, '/api/monarch should return valid JSON').toBeTruthy();
   });
 
-  test('revenue projection widget renders and has add button', async ({ page }) => {
+  test('revenue projections is NOT rendered on the dashboard', async ({ page }) => {
     await page.goto('/dashboard');
     await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
 
     const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
     if (hasFullDashboard) {
-      // Revenue Projections section should be visible
-      await expect(page.getByText('Revenue Projections')).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Add Adjustment' })).toBeVisible();
-
-      // Projection table should render
-      await expect(page.getByText('Projection')).toBeVisible();
-      await expect(page.getByText('Adjustments')).toBeVisible();
+      // Revenue Projections should NOT be anywhere on the page
+      await expect(page.getByText('Revenue Projections', { exact: true })).toBeHidden();
     }
   });
 
@@ -149,49 +144,101 @@ test.describe('Dashboard page rendering', () => {
     }
   });
 
-  test('dashboard layout has tasks at the bottom', async ({ page }) => {
+  test('dashboard default tab shows Financial Impact before Weekly Performance', async ({ page }) => {
     await page.goto('/dashboard');
     await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
 
     const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
     if (hasFullDashboard) {
-      // Verify section ordering: Financial Command Center should appear before Task Dashboard
       const allText = await page.textContent('main');
       if (allText) {
-        const financialPos = allText.indexOf('Financial Command Center');
-        const revenuePos = allText.indexOf('Revenue Projections');
-        const taskPos = allText.indexOf('Task Dashboard') !== -1
-          ? allText.indexOf('Task Dashboard')
-          : allText.indexOf('Active Tasks');
+        const financialImpactPos = allText.indexOf('Financial Impact Tracking');
+        const weeklyPos = allText.indexOf('Weekly Performance Tracker');
 
-        // Financial sections should come before tasks
-        if (financialPos !== -1 && taskPos !== -1) {
-          expect(financialPos).toBeLessThan(taskPos);
-        }
-        if (revenuePos !== -1 && taskPos !== -1) {
-          expect(revenuePos).toBeLessThan(taskPos);
+        if (financialImpactPos !== -1 && weeklyPos !== -1) {
+          expect(financialImpactPos).toBeLessThan(weeklyPos);
         }
       }
     }
   });
 
-  test('weekly performance tracker renders on dashboard', async ({ page }) => {
+  test('dashboard renders tab bar with 3 tabs', async ({ page }) => {
     await page.goto('/dashboard');
     await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
 
     const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
     if (hasFullDashboard) {
-      // Weekly Performance Tracker should be visible
+      await expect(page.getByRole('button', { name: /Dashboard/i }).first()).toBeVisible();
+      await expect(page.getByRole('button', { name: /^Tasks$/i })).toBeVisible();
+      await expect(page.getByRole('button', { name: /Monthly Review/i })).toBeVisible();
+    }
+  });
+
+  test('Tasks tab shows task dashboard', async ({ page }) => {
+    await page.goto('/dashboard');
+    await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+    const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
+    if (hasFullDashboard) {
+      await page.getByRole('button', { name: /^Tasks$/i }).click();
+      // Task dashboard should now be visible
+      const allText = await page.textContent('main');
+      expect(allText).toContain('Tasks');
+      // Financial Impact should NOT be visible on Tasks tab
+      await expect(page.getByText('Financial Impact Tracking')).toBeHidden();
+    }
+  });
+
+  test('Monthly Review tab shows review sections', async ({ page }) => {
+    await page.goto('/dashboard');
+    await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+    const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
+    if (hasFullDashboard) {
+      await page.getByRole('button', { name: /Monthly Review/i }).click();
+      await expect(page.getByText('Mission Command')).toBeVisible();
+      // Financial Impact should NOT be visible on Monthly Review tab
+      await expect(page.getByText('Financial Impact Tracking')).toBeHidden();
+    }
+  });
+
+  test('tab switching produces no JS errors', async ({ page }) => {
+    const jsErrors: string[] = [];
+    page.on('pageerror', error => jsErrors.push(error.message));
+
+    await page.goto('/dashboard');
+    await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+    const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
+    if (hasFullDashboard) {
+      await page.getByRole('button', { name: /^Tasks$/i }).click();
+      await page.waitForTimeout(500);
+      await page.getByRole('button', { name: /Monthly Review/i }).click();
+      await page.waitForTimeout(500);
+      await page.getByRole('button', { name: /Dashboard/i }).first().click();
+      await page.waitForTimeout(500);
+    }
+
+    expect(jsErrors).toHaveLength(0);
+  });
+
+  test('weekly performance tracker renders on dashboard default tab', async ({ page }) => {
+    await page.goto('/dashboard');
+    await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+    const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
+    if (hasFullDashboard) {
+      // Weekly Performance Tracker should be visible on default Dashboard tab
       await expect(page.getByText('Weekly Performance Tracker')).toBeVisible();
       await expect(page.getByRole('button', { name: 'Log Today' })).toBeVisible();
 
-      // Verify it appears between Revenue Projections and Mission Tracker
+      // Verify it appears after Financial Impact Tracking
       const allText = await page.textContent('main');
       if (allText) {
+        const financialPos = allText.indexOf('Financial Impact Tracking');
         const trackerPos = allText.indexOf('Weekly Performance Tracker');
-        const missionPos = allText.indexOf('Mission Progress');
-        if (trackerPos !== -1 && missionPos !== -1) {
-          expect(trackerPos).toBeLessThan(missionPos);
+        if (financialPos !== -1 && trackerPos !== -1) {
+          expect(financialPos).toBeLessThan(trackerPos);
         }
       }
     }
@@ -433,14 +480,17 @@ test.describe('Dashboard page rendering', () => {
     });
   });
 
-  test('monthly review tracker renders on dashboard', async ({ page }) => {
+  test('monthly review tracker renders on Monthly Review tab', async ({ page }) => {
     await page.goto('/dashboard');
     await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
 
     const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
     if (hasFullDashboard) {
+      // Switch to Monthly Review tab first
+      await page.getByRole('button', { name: /Monthly Review/i }).click();
+
       // Monthly Review section should be visible
-      await expect(page.getByText('Monthly Review')).toBeVisible();
+      await expect(page.getByText('Monthly Review').first()).toBeVisible();
 
       // Verify it has the expected tabs
       const newReviewTab = page.getByRole('button', { name: /New Review/ });

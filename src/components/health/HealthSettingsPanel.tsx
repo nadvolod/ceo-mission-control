@@ -10,7 +10,7 @@ interface HealthSettingsPanelProps {
   };
   syncStatus: { lastSyncedAt: string; syncStatus: string; syncError: string | null };
   onUpdateTemplate: (operation: string, name: string, defaultDosageMg?: number) => Promise<{ success: boolean }>;
-  onSync?: () => void;
+  onSync?: () => void | Promise<void>;
 }
 
 function DragHandle() {
@@ -47,6 +47,7 @@ export function HealthSettingsPanel({
 
   // Loading states to disable buttons while async calls are in-flight
   const [loading, setLoading] = useState<Record<string, boolean>>({});
+  const [isSyncing, setIsSyncing] = useState(false);
 
   useEffect(() => {
     const stored = localStorage.getItem('garmin-training-threshold');
@@ -361,11 +362,21 @@ export function HealthSettingsPanel({
           )}
           <div className="pt-2 border-t border-gray-200">
             <button
-              onClick={onSync}
-              disabled={!onSync}
+              onClick={async () => {
+                if (!onSync || isSyncing) return;
+                setIsSyncing(true);
+                try {
+                  await onSync();
+                } catch {
+                  // error handled upstream
+                } finally {
+                  setIsSyncing(false);
+                }
+              }}
+              disabled={!onSync || isSyncing}
               className="w-full py-2 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50"
             >
-              Sync Now
+              {isSyncing ? 'Syncing...' : 'Sync Now'}
             </button>
           </div>
         </div>

@@ -79,11 +79,11 @@ export class HealthNotesTracker {
   }
 
   getTemplates() {
-    return {
+    return structuredClone({
       supplementTemplate: this.data.supplementTemplate,
       habitTemplate: this.data.habitTemplate,
       environmentTemplate: this.data.environmentTemplate,
-    };
+    });
   }
 
   async addSupplement(name: string, defaultDosageMg: number): Promise<void> {
@@ -126,6 +126,6 @@ export class HealthNotesTracker {
   }
 
   getAllData(): HealthNotesData {
-    return this.data;
+    return structuredClone(this.data);
   }
 }

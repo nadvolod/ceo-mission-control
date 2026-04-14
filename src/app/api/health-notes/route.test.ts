@@ -105,4 +105,107 @@ describe('/api/health-notes', () => {
       expect(data.success).toBe(true);
     });
   });
+
+  describe('POST log input validation', () => {
+    it('accepts valid log with empty supplements, habits, and valid sleepEnvironment', async () => {
+      const response = await POST(makeRequest('POST', {
+        action: 'log',
+        date: '2026-04-13',
+        sleepEnvironment: { temperatureF: 68, fanRunning: true, dogInRoom: false, customFields: {} },
+        supplements: [],
+        habits: [],
+        freeformNote: '',
+      }, { 'x-sync-api-key': 'test-key' }));
+
+      const data = await response.json();
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.note.date).toBe('2026-04-13');
+      expect(data.note.supplements).toEqual([]);
+      expect(data.note.habits).toEqual([]);
+    });
+
+    it('rejects log with supplements as a string instead of array', async () => {
+      const response = await POST(makeRequest('POST', {
+        action: 'log',
+        date: '2026-04-13',
+        sleepEnvironment: { temperatureF: 68, fanRunning: true, dogInRoom: false, customFields: {} },
+        supplements: 'string',
+        habits: [],
+      }, { 'x-sync-api-key': 'test-key' }));
+
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.success).toBe(false);
+    });
+
+    it('rejects log with habits as a number instead of array', async () => {
+      const response = await POST(makeRequest('POST', {
+        action: 'log',
+        date: '2026-04-13',
+        sleepEnvironment: { temperatureF: 68, fanRunning: true, dogInRoom: false, customFields: {} },
+        supplements: [],
+        habits: 123,
+      }, { 'x-sync-api-key': 'test-key' }));
+
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.success).toBe(false);
+    });
+
+    it('rejects log with sleepEnvironment as null', async () => {
+      const response = await POST(makeRequest('POST', {
+        action: 'log',
+        date: '2026-04-13',
+        sleepEnvironment: null,
+        supplements: [],
+        habits: [],
+      }, { 'x-sync-api-key': 'test-key' }));
+
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.success).toBe(false);
+    });
+  });
+
+  describe('POST update-templates input validation', () => {
+    it('rejects addSupplement with negative defaultDosageMg', async () => {
+      const response = await POST(makeRequest('POST', {
+        action: 'update-templates',
+        operation: 'addSupplement',
+        name: 'Melatonin',
+        defaultDosageMg: -5,
+      }, { 'x-sync-api-key': 'test-key' }));
+
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.success).toBe(false);
+    });
+
+    it('rejects addSupplement with non-numeric defaultDosageMg', async () => {
+      const response = await POST(makeRequest('POST', {
+        action: 'update-templates',
+        operation: 'addSupplement',
+        name: 'Melatonin',
+        defaultDosageMg: 'abc',
+      }, { 'x-sync-api-key': 'test-key' }));
+
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.success).toBe(false);
+    });
+
+    it('rejects addSupplement with defaultDosageMg of 0', async () => {
+      const response = await POST(makeRequest('POST', {
+        action: 'update-templates',
+        operation: 'addSupplement',
+        name: 'Melatonin',
+        defaultDosageMg: 0,
+      }, { 'x-sync-api-key': 'test-key' }));
+
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.success).toBe(false);
+    });
+  });
 });

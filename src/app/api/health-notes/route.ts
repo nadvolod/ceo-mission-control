@@ -42,6 +42,27 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        if (supplements !== undefined && !Array.isArray(supplements)) {
+          return NextResponse.json(
+            { success: false, error: 'supplements must be an array' },
+            { status: 400 }
+          );
+        }
+
+        if (habits !== undefined && !Array.isArray(habits)) {
+          return NextResponse.json(
+            { success: false, error: 'habits must be an array' },
+            { status: 400 }
+          );
+        }
+
+        if (sleepEnvironment !== undefined && (sleepEnvironment === null || typeof sleepEnvironment !== 'object' || Array.isArray(sleepEnvironment))) {
+          return NextResponse.json(
+            { success: false, error: 'sleepEnvironment must be an object' },
+            { status: 400 }
+          );
+        }
+
         const note = await tracker.logNote({
           date,
           sleepEnvironment: sleepEnvironment || { temperatureF: null, fanRunning: false, dogInRoom: false, customFields: {} },
@@ -62,7 +83,13 @@ export async function POST(request: NextRequest) {
 
         switch (operation) {
           case 'addSupplement':
-            await tracker.addSupplement(name, defaultDosageMg || 0);
+            if (typeof defaultDosageMg !== 'number' || !Number.isFinite(defaultDosageMg) || defaultDosageMg <= 0) {
+              return NextResponse.json(
+                { success: false, error: 'defaultDosageMg must be a positive finite number' },
+                { status: 400 }
+              );
+            }
+            await tracker.addSupplement(name, defaultDosageMg);
             break;
           case 'removeSupplement':
             await tracker.removeSupplement(name);

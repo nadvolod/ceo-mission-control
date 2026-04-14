@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { GarminTracker } from '@/lib/garmin-tracker';
 import { HealthNotesTracker } from '@/lib/health-notes-tracker';
+import { WeeklyTracker } from '@/lib/weekly-tracker';
 import { checkAuth } from '@/lib/auth';
 
 export async function GET() {
@@ -38,7 +39,7 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'sync': {
-        const { metrics } = data;
+        const { metrics, trainingThreshold } = data;
         if (!Array.isArray(metrics)) {
           return NextResponse.json(
             { success: false, error: 'metrics must be an array' },
@@ -49,7 +50,20 @@ export async function POST(request: NextRequest) {
         const garmin = await GarminTracker.create();
         const result = await garmin.syncMetrics(metrics);
 
-        return NextResponse.json({ success: true, synced: result.synced });
+        // Auto-apply training for days with sufficient active minutes
+        const threshold = typeof trainingThreshold === 'number' && trainingThreshold > 0
+          ? trainingThreshold
+          : 30;
+        let trained = 0;
+        const weeklyTracker = await WeeklyTracker.create();
+        for (const m of metrics) {
+          if (m.date && typeof m.activeMinutes === 'number' && m.activeMinutes >= threshold) {
+            const applied = await weeklyTracker.applyGarminTraining(m.date, m.activeMinutes, threshold);
+            if (applied) trained++;
+          }
+        }
+
+        return NextResponse.json({ success: true, synced: result.synced, trained });
       }
 
       default:

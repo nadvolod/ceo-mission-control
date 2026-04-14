@@ -221,4 +221,54 @@ describe('HealthNotesTracker', () => {
       expect(result[0].date).toBe('2026-04-11');
     });
   });
+
+  describe('getAllData defensive copy', () => {
+    it('returns a copy — mutating returned data does not change internal state', async () => {
+      const data = defaultHealthNotesData();
+      data.notes['2026-04-13'] = {
+        date: '2026-04-13',
+        sleepEnvironment: { temperatureF: 68, fanRunning: true, dogInRoom: false, customFields: {} },
+        supplements: [{ name: 'Guanfacine', dosageMg: 1, taken: true }],
+        habits: [{ name: 'Red light therapy', done: true }],
+        freeformNote: 'Original note',
+        loggedAt: '2026-04-13T07:00:00Z',
+      };
+      mockLoadJSON.mockResolvedValue(data);
+
+      const tracker = await HealthNotesTracker.create();
+
+      // Get first copy and mutate it
+      const firstCopy = tracker.getAllData();
+      firstCopy.notes['2026-04-13'].freeformNote = 'MUTATED';
+      delete firstCopy.notes['2026-04-13'];
+      firstCopy.supplementTemplate.push({ name: 'Fake', defaultDosageMg: 999 });
+
+      // Get second copy and verify it is unaffected
+      const secondCopy = tracker.getAllData();
+      expect(secondCopy.notes['2026-04-13']).toBeDefined();
+      expect(secondCopy.notes['2026-04-13'].freeformNote).toBe('Original note');
+      expect(secondCopy.supplementTemplate).toHaveLength(3);
+      expect(secondCopy.supplementTemplate.find(s => s.name === 'Fake')).toBeUndefined();
+    });
+  });
+
+  describe('getTemplates defensive copy', () => {
+    it('returns a copy — mutating returned templates does not change internal state', async () => {
+      const tracker = await HealthNotesTracker.create();
+
+      // Get first copy and mutate it
+      const firstCopy = tracker.getTemplates();
+      firstCopy.supplementTemplate.push({ name: 'Fake Supplement', defaultDosageMg: 999 });
+      firstCopy.habitTemplate.push({ name: 'Fake Habit' });
+      firstCopy.environmentTemplate.customFieldNames.push('Fake Field');
+
+      // Get second copy and verify it is unaffected
+      const secondCopy = tracker.getTemplates();
+      expect(secondCopy.supplementTemplate).toHaveLength(3);
+      expect(secondCopy.supplementTemplate.find(s => s.name === 'Fake Supplement')).toBeUndefined();
+      expect(secondCopy.habitTemplate).toHaveLength(2);
+      expect(secondCopy.habitTemplate.find(h => h.name === 'Fake Habit')).toBeUndefined();
+      expect(secondCopy.environmentTemplate.customFieldNames).not.toContain('Fake Field');
+    });
+  });
 });

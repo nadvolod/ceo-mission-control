@@ -116,6 +116,6 @@ export class GarminTracker {
   }
 
   getAllData(): GarminHealthData {
-    return this.data;
+    return structuredClone(this.data);
   }
 }
