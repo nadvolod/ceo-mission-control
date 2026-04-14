@@ -41,6 +41,7 @@ export interface DashboardData {
   projectionData: RevenueProjectionApiResponse | null;
   weeklyTrackerData: WeeklyTrackerApiResponse | null;
   monthlyReviewData: MonthlyReviewApiResponse | null;
+  hasGarminData: boolean;
   isLoading: boolean;
 }
 
@@ -77,6 +78,7 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
   const [projectionData, setProjectionData] = useState<RevenueProjectionApiResponse | null>(null);
   const [weeklyTrackerData, setWeeklyTrackerData] = useState<WeeklyTrackerApiResponse | null>(null);
   const [monthlyReviewData, setMonthlyReviewData] = useState<MonthlyReviewApiResponse | null>(null);
+  const [hasGarminData, setHasGarminData] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
   const loadAllData = useCallback(async () => {
@@ -163,6 +165,20 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
             setMonthlyReviewData(data);
           }
         } catch (e) { console.error('Error loading monthly reviews:', e); }
+      },
+      async () => {
+        try {
+          const res = await fetch('/api/garmin');
+          if (res.ok) {
+            const data = await res.json();
+            setHasGarminData(data?.success && Object.keys(data?.metrics || {}).length > 0);
+          } else {
+            setHasGarminData(false);
+          }
+        } catch (e) {
+          console.error('Error loading Garmin data:', e);
+          setHasGarminData(false);
+        }
       },
     ];
 
@@ -389,7 +405,7 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
   return {
     aiTasks, taskStats, initiatives, scorecard, financialData, focusData,
     monarchData, monarchError, monarchLoading, projectionData, weeklyTrackerData,
-    monthlyReviewData, isLoading,
+    monthlyReviewData, hasGarminData, isLoading,
     loadAllData, handleCreateTask, handleUpdateTask, handleDeleteTask,
     handleMonarchRefresh, handleAddProjectionAdjustment, handleRemoveProjectionAdjustment,
     handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleSubmitWeeklyReview,

@@ -1,26 +1,30 @@
 'use client';
 
+import { useState } from 'react';
 import { TaskDashboard } from '@/components/TaskDashboard';
 import { FocusOptimization } from '@/components/FocusOptimization';
 import { MissionTracker } from '@/components/MissionTracker';
 import { FinancialMetricsDashboard } from '@/components/FinancialMetricsDashboard';
 import { FinancialCommandCenter } from '@/components/FinancialCommandCenter';
-import { FocusHoursTracker } from '@/components/FocusHoursTracker';
-import { RevenueProjectionWidget } from '@/components/RevenueProjectionWidget';
 import { WeeklyPerformanceTracker } from '@/components/WeeklyPerformanceTracker';
 import { MonthlyReviewTracker } from '@/components/MonthlyReviewTracker';
+import { HealthIntelligenceDashboard } from '@/components/HealthIntelligenceDashboard';
+import { DashboardTabs } from '@/components/DashboardTabs';
+import type { TabId } from '@/components/DashboardTabs';
 import { enrichScorecard } from '@/lib/derive-focus';
 import { useDashboardData } from '@/hooks/useDashboardData';
 
 export default function HomePage() {
   const {
     aiTasks, taskStats, initiatives, scorecard, financialData, focusData,
-    monarchData, monarchError, monarchLoading, projectionData, weeklyTrackerData, isLoading,
+    monarchData, monarchError, monarchLoading, weeklyTrackerData, isLoading,
     loadAllData, handleCreateTask, handleUpdateTask, handleDeleteTask,
-    handleMonarchRefresh, handleAddProjectionAdjustment, handleRemoveProjectionAdjustment,
+    handleMonarchRefresh,
     handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleSubmitWeeklyReview,
     monthlyReviewData, handleSubmitMonthlyReview, handleDeleteMonthlyReview,
   } = useDashboardData();
+
+  const [activeTab, setActiveTab] = useState<TabId>('dashboard');
 
   if (isLoading) {
     return (
@@ -102,118 +106,102 @@ export default function HomePage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-8 py-8">
-        {/* Financial Command Center - Real Monarch data */}
-        <div className="mb-8">
-          <FinancialCommandCenter
-            snapshot={monarchData}
-            isLoading={monarchLoading}
-            onRefresh={handleMonarchRefresh}
-            error={monarchError}
-          />
-        </div>
+        <DashboardTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
-        {/* Revenue Projections */}
-        {projectionData && (
+        {/* Dashboard Tab - Daily items */}
+        {activeTab === 'dashboard' && (
+          <>
+            {/* Financial Impact Tracking */}
+            {financialData && (
+              <div className="mb-8">
+                <FinancialMetricsDashboard
+                  todaysMetrics={financialData.todaysMetrics}
+                  weeklyTotals={financialData.weeklyTotals}
+                  monthlyTotals={financialData.monthlyTotals}
+                  recentEntries={financialData.recentEntries}
+                  onAddEntry={handleAddFinancialEntry}
+                />
+              </div>
+            )}
+
+            {/* Weekly Performance Tracker */}
+            {weeklyTrackerData && (
+              <div className="mb-8">
+                <WeeklyPerformanceTracker
+                  todaysEntry={weeklyTrackerData.todaysEntry}
+                  currentWeekSummary={weeklyTrackerData.currentWeekSummary}
+                  previousWeekSummary={weeklyTrackerData.previousWeekSummary}
+                  dailyTrend={weeklyTrackerData.dailyTrend}
+                  recentReviews={weeklyTrackerData.recentReviews}
+                  onLogDay={handleLogDay}
+                  onSubmitReview={handleSubmitWeeklyReview}
+                  onAddFocusSession={handleAddFocusSession}
+                  temporalActual={focusData?.weeklyTotals?.Temporal ?? scorecard.temporalActual ?? 0}
+                  todaysFocusSessions={focusData?.recentSessions?.filter((s: { date: string }) => s.date === scorecard.date)}
+                  todaysFocusTotal={focusData?.todaysMetrics?.totalHours ?? 0}
+                />
+              </div>
+            )}
+
+            {/* Financial Command Center - Real Monarch data */}
+            <div className="mb-8">
+              <FinancialCommandCenter
+                snapshot={monarchData}
+                isLoading={monarchLoading}
+                onRefresh={handleMonarchRefresh}
+                error={monarchError}
+              />
+            </div>
+
+            {/* Health Intelligence */}
+            <div className="mb-8">
+              <HealthIntelligenceDashboard />
+            </div>
+
+            {/* Today's Plan - Priorities, Critical Moves, Focus Blocks */}
+            <div className="mb-8">
+              <FocusOptimization scorecard={enrichedScorecard} />
+            </div>
+          </>
+        )}
+
+        {/* Tasks Tab */}
+        {activeTab === 'tasks' && (
           <div className="mb-8">
-            <RevenueProjectionWidget
-              projections={projectionData.projections ?? []}
-              adjustments={projectionData.data?.adjustments ?? []}
-              baseIncome={projectionData.data?.baseMonthlyIncome ?? projectionData.monarchBase?.income ?? 0}
-              baseExpenses={projectionData.data?.baseMonthlyExpenses ?? projectionData.monarchBase?.expenses ?? 0}
-              isUsingMonarchBase={{
-                income: projectionData.data?.baseMonthlyIncome == null,
-                expenses: projectionData.data?.baseMonthlyExpenses == null,
-              }}
-              monarchBaseLabel={projectionData.monarchBase?.label}
-              onAddAdjustment={handleAddProjectionAdjustment}
-              onRemoveAdjustment={handleRemoveProjectionAdjustment}
+            <TaskDashboard
+              tasks={aiTasks.filter(t => t.status !== 'done')}
+              stats={taskStats}
+              onCreateTask={handleCreateTask}
+              onUpdateTask={handleUpdateTask}
+              onDeleteTask={handleDeleteTask}
+              onRefresh={loadAllData}
+              taskListUrl={process.env.NEXT_PUBLIC_AI_TASK_LIST_URL || 'https://tasklistai.vercel.app'}
             />
           </div>
         )}
 
-        {/* Weekly Performance Tracker */}
-        {weeklyTrackerData && (
-          <div className="mb-8">
-            <WeeklyPerformanceTracker
-              todaysEntry={weeklyTrackerData.todaysEntry}
-              currentWeekSummary={weeklyTrackerData.currentWeekSummary}
-              previousWeekSummary={weeklyTrackerData.previousWeekSummary}
-              dailyTrend={weeklyTrackerData.dailyTrend}
-              recentReviews={weeklyTrackerData.recentReviews}
-              onLogDay={handleLogDay}
-              onSubmitReview={handleSubmitWeeklyReview}
-              onAddFocusSession={handleAddFocusSession}
-              temporalActual={focusData?.weeklyTotals?.Temporal ?? scorecard.temporalActual ?? 0}
-            />
-          </div>
+        {/* Monthly Review Tab */}
+        {activeTab === 'monthly-review' && (
+          <>
+            {/* Mission Tracker - Connected to real MRR from Monarch */}
+            <div className="mb-8">
+              <MissionTracker currentMRR={monarchData?.monthlyIncome} />
+            </div>
+
+            {/* Monthly Review */}
+            {monthlyReviewData && (
+              <div className="mb-8">
+                <MonthlyReviewTracker
+                  currentMonthReview={monthlyReviewData.currentMonthReview}
+                  recentReviews={monthlyReviewData.recentReviews}
+                  ratingsTrend={monthlyReviewData.ratingsTrend}
+                  onSubmitReview={handleSubmitMonthlyReview}
+                  onDeleteReview={handleDeleteMonthlyReview}
+                />
+              </div>
+            )}
+          </>
         )}
-
-        {/* Monthly Review */}
-        {monthlyReviewData && (
-          <div className="mb-8">
-            <MonthlyReviewTracker
-              currentMonthReview={monthlyReviewData.currentMonthReview}
-              recentReviews={monthlyReviewData.recentReviews}
-              ratingsTrend={monthlyReviewData.ratingsTrend}
-              onSubmitReview={handleSubmitMonthlyReview}
-              onDeleteReview={handleDeleteMonthlyReview}
-            />
-          </div>
-        )}
-
-        {/* Mission Tracker - Connected to real MRR from Monarch */}
-        <div className="mb-8">
-          <MissionTracker currentMRR={monarchData?.monthlyIncome} />
-        </div>
-
-        {/* Today's Plan - Priorities, Critical Moves, Focus Blocks */}
-        <div className="mb-8">
-          <FocusOptimization scorecard={enrichedScorecard} />
-        </div>
-
-        {/* Focus Hours Dashboard - Full Width */}
-        {focusData && (
-          <div className="mb-8">
-            <FocusHoursTracker
-              todaysMetrics={focusData.todaysMetrics}
-              weeklyTotals={focusData.weeklyTotals}
-              weekOverWeek={focusData.weekOverWeek}
-              dailyTrend={focusData.dailyTrend}
-              rollingAverage={focusData.rollingAverage}
-              categoryDistribution={focusData.categoryDistribution}
-              recentSessions={focusData.recentSessions}
-              temporalTarget={scorecard.temporalTarget || 0}
-              temporalActual={scorecard.temporalActual || 0}
-              onAddSession={handleAddFocusSession}
-            />
-          </div>
-        )}
-
-        {/* Financial Impact Tracking - Full Width */}
-        {financialData && (
-          <div className="mb-8">
-            <FinancialMetricsDashboard
-              todaysMetrics={financialData.todaysMetrics}
-              weeklyTotals={financialData.weeklyTotals}
-              monthlyTotals={financialData.monthlyTotals}
-              recentEntries={financialData.recentEntries}
-              onAddEntry={handleAddFinancialEntry}
-            />
-          </div>
-        )}
-
-        {/* Task Dashboard - Always Last */}
-        <div className="mb-8">
-          <TaskDashboard
-            tasks={aiTasks.filter(t => t.status !== 'done')}
-            stats={taskStats}
-            onCreateTask={handleCreateTask}
-            onUpdateTask={handleUpdateTask}
-            onDeleteTask={handleDeleteTask}
-            onRefresh={loadAllData}
-            taskListUrl={process.env.NEXT_PUBLIC_AI_TASK_LIST_URL || 'https://tasklistai.vercel.app'}
-          />
-        </div>
       </main>
     </div>
   );
