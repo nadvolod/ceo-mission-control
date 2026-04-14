@@ -172,8 +172,13 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
           if (res.ok) {
             const data = await res.json();
             setHasGarminData(data?.success && Object.keys(data?.metrics || {}).length > 0);
+          } else {
+            setHasGarminData(false);
           }
-        } catch (e) { console.error('Error loading Garmin data:', e); }
+        } catch (e) {
+          console.error('Error loading Garmin data:', e);
+          setHasGarminData(false);
+        }
       },
     ];
 

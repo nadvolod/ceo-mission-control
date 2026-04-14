@@ -50,6 +50,12 @@ export class HealthNotesTracker {
       throw new Error('date must be a valid YYYY-MM-DD string');
     }
 
+    const [y, m, d] = note.date.split('-').map(Number);
+    const dateObj = new Date(y, m - 1, d);
+    if (dateObj.getFullYear() !== y || dateObj.getMonth() !== m - 1 || dateObj.getDate() !== d) {
+      throw new Error('date is not a valid calendar date');
+    }
+
     const fullNote: DailyHealthNote = {
       ...note,
       loggedAt: new Date().toISOString(),

@@ -28,7 +28,7 @@ export function HealthIntelligenceDashboard() {
 
   const filteredMetrics = useMemo<GarminDayMetrics[]>(() => {
     const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - timeRange);
+    cutoff.setDate(cutoff.getDate() - (timeRange - 1));
     const cutoffStr = cutoff.toISOString().slice(0, 10);
 
     return Object.values(metrics)

@@ -40,15 +40,15 @@ export function useHealthData() {
       const garmin = garminRes.status === 'fulfilled' ? await garminRes.value.json() : null;
       const notes = notesRes.status === 'fulfilled' ? await notesRes.value.json() : null;
 
-      setData({
+      setData((prev) => ({
         metrics: garmin?.metrics || {},
-        notes: notes?.notes || {},
+        notes: notes?.notes || prev.notes,
         latest: garmin?.latest || null,
         averages: garmin?.averages || {},
         syncStatus: garmin?.syncStatus || { lastSyncedAt: '', syncStatus: 'idle', syncError: null },
-        templates: notes?.templates || { supplementTemplate: [], habitTemplate: [], environmentTemplate: { customFieldNames: [] } },
+        templates: notes?.templates || prev.templates,
         isLoading: false,
-      });
+      }));
     } catch (error) {
       console.error('Failed to load health data:', error);
       setData(prev => ({ ...prev, isLoading: false }));

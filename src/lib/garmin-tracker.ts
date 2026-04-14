@@ -40,7 +40,7 @@ export class GarminTracker {
         console.warn('Skipping metric with invalid date:', m.date);
         continue;
       }
-      this.data.metrics[m.date] = m;
+      this.data.metrics[m.date] = { ...this.data.metrics[m.date], ...m };
       synced++;
     }
 

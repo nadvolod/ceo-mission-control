@@ -251,7 +251,9 @@ export class WeeklyTracker {
     if (!entry) return false;
 
     const autoTrained = activeMinutes >= threshold;
-    entry.trained = autoTrained;
+    if (autoTrained) {
+      entry.trained = true;
+    }
     entry.timestamp = new Date().toISOString();
     await this.saveData();
 
