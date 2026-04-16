@@ -110,7 +110,11 @@ export class HealthNotesTracker {
     if (idx === -1) {
       throw new Error(`Supplement "${originalName}" not found`);
     }
-    if (originalName !== newName && this.data.supplementTemplate.some(s => s.name.toLowerCase() === newName.toLowerCase())) {
+    const newNameLower = newName.toLowerCase();
+    const hasDuplicate = this.data.supplementTemplate.some(
+      (s, i) => i !== idx && s.name.toLowerCase() === newNameLower
+    );
+    if (hasDuplicate) {
       throw new Error(`Supplement "${newName}" already exists`);
     }
     this.data.supplementTemplate[idx] = { name: newName, defaultDosageMg: newDosageMg };

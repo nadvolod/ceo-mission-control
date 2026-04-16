@@ -198,12 +198,12 @@ export function HealthSettingsPanel({
                   onChange={(e) => setEditMg(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && handleSaveEditSupplement()}
                   className="w-24 px-2 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-300"
-                  min={0}
+                  min={1}
                 />
                 <span className="text-xs text-gray-400">mg</span>
                 <button
                   onClick={handleSaveEditSupplement}
-                  disabled={loading[`editSupplement-${s.name}`] || !editName.trim() || !editMg}
+                  disabled={loading[`editSupplement-${s.name}`] || !editName.trim() || !editMg || isNaN(parseFloat(editMg)) || parseFloat(editMg) <= 0}
                   className="text-xs text-green-600 hover:text-green-800 font-medium transition-colors disabled:opacity-50"
                 >
                   Save

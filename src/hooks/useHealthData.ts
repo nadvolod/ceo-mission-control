@@ -81,7 +81,7 @@ export function useHealthData() {
     const response = await fetch('/api/health-notes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'update-templates', operation, name, defaultDosageMg, ...extra }),
+      body: JSON.stringify({ ...extra, action: 'update-templates', operation, name, defaultDosageMg }),
     });
     const result = await response.json();
     if (result.success) await loadData();

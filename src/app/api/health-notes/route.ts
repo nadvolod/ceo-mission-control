@@ -108,7 +108,12 @@ export async function POST(request: NextRequest) {
                 { status: 400 }
               );
             }
-            await tracker.editSupplement(name, newName.trim(), newDosageMg);
+            try {
+              await tracker.editSupplement(name, newName.trim(), newDosageMg);
+            } catch (err) {
+              const message = err instanceof Error ? err.message : 'Failed to edit supplement';
+              return NextResponse.json({ success: false, error: message }, { status: 400 });
+            }
             break;
           }
           case 'addHabit':

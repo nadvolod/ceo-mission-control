@@ -842,17 +842,21 @@ test.describe('editSupplement API', () => {
       test.skip();
       return;
     }
-    await request.post('/api/health-notes', {
+    expect(addA.status()).toBe(200);
+
+    const addB = await request.post('/api/health-notes', {
       data: { action: 'update-templates', operation: 'addSupplement', name: nameB, defaultDosageMg: 10 },
     });
+    expect(addB.status()).toBe(200);
 
-    // Try to rename A to B's name — should fail
+    // Try to rename A to B's name — should fail with 400
     const editRes = await request.post('/api/health-notes', {
       data: { action: 'update-templates', operation: 'editSupplement', name: nameA, newName: nameB, newDosageMg: 5 },
     });
-    expect(editRes.status()).toBe(500);
+    expect(editRes.status()).toBe(400);
     const editData = await editRes.json();
     expect(editData.success).toBe(false);
+    expect(editData.error).toContain('already exists');
 
     // Clean up
     await request.post('/api/health-notes', {
@@ -897,7 +901,9 @@ test.describe('Health Intelligence UI interactions', () => {
 
     // Check API to know whether data exists (other tests may have synced data)
     const apiRes = await request.get('/api/garmin');
+    expect(apiRes.status()).toBe(200);
     const apiData = await apiRes.json();
+    expect(apiData.success).toBe(true);
     const hasMetrics = Object.keys(apiData.metrics || {}).length > 0;
 
     await page.goto('/dashboard');
