@@ -181,7 +181,6 @@ jobs:
           DASHBOARD_URL=http://localhost:3000 npm run test:e2e:playwright
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          SYNC_API_KEY: ${{ secrets.SYNC_API_KEY }}
 
       - name: Upload Playwright report
         if: failure()
