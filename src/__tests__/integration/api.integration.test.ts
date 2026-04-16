@@ -27,6 +27,12 @@ beforeAll(() => {
   }
 });
 
+// Auth headers for requests when SYNC_API_KEY is configured
+function authHeaders(): Record<string, string> {
+  const key = process.env.SYNC_API_KEY;
+  return key ? { 'x-sync-api-key': key } : {};
+}
+
 // Use unique test keys to avoid collisions with production data
 // No underscores — _ is a SQL LIKE wildcard
 const TEST_PREFIX = `test${Date.now()}x`;
@@ -135,6 +141,7 @@ describe('/api/focus-hours (real DB)', () => {
   it('POST addSession should persist and be retrievable', async () => {
     const request = new NextRequest('http://localhost/api/focus-hours', {
       method: 'POST',
+      headers: { ...authHeaders() },
       body: JSON.stringify({
         action: 'addSession',
         category: 'Temporal',
@@ -162,6 +169,7 @@ describe('/api/focus-hours (real DB)', () => {
   it('POST addSession should reject invalid hours', async () => {
     const request = new NextRequest('http://localhost/api/focus-hours', {
       method: 'POST',
+      headers: { ...authHeaders() },
       body: JSON.stringify({ action: 'addSession', category: 'Temporal', hours: -1 }),
     });
 
@@ -172,6 +180,7 @@ describe('/api/focus-hours (real DB)', () => {
   it('POST addSession should reject invalid category', async () => {
     const request = new NextRequest('http://localhost/api/focus-hours', {
       method: 'POST',
+      headers: { ...authHeaders() },
       body: JSON.stringify({ action: 'addSession', category: 'NotACategory', hours: 1 }),
     });
 
@@ -182,6 +191,7 @@ describe('/api/focus-hours (real DB)', () => {
   it('POST processMessage should detect focus patterns', async () => {
     const request = new NextRequest('http://localhost/api/focus-hours', {
       method: 'POST',
+      headers: { ...authHeaders() },
       body: JSON.stringify({ action: 'processMessage', message: 'logged 2h on revenue calls' }),
     });
 
@@ -197,6 +207,7 @@ describe('/api/focus-hours (real DB)', () => {
   it('POST processMessage with no patterns returns empty', async () => {
     const request = new NextRequest('http://localhost/api/focus-hours', {
       method: 'POST',
+      headers: { ...authHeaders() },
       body: JSON.stringify({ action: 'processMessage', message: 'Had a great meeting today' }),
     });
 
@@ -243,7 +254,7 @@ describe('/api/temporal (real DB)', () => {
   it('POST addSession should persist a temporal session', async () => {
     const request = new NextRequest('http://localhost/api/temporal', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({
         action: 'addSession',
         hours: 2,
@@ -269,7 +280,7 @@ describe('/api/temporal (real DB)', () => {
   it('POST should reject invalid hours', async () => {
     const request = new NextRequest('http://localhost/api/temporal', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ action: 'addSession', hours: 0 })
     });
 
@@ -280,7 +291,7 @@ describe('/api/temporal (real DB)', () => {
   it('POST should reject invalid action', async () => {
     const request = new NextRequest('http://localhost/api/temporal', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...authHeaders() },
       body: JSON.stringify({ action: 'badAction' })
     });
 
@@ -304,6 +315,7 @@ describe('/api/sync (real DB)', () => {
   it('should sync text files to DB', async () => {
     const request = new NextRequest('http://localhost/api/sync', {
       method: 'POST',
+      headers: { ...authHeaders() },
       body: JSON.stringify({
         files: { [`${TEST_PREFIX}INITIATIVES.md`]: '# Test Initiatives\n\nContent here' }
       }),
@@ -324,6 +336,7 @@ describe('/api/sync (real DB)', () => {
   it('should sync JSON data to DB', async () => {
     const request = new NextRequest('http://localhost/api/sync', {
       method: 'POST',
+      headers: { ...authHeaders() },
       body: JSON.stringify({
         json: { [`${TEST_PREFIX}data.json`]: { tasks: [{ id: 'test-1', title: 'Test task' }] } }
       }),
@@ -343,6 +356,7 @@ describe('/api/sync (real DB)', () => {
   it('should sync both files and JSON in one request', async () => {
     const request = new NextRequest('http://localhost/api/sync', {
       method: 'POST',
+      headers: { ...authHeaders() },
       body: JSON.stringify({
         files: { [`${TEST_PREFIX}mixed.md`]: 'Text content' },
         json: { [`${TEST_PREFIX}mixed.json`]: { value: 42 } }
@@ -394,6 +408,7 @@ describe('/api/weekly-tracker (real DB)', () => {
   it('POST logDay should persist and be retrievable', async () => {
     const request = new NextRequest('http://localhost/api/weekly-tracker', {
       method: 'POST',
+      headers: { ...authHeaders() },
       body: JSON.stringify({
         action: 'logDay',
         deepWorkHours: 3.5,
@@ -422,6 +437,7 @@ describe('/api/weekly-tracker (real DB)', () => {
   it('POST logDay should reject invalid input', async () => {
     const request = new NextRequest('http://localhost/api/weekly-tracker', {
       method: 'POST',
+      headers: { ...authHeaders() },
       body: JSON.stringify({
         action: 'logDay',
         deepWorkHours: 10,
@@ -437,6 +453,7 @@ describe('/api/weekly-tracker (real DB)', () => {
   it('POST submitReview should persist review', async () => {
     const request = new NextRequest('http://localhost/api/weekly-tracker', {
       method: 'POST',
+      headers: { ...authHeaders() },
       body: JSON.stringify({
         action: 'submitReview',
         revenue: 5000,
@@ -464,6 +481,7 @@ describe('/api/weekly-tracker (real DB)', () => {
   it('POST submitReview should reject negative revenue', async () => {
     const request = new NextRequest('http://localhost/api/weekly-tracker', {
       method: 'POST',
+      headers: { ...authHeaders() },
       body: JSON.stringify({
         action: 'submitReview',
         revenue: -100,

@@ -5,7 +5,7 @@ const IS_VERCEL = process.env.VERCEL === '1';
 
 export const WORKSPACE_PATH = IS_VERCEL
   ? '/tmp/workspace'
-  : (process.env.WORKSPACE_PATH || '/Users/nikolay/.openclaw/workspace');
+  : (process.env.WORKSPACE_PATH || join(process.cwd(), 'data', 'workspace'));
 
 const SEED_FILES = ['INITIATIVES.md', 'DAILY_SCORECARD.md'];
 

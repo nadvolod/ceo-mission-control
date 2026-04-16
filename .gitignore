@@ -8,6 +8,10 @@
 
 # testing
 /coverage
+/test-results
+
+# runtime workspace data (filesystem storage fallback)
+/data/workspace
 
 # next.js
 /.next/

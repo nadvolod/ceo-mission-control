@@ -9,7 +9,7 @@ interface HealthSettingsPanelProps {
     environmentTemplate: { customFieldNames: string[] };
   };
   syncStatus: { lastSyncedAt: string; syncStatus: string; syncError: string | null };
-  onUpdateTemplate: (operation: string, name: string, defaultDosageMg?: number) => Promise<{ success: boolean }>;
+  onUpdateTemplate: (operation: string, name: string, defaultDosageMg?: number, extra?: Record<string, unknown>) => Promise<{ success: boolean }>;
   onSync?: () => void | Promise<void>;
 }
 
@@ -35,6 +35,11 @@ export function HealthSettingsPanel({
   // Supplement add form state
   const [newSupplementName, setNewSupplementName] = useState('');
   const [newSupplementMg, setNewSupplementMg] = useState('');
+
+  // Supplement edit state
+  const [editingSupplement, setEditingSupplement] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editMg, setEditMg] = useState('');
 
   // Habit add form state
   const [newHabitName, setNewHabitName] = useState('');
@@ -88,6 +93,32 @@ export function HealthSettingsPanel({
   async function handleRemoveSupplement(name: string) {
     await withLoading(`removeSupplement-${name}`, async () => {
       await onUpdateTemplate('removeSupplement', name);
+    });
+  }
+
+  function startEditSupplement(name: string, dosageMg: number) {
+    setEditingSupplement(name);
+    setEditName(name);
+    setEditMg(String(dosageMg));
+  }
+
+  function cancelEditSupplement() {
+    setEditingSupplement(null);
+    setEditName('');
+    setEditMg('');
+  }
+
+  async function handleSaveEditSupplement() {
+    if (!editingSupplement) return;
+    const trimmedName = editName.trim();
+    const mg = parseFloat(editMg);
+    if (!trimmedName || isNaN(mg) || mg <= 0) return;
+    await withLoading(`editSupplement-${editingSupplement}`, async () => {
+      const result = await onUpdateTemplate('editSupplement', editingSupplement, undefined, {
+        newName: trimmedName,
+        newDosageMg: mg,
+      });
+      if (result.success) cancelEditSupplement();
     });
   }
 
@@ -146,35 +177,74 @@ export function HealthSettingsPanel({
           These appear as options in your morning log. Set the default dosage for quick entry.
         </p>
         <div className="bg-gray-50 rounded-lg p-4 space-y-2">
-          {templates.supplementTemplate.map((s) => (
-            <div
-              key={s.name}
-              className="bg-white rounded-lg border border-gray-100 py-2 px-3 flex items-center justify-between"
-            >
-              <div className="flex items-center space-x-3">
-                <DragHandle />
-                <span className="text-sm text-gray-700">{s.name}</span>
-              </div>
-              <div className="flex items-center space-x-3">
-                <span className="text-xs text-gray-400">Default: {s.defaultDosageMg} mg</span>
+          {templates.supplementTemplate.map((s) =>
+            editingSupplement === s.name ? (
+              <div
+                key={s.name}
+                data-testid="supplement-edit-row"
+                className="bg-blue-50 rounded-lg border border-blue-200 py-2 px-3 flex items-center space-x-2"
+              >
+                <input
+                  type="text"
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSaveEditSupplement()}
+                  className="flex-1 px-2 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-300"
+                  autoFocus
+                />
+                <input
+                  type="number"
+                  value={editMg}
+                  onChange={(e) => setEditMg(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSaveEditSupplement()}
+                  className="w-24 px-2 py-1 border border-gray-200 rounded text-sm focus:outline-none focus:ring-1 focus:ring-blue-300"
+                  min={1}
+                />
+                <span className="text-xs text-gray-400">mg</span>
                 <button
-                  className="text-xs text-blue-500 hover:text-blue-700 transition-colors"
-                  disabled
-                  aria-label={`Edit ${s.name}`}
+                  onClick={handleSaveEditSupplement}
+                  disabled={loading[`editSupplement-${s.name}`] || !editName.trim() || !editMg || isNaN(parseFloat(editMg)) || parseFloat(editMg) <= 0}
+                  className="text-xs text-green-600 hover:text-green-800 font-medium transition-colors disabled:opacity-50"
                 >
-                  Edit
+                  Save
                 </button>
                 <button
-                  className="text-xs text-red-400 hover:text-red-600 transition-colors disabled:opacity-50"
-                  disabled={loading[`removeSupplement-${s.name}`]}
-                  onClick={() => handleRemoveSupplement(s.name)}
-                  aria-label={`Remove ${s.name}`}
+                  onClick={cancelEditSupplement}
+                  className="text-xs text-gray-400 hover:text-gray-600 transition-colors"
                 >
-                  Remove
+                  Cancel
                 </button>
               </div>
-            </div>
-          ))}
+            ) : (
+              <div
+                key={s.name}
+                className="bg-white rounded-lg border border-gray-100 py-2 px-3 flex items-center justify-between"
+              >
+                <div className="flex items-center space-x-3">
+                  <DragHandle />
+                  <span className="text-sm text-gray-700">{s.name}</span>
+                </div>
+                <div className="flex items-center space-x-3">
+                  <span className="text-xs text-gray-400">Default: {s.defaultDosageMg} mg</span>
+                  <button
+                    className="text-xs text-blue-500 hover:text-blue-700 transition-colors"
+                    onClick={() => startEditSupplement(s.name, s.defaultDosageMg)}
+                    aria-label={`Edit ${s.name}`}
+                  >
+                    Edit
+                  </button>
+                  <button
+                    className="text-xs text-red-400 hover:text-red-600 transition-colors disabled:opacity-50"
+                    disabled={loading[`removeSupplement-${s.name}`]}
+                    onClick={() => handleRemoveSupplement(s.name)}
+                    aria-label={`Remove ${s.name}`}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            )
+          )}
           {templates.supplementTemplate.length === 0 && (
             <p className="text-xs text-gray-400 text-center py-2">No supplements yet.</p>
           )}

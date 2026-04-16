@@ -634,3 +634,436 @@ test.describe('Health Intelligence Dashboard', () => {
     expect(jsErrors).toHaveLength(0);
   });
 });
+
+test.describe('Garmin sync round-trip', () => {
+  const SYNC_METRICS = [
+    {
+      date: '2099-11-01',
+      sleepScore: 82,
+      sleepDurationMinutes: 420,
+      deepSleepMinutes: 90,
+      lightSleepMinutes: 210,
+      remSleepMinutes: 100,
+      awakeDuringMinutes: 20,
+      restingHeartRate: 55,
+      hrvStatus: 62,
+      averageStressLevel: 28,
+      bodyBatteryHigh: 95,
+      bodyBatteryLow: 20,
+      steps: 8500,
+      activeMinutes: 45,
+      weight: 175.2,
+    },
+    {
+      date: '2099-11-02',
+      sleepScore: 75,
+      sleepDurationMinutes: 390,
+      deepSleepMinutes: 70,
+      lightSleepMinutes: 200,
+      remSleepMinutes: 90,
+      awakeDuringMinutes: 30,
+      restingHeartRate: 58,
+      hrvStatus: 55,
+      averageStressLevel: 35,
+      bodyBatteryHigh: 88,
+      bodyBatteryLow: 15,
+      steps: 6200,
+      activeMinutes: 20,
+      weight: 175.5,
+    },
+  ];
+
+  test('POST sync persists metrics and GET returns them', async ({ request }) => {
+    const postRes = await request.post('/api/garmin', {
+      data: { action: 'sync', metrics: SYNC_METRICS },
+    });
+    if (postRes.status() === 401) {
+      test.skip();
+      return;
+    }
+    expect(postRes.status()).toBe(200);
+    const postData = await postRes.json();
+    expect(postData.success).toBe(true);
+    expect(postData.synced).toBe(2);
+
+    // GET should return the synced metrics
+    const getRes = await request.get('/api/garmin');
+    expect(getRes.status()).toBe(200);
+    const getData = await getRes.json();
+    expect(getData.success).toBe(true);
+
+    // Verify both days are present
+    const day1 = getData.metrics['2099-11-01'];
+    expect(day1).toBeTruthy();
+    expect(day1.sleepScore).toBe(82);
+    expect(day1.restingHeartRate).toBe(55);
+    expect(day1.hrvStatus).toBe(62);
+    expect(day1.bodyBatteryHigh).toBe(95);
+    expect(day1.steps).toBe(8500);
+
+    const day2 = getData.metrics['2099-11-02'];
+    expect(day2).toBeTruthy();
+    expect(day2.sleepScore).toBe(75);
+    expect(day2.averageStressLevel).toBe(35);
+    expect(day2.weight).toBe(175.5);
+  });
+
+  test('sync with empty metrics array succeeds with zero synced', async ({ request }) => {
+    const res = await request.post('/api/garmin', {
+      data: { action: 'sync', metrics: [] },
+    });
+    if (res.status() === 401) {
+      test.skip();
+      return;
+    }
+    expect(res.status()).toBe(200);
+    const data = await res.json();
+    expect(data.success).toBe(true);
+    expect(data.synced).toBe(0);
+  });
+
+  test('sync rejects non-array metrics', async ({ request }) => {
+    const res = await request.post('/api/garmin', {
+      data: { action: 'sync', metrics: 'not-an-array' },
+    });
+    if (res.status() === 401) {
+      test.skip();
+      return;
+    }
+    expect(res.status()).toBe(400);
+    const data = await res.json();
+    expect(data.error).toContain('array');
+  });
+
+  test('sync updates existing day metrics (merge, not replace)', async ({ request }) => {
+    // First sync: partial data
+    const firstRes = await request.post('/api/garmin', {
+      data: { action: 'sync', metrics: [{ date: '2099-11-03', sleepScore: 90 }] },
+    });
+    if (firstRes.status() === 401) {
+      test.skip();
+      return;
+    }
+    expect(firstRes.status()).toBe(200);
+
+    // Second sync: different fields for same date
+    const secondRes = await request.post('/api/garmin', {
+      data: { action: 'sync', metrics: [{ date: '2099-11-03', restingHeartRate: 52, steps: 10000 }] },
+    });
+    expect(secondRes.status()).toBe(200);
+
+    // GET: merged result should have all fields
+    const getRes = await request.get('/api/garmin');
+    const getData = await getRes.json();
+    const merged = getData.metrics['2099-11-03'];
+    expect(merged).toBeTruthy();
+    expect(merged.sleepScore).toBe(90);
+    expect(merged.restingHeartRate).toBe(52);
+    expect(merged.steps).toBe(10000);
+  });
+
+  test('GET returns correct latest and syncStatus after sync', async ({ request }) => {
+    // Sync with a far-future date to guarantee it's "latest"
+    const res = await request.post('/api/garmin', {
+      data: { action: 'sync', metrics: [{ date: '2099-12-31', sleepScore: 99, hrvStatus: 70 }] },
+    });
+    if (res.status() === 401) {
+      test.skip();
+      return;
+    }
+    expect(res.status()).toBe(200);
+
+    const getRes = await request.get('/api/garmin');
+    const getData = await getRes.json();
+
+    // Latest should be the 2099-12-31 entry
+    expect(getData.latest).toBeTruthy();
+    expect(getData.latest.date).toBe('2099-12-31');
+    expect(getData.latest.sleepScore).toBe(99);
+
+    // Sync status should show a recent timestamp
+    expect(getData.syncStatus.lastSyncedAt).toBeTruthy();
+    const syncedAt = new Date(getData.syncStatus.lastSyncedAt);
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    expect(syncedAt.getTime()).toBeGreaterThan(fiveMinutesAgo.getTime());
+  });
+});
+
+test.describe('editSupplement API', () => {
+  const UNIQUE_SUPP = `E2E-Edit-Test-${Date.now()}`;
+
+  test('add, edit, and remove a supplement end-to-end', async ({ request }) => {
+    // 1. Add a test supplement
+    const addRes = await request.post('/api/health-notes', {
+      data: { action: 'update-templates', operation: 'addSupplement', name: UNIQUE_SUPP, defaultDosageMg: 10 },
+    });
+    if (addRes.status() === 401) {
+      test.skip();
+      return;
+    }
+    expect(addRes.status()).toBe(200);
+    const addData = await addRes.json();
+    expect(addData.templates.supplementTemplate.find((s: { name: string }) => s.name === UNIQUE_SUPP)).toBeTruthy();
+
+    // 2. Edit name and dosage
+    const editedName = `${UNIQUE_SUPP}-Edited`;
+    const editRes = await request.post('/api/health-notes', {
+      data: { action: 'update-templates', operation: 'editSupplement', name: UNIQUE_SUPP, newName: editedName, newDosageMg: 25 },
+    });
+    expect(editRes.status()).toBe(200);
+    const editData = await editRes.json();
+    const edited = editData.templates.supplementTemplate.find((s: { name: string }) => s.name === editedName);
+    expect(edited).toBeTruthy();
+    expect(edited.defaultDosageMg).toBe(25);
+    // Original name should be gone
+    expect(editData.templates.supplementTemplate.find((s: { name: string }) => s.name === UNIQUE_SUPP)).toBeFalsy();
+
+    // 3. Verify via GET
+    const getRes = await request.get('/api/health-notes');
+    const getData = await getRes.json();
+    expect(getData.templates.supplementTemplate.find((s: { name: string }) => s.name === editedName)).toBeTruthy();
+
+    // 4. Clean up
+    const removeRes = await request.post('/api/health-notes', {
+      data: { action: 'update-templates', operation: 'removeSupplement', name: editedName },
+    });
+    expect(removeRes.status()).toBe(200);
+  });
+
+  test('editSupplement rejects duplicate name', async ({ request }) => {
+    // Add two supplements
+    const nameA = `E2E-DupA-${Date.now()}`;
+    const nameB = `E2E-DupB-${Date.now()}`;
+
+    const addA = await request.post('/api/health-notes', {
+      data: { action: 'update-templates', operation: 'addSupplement', name: nameA, defaultDosageMg: 5 },
+    });
+    if (addA.status() === 401) {
+      test.skip();
+      return;
+    }
+    expect(addA.status()).toBe(200);
+
+    const addB = await request.post('/api/health-notes', {
+      data: { action: 'update-templates', operation: 'addSupplement', name: nameB, defaultDosageMg: 10 },
+    });
+    expect(addB.status()).toBe(200);
+
+    // Try to rename A to B's name — should fail with 400
+    const editRes = await request.post('/api/health-notes', {
+      data: { action: 'update-templates', operation: 'editSupplement', name: nameA, newName: nameB, newDosageMg: 5 },
+    });
+    expect(editRes.status()).toBe(400);
+    const editData = await editRes.json();
+    expect(editData.success).toBe(false);
+    expect(editData.error).toContain('already exists');
+
+    // Clean up
+    await request.post('/api/health-notes', {
+      data: { action: 'update-templates', operation: 'removeSupplement', name: nameA },
+    });
+    await request.post('/api/health-notes', {
+      data: { action: 'update-templates', operation: 'removeSupplement', name: nameB },
+    });
+  });
+
+  test('editSupplement rejects invalid dosage', async ({ request }) => {
+    const res = await request.post('/api/health-notes', {
+      data: { action: 'update-templates', operation: 'editSupplement', name: 'Anything', newName: 'Anything', newDosageMg: -5 },
+    });
+    if (res.status() === 401) {
+      test.skip();
+      return;
+    }
+    expect(res.status()).toBe(400);
+    const data = await res.json();
+    expect(data.error).toContain('newDosageMg');
+  });
+
+  test('editSupplement rejects empty newName', async ({ request }) => {
+    const res = await request.post('/api/health-notes', {
+      data: { action: 'update-templates', operation: 'editSupplement', name: 'Anything', newName: '', newDosageMg: 10 },
+    });
+    if (res.status() === 401) {
+      test.skip();
+      return;
+    }
+    expect(res.status()).toBe(400);
+    const data = await res.json();
+    expect(data.error).toContain('newName');
+  });
+});
+
+test.describe('Health Intelligence UI interactions', () => {
+  test('charts tab shows empty state or rendered chart (not blank)', async ({ page, request }) => {
+    const jsErrors: string[] = [];
+    page.on('pageerror', error => jsErrors.push(error.message));
+
+    // Check API to know whether data exists (other tests may have synced data)
+    const apiRes = await request.get('/api/garmin');
+    expect(apiRes.status()).toBe(200);
+    const apiData = await apiRes.json();
+    expect(apiData.success).toBe(true);
+    const hasMetrics = Object.keys(apiData.metrics || {}).length > 0;
+
+    await page.goto('/dashboard');
+    await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+    // Scroll to Health Intelligence and click Charts tab
+    const healthSection = page.getByText('Health Intelligence');
+    await expect(healthSection).toBeVisible({ timeout: 10_000 });
+    await healthSection.scrollIntoViewIfNeeded();
+    await page.getByRole('button', { name: /Charts/i }).click();
+
+    if (hasMetrics) {
+      // Data exists — chart should render with toggle pill buttons
+      await expect(page.getByRole('button', { name: 'Sleep Score' })).toBeVisible({ timeout: 5_000 });
+    } else {
+      // No data — empty state message should show
+      await expect(page.getByText('No Garmin data yet')).toBeVisible({ timeout: 5_000 });
+    }
+
+    expect(jsErrors).toHaveLength(0);
+  });
+
+  test('Settings tab Edit button opens inline edit for supplements', async ({ page, request }) => {
+    const jsErrors: string[] = [];
+    page.on('pageerror', error => jsErrors.push(error.message));
+
+    // Clean up any leftovers from prior runs
+    await request.post('/api/health-notes', {
+      data: { action: 'update-templates', operation: 'removeSupplement', name: 'E2E-Edit-UI-Test' },
+    });
+
+    // Ensure exactly one test supplement exists
+    const addRes = await request.post('/api/health-notes', {
+      data: { action: 'update-templates', operation: 'addSupplement', name: 'E2E-Edit-UI-Test', defaultDosageMg: 50 },
+    });
+    if (addRes.status() === 401) {
+      test.skip();
+      return;
+    }
+
+    await page.goto('/dashboard');
+    await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+    const healthSection = page.getByText('Health Intelligence');
+    await healthSection.scrollIntoViewIfNeeded();
+    await page.getByRole('button', { name: /Settings/i }).click();
+
+    // Find the Edit button for our test supplement (exact match)
+    const editButton = page.getByRole('button', { name: 'Edit E2E-Edit-UI-Test', exact: true });
+    await expect(editButton).toBeVisible();
+    await editButton.click();
+
+    // Inline edit form should appear with Save and Cancel buttons
+    // Scope to the supplement templates section to avoid matching other Save buttons
+    const supplementSection = page.locator('div').filter({ hasText: 'Supplement Templates' }).first();
+    await expect(supplementSection.getByRole('button', { name: 'Save', exact: true })).toBeVisible();
+    await expect(supplementSection.getByRole('button', { name: 'Cancel', exact: true })).toBeVisible();
+
+    // Cancel should close the form
+    await supplementSection.getByRole('button', { name: 'Cancel', exact: true }).click();
+    await expect(supplementSection.getByRole('button', { name: 'Save', exact: true })).toBeHidden();
+    await expect(editButton).toBeVisible();
+
+    // Clean up
+    await request.post('/api/health-notes', {
+      data: { action: 'update-templates', operation: 'removeSupplement', name: 'E2E-Edit-UI-Test' },
+    });
+
+    expect(jsErrors).toHaveLength(0);
+  });
+
+  test('Settings Edit button saves changes and persists via API', async ({ page, request }) => {
+    // Clean up any leftovers from prior runs
+    await request.post('/api/health-notes', {
+      data: { action: 'update-templates', operation: 'removeSupplement', name: 'E2E-Save-Test' },
+    });
+    await request.post('/api/health-notes', {
+      data: { action: 'update-templates', operation: 'removeSupplement', name: 'E2E-Save-Test-Renamed' },
+    });
+
+    // Add a supplement to edit
+    const addRes = await request.post('/api/health-notes', {
+      data: { action: 'update-templates', operation: 'addSupplement', name: 'E2E-Save-Test', defaultDosageMg: 10 },
+    });
+    if (addRes.status() === 401) {
+      test.skip();
+      return;
+    }
+
+    await page.goto('/dashboard');
+    await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+    const healthSection = page.getByText('Health Intelligence');
+    await healthSection.scrollIntoViewIfNeeded();
+    await page.getByRole('button', { name: /Settings/i }).click();
+
+    // Click Edit (exact match to avoid matching "E2E-Save-Test-Renamed")
+    const editButton = page.getByRole('button', { name: 'Edit E2E-Save-Test', exact: true });
+    await expect(editButton).toBeVisible();
+    await editButton.click();
+
+    // The inline edit form replaces the row — find it by data-testid
+    const editRow = page.getByTestId('supplement-edit-row');
+    await expect(editRow).toBeVisible();
+
+    // Modify the name input
+    const nameInput = editRow.locator('input[type="text"]');
+    await nameInput.clear();
+    await nameInput.fill('E2E-Save-Test-Renamed');
+
+    // Modify dosage
+    const dosageInput = editRow.locator('input[type="number"]');
+    await dosageInput.clear();
+    await dosageInput.fill('99');
+
+    // Save
+    await editRow.getByRole('button', { name: 'Save', exact: true }).click();
+
+    // Wait for the edit row to disappear (form closes on success)
+    await expect(editRow).toBeHidden({ timeout: 5_000 });
+
+    // Verify via API that the edit persisted
+    const getRes = await request.get('/api/health-notes');
+    const getData = await getRes.json();
+    const renamed = getData.templates.supplementTemplate.find(
+      (s: { name: string }) => s.name === 'E2E-Save-Test-Renamed'
+    );
+    expect(renamed, 'renamed supplement should exist in API response').toBeTruthy();
+    expect(renamed.defaultDosageMg).toBe(99);
+    // Old name should be gone
+    expect(getData.templates.supplementTemplate.find(
+      (s: { name: string }) => s.name === 'E2E-Save-Test'
+    )).toBeFalsy();
+
+    // Clean up
+    await request.post('/api/health-notes', {
+      data: { action: 'update-templates', operation: 'removeSupplement', name: 'E2E-Save-Test-Renamed' },
+    });
+  });
+
+  test('Settings tab has no JS errors during tab switching', async ({ page }) => {
+    const jsErrors: string[] = [];
+    page.on('pageerror', error => jsErrors.push(error.message));
+
+    await page.goto('/dashboard');
+    await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+    const healthSection = page.getByText('Health Intelligence');
+    await healthSection.scrollIntoViewIfNeeded();
+
+    // Rapidly switch between all Health Intelligence tabs
+    await page.getByRole('button', { name: /Charts/i }).click();
+    await page.waitForTimeout(300);
+    await page.getByRole('button', { name: /Morning Log/i }).click();
+    await page.waitForTimeout(300);
+    await page.getByRole('button', { name: /Settings/i }).click();
+    await page.waitForTimeout(300);
+    await page.getByRole('button', { name: /Charts/i }).click();
+    await page.waitForTimeout(300);
+
+    expect(jsErrors).toHaveLength(0);
+  });
+});

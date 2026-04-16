@@ -77,11 +77,11 @@ export function useHealthData() {
     return result;
   }, [loadData]);
 
-  const updateTemplate = useCallback(async (operation: string, name: string, defaultDosageMg?: number) => {
+  const updateTemplate = useCallback(async (operation: string, name: string, defaultDosageMg?: number, extra?: Record<string, unknown>) => {
     const response = await fetch('/api/health-notes', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ action: 'update-templates', operation, name, defaultDosageMg }),
+      body: JSON.stringify({ ...extra, action: 'update-templates', operation, name, defaultDosageMg }),
     });
     const result = await response.json();
     if (result.success) await loadData();

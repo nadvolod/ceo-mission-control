@@ -47,9 +47,13 @@ afterAll(async () => {
 
 function makeRequest(method: string, body?: unknown, headers?: Record<string, string>): NextRequest {
   const url = 'http://localhost:3000/api/sync-tasks';
+  const authHeaders: Record<string, string> = {};
+  if (process.env.SYNC_API_KEY) {
+    authHeaders['x-sync-api-key'] = process.env.SYNC_API_KEY;
+  }
   return new NextRequest(url, {
     method,
-    headers: { 'Content-Type': 'application/json', ...headers },
+    headers: { 'Content-Type': 'application/json', ...authHeaders, ...headers },
     body: body ? JSON.stringify(body) : undefined,
   });
 }
@@ -175,8 +179,9 @@ describe('Task sync API (real DB)', () => {
     process.env.SYNC_API_KEY = 'test-secret-key';
 
     try {
+      // Send a wrong key to simulate unauthorized access
       const response = await syncPost(
-        makeRequest('POST', { action: 'push', tasks: [makeLocalTask('auth-1')] })
+        makeRequest('POST', { action: 'push', tasks: [makeLocalTask('auth-1')] }, { 'x-sync-api-key': 'wrong-key' })
       );
       expect(response.status).toBe(401);
 

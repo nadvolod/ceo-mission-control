@@ -24,6 +24,9 @@ jobs:
           if [ -z "${{ secrets.MONARCH_TOKEN }}" ]; then
             missing+=("MONARCH_TOKEN")
           fi
+          if [ -z "${{ secrets.SYNC_API_KEY }}" ]; then
+            missing+=("SYNC_API_KEY")
+          fi
           if [ ${#missing[@]} -gt 0 ]; then
             echo "::error::Missing required secrets: ${missing[*]}"
             echo "Configure these in GitHub repo Settings > Secrets and variables > Actions"
@@ -84,6 +87,7 @@ jobs:
         env:
           CI: true
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          SYNC_API_KEY: ${{ secrets.SYNC_API_KEY }}
 
       - name: Monarch integration tests (real API)
         run: npm run test:monarch
@@ -165,6 +169,7 @@ jobs:
         run: npm run build
         env:
           NODE_ENV: production
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
@@ -174,6 +179,8 @@ jobs:
           npm start &
           npx wait-on http://localhost:3000 --timeout 30000
           DASHBOARD_URL=http://localhost:3000 npm run test:e2e:playwright
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
       - name: Upload Playwright report
         if: failure()

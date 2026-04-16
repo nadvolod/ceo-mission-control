@@ -105,6 +105,22 @@ export class HealthNotesTracker {
     await this.saveData();
   }
 
+  async editSupplement(originalName: string, newName: string, newDosageMg: number): Promise<void> {
+    const idx = this.data.supplementTemplate.findIndex(s => s.name === originalName);
+    if (idx === -1) {
+      throw new Error(`Supplement "${originalName}" not found`);
+    }
+    const newNameLower = newName.toLowerCase();
+    const hasDuplicate = this.data.supplementTemplate.some(
+      (s, i) => i !== idx && s.name.toLowerCase() === newNameLower
+    );
+    if (hasDuplicate) {
+      throw new Error(`Supplement "${newName}" already exists`);
+    }
+    this.data.supplementTemplate[idx] = { name: newName, defaultDosageMg: newDosageMg };
+    await this.saveData();
+  }
+
   async addHabit(name: string): Promise<void> {
     if (this.data.habitTemplate.some(h => h.name.toLowerCase() === name.toLowerCase())) {
       throw new Error(`Habit "${name}" already exists`);

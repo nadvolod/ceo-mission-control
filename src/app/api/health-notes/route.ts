@@ -94,6 +94,28 @@ export async function POST(request: NextRequest) {
           case 'removeSupplement':
             await tracker.removeSupplement(name);
             break;
+          case 'editSupplement': {
+            const { newName, newDosageMg } = data;
+            if (typeof newName !== 'string' || newName.trim().length === 0) {
+              return NextResponse.json(
+                { success: false, error: 'newName must be a non-empty string' },
+                { status: 400 }
+              );
+            }
+            if (typeof newDosageMg !== 'number' || !Number.isFinite(newDosageMg) || newDosageMg <= 0) {
+              return NextResponse.json(
+                { success: false, error: 'newDosageMg must be a positive finite number' },
+                { status: 400 }
+              );
+            }
+            try {
+              await tracker.editSupplement(name, newName.trim(), newDosageMg);
+            } catch (err) {
+              const message = err instanceof Error ? err.message : 'Failed to edit supplement';
+              return NextResponse.json({ success: false, error: message }, { status: 400 });
+            }
+            break;
+          }
           case 'addHabit':
             await tracker.addHabit(name);
             break;
