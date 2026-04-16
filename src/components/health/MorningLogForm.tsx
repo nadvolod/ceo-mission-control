@@ -30,6 +30,7 @@ interface MorningLogFormProps {
     operation: string,
     name: string,
     defaultDosageMg?: number,
+    extra?: Record<string, unknown>,
   ) => Promise<{ success: boolean }>;
 }
 
