@@ -9,6 +9,8 @@ interface HealthSettingsPanelProps {
     environmentTemplate: { customFieldNames: string[] };
   };
   syncStatus: { lastSyncedAt: string; syncStatus: string; syncError: string | null };
+  garminConfigured?: boolean;
+  garminConnected?: boolean;
   onUpdateTemplate: (operation: string, name: string, defaultDosageMg?: number, extra?: Record<string, unknown>) => Promise<{ success: boolean }>;
   onSync?: () => void | Promise<void>;
 }
@@ -29,6 +31,8 @@ function DragHandle() {
 export function HealthSettingsPanel({
   templates,
   syncStatus,
+  garminConfigured,
+  garminConnected,
   onUpdateTemplate,
   onSync,
 }: HealthSettingsPanelProps) {
@@ -53,6 +57,13 @@ export function HealthSettingsPanel({
   // Loading states to disable buttons while async calls are in-flight
   const [loading, setLoading] = useState<Record<string, boolean>>({});
   const [isSyncing, setIsSyncing] = useState(false);
+
+  // Garmin connection state
+  const [isConnecting, setIsConnecting] = useState(false);
+  const [mfaSessionId, setMfaSessionId] = useState<string | null>(null);
+  const [mfaCode, setMfaCode] = useState('');
+  const [connectError, setConnectError] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(garminConnected ?? false);
 
   useEffect(() => {
     const stored = localStorage.getItem('garmin-training-threshold');
@@ -154,6 +165,57 @@ export function HealthSettingsPanel({
     });
   }
 
+  // Garmin connection handlers
+  async function handleConnectGarmin() {
+    setIsConnecting(true);
+    setConnectError(null);
+    setMfaSessionId(null);
+    try {
+      const res = await fetch('/api/garmin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'garmin-login' }),
+      });
+      const data = await res.json();
+      if (data.success && data.connected) {
+        setIsConnected(true);
+      } else if (data.mfaRequired && data.sessionId) {
+        setMfaSessionId(data.sessionId);
+      } else {
+        setConnectError(data.error || 'Connection failed');
+      }
+    } catch {
+      setConnectError('Network error connecting to Garmin');
+    } finally {
+      setIsConnecting(false);
+    }
+  }
+
+  async function handleSubmitMFA() {
+    if (!mfaSessionId || mfaCode.length < 4) return;
+    setIsConnecting(true);
+    setConnectError(null);
+    try {
+      const res = await fetch('/api/garmin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'garmin-mfa', sessionId: mfaSessionId, code: mfaCode }),
+      });
+      const data = await res.json();
+      if (data.success && data.connected) {
+        setIsConnected(true);
+        setMfaSessionId(null);
+        setMfaCode('');
+      } else {
+        setConnectError(data.error || 'MFA verification failed');
+      }
+    } catch {
+      setConnectError('Network error during MFA verification');
+    } finally {
+      setIsConnecting(false);
+    }
+  }
+
   // Format last sync timestamp for display
   const lastSyncDisplay = syncStatus.lastSyncedAt
     ? new Date(syncStatus.lastSyncedAt).toLocaleString('en-US', {
@@ -164,8 +226,6 @@ export function HealthSettingsPanel({
         minute: '2-digit',
       })
     : null;
-
-  const isConnected = !!syncStatus.lastSyncedAt;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -403,10 +463,11 @@ export function HealthSettingsPanel({
         </div>
       </div>
 
-      {/* Garmin Sync Status */}
+      {/* Garmin Sync */}
       <div>
         <h3 className="text-sm font-semibold text-gray-700 mb-1">Garmin Sync</h3>
         <div className="bg-gray-50 rounded-lg p-4 space-y-3">
+          {/* Connection status */}
           <div className="flex items-center justify-between">
             <span className="text-sm text-gray-600">Status</span>
             {isConnected ? (
@@ -415,7 +476,7 @@ export function HealthSettingsPanel({
               </span>
             ) : (
               <span className="px-2 py-0.5 bg-gray-200 text-gray-500 rounded-full text-xs font-medium">
-                Not synced
+                Not connected
               </span>
             )}
           </div>
@@ -425,29 +486,83 @@ export function HealthSettingsPanel({
               {lastSyncDisplay ?? '—'}
             </span>
           </div>
-          {syncStatus.syncError && (
+
+          {/* Connection errors */}
+          {connectError && (
             <div className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">
-              Error: {syncStatus.syncError}
+              {connectError}
             </div>
           )}
-          <div className="pt-2 border-t border-gray-200">
-            <button
-              onClick={async () => {
-                if (!onSync || isSyncing) return;
-                setIsSyncing(true);
-                try {
-                  await onSync();
-                } catch {
-                  // error handled upstream
-                } finally {
-                  setIsSyncing(false);
-                }
-              }}
-              disabled={!onSync || isSyncing}
-              className="w-full py-2 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50"
-            >
-              {isSyncing ? 'Syncing...' : 'Sync Now'}
-            </button>
+          {syncStatus.syncError && (
+            <div className="text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">
+              Sync error: {syncStatus.syncError}
+            </div>
+          )}
+
+          {/* MFA code input (shown when Garmin requests MFA) */}
+          {mfaSessionId && (
+            <div className="bg-blue-50 rounded-lg p-3 space-y-2">
+              <p className="text-xs text-blue-700">
+                Garmin sent a verification code to your email. Enter it below:
+              </p>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="text"
+                  value={mfaCode}
+                  onChange={(e) => setMfaCode(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && mfaCode.length >= 4 && handleSubmitMFA()}
+                  placeholder="Enter code..."
+                  className="flex-1 px-3 py-1.5 border border-blue-200 rounded-lg text-sm text-center tracking-widest focus:outline-none focus:ring-1 focus:ring-blue-300"
+                  autoFocus
+                />
+                <button
+                  onClick={handleSubmitMFA}
+                  disabled={isConnecting || mfaCode.length < 4}
+                  className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
+                >
+                  {isConnecting ? 'Verifying...' : 'Verify'}
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Action buttons */}
+          <div className="pt-2 border-t border-gray-200 space-y-2">
+            {!garminConfigured && (
+              <p className="text-xs text-amber-600">
+                Set GARMIN_EMAIL and GARMIN_PASSWORD environment variables to enable sync.
+              </p>
+            )}
+
+            {garminConfigured && !isConnected && !mfaSessionId && (
+              <button
+                onClick={handleConnectGarmin}
+                disabled={isConnecting}
+                className="w-full py-2 text-sm bg-green-50 text-green-700 rounded-lg hover:bg-green-100 transition-colors disabled:opacity-50"
+              >
+                {isConnecting ? 'Connecting...' : 'Connect Garmin Account'}
+              </button>
+            )}
+
+            {isConnected && (
+              <button
+                onClick={async () => {
+                  if (!onSync || isSyncing) return;
+                  setIsSyncing(true);
+                  try {
+                    await onSync();
+                  } catch {
+                    // error handled upstream
+                  } finally {
+                    setIsSyncing(false);
+                  }
+                }}
+                disabled={!onSync || isSyncing}
+                className="w-full py-2 text-sm bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors disabled:opacity-50"
+              >
+                {isSyncing ? 'Syncing from Garmin...' : 'Sync Now'}
+              </button>
+            )}
           </div>
         </div>
       </div>

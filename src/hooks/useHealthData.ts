@@ -16,6 +16,8 @@ interface HealthData {
   averages: Record<string, number | null>;
   syncStatus: { lastSyncedAt: string; syncStatus: string; syncError: string | null };
   templates: HealthTemplates;
+  garminConfigured: boolean;
+  garminConnected: boolean;
   isLoading: boolean;
 }
 
@@ -27,6 +29,8 @@ export function useHealthData() {
     averages: {},
     syncStatus: { lastSyncedAt: '', syncStatus: 'idle', syncError: null },
     templates: { supplementTemplate: [], habitTemplate: [], environmentTemplate: { customFieldNames: [] } },
+    garminConfigured: false,
+    garminConnected: false,
     isLoading: true,
   });
 
@@ -47,6 +51,8 @@ export function useHealthData() {
         averages: garmin?.averages || {},
         syncStatus: garmin?.syncStatus || { lastSyncedAt: '', syncStatus: 'idle', syncError: null },
         templates: notes?.templates || prev.templates,
+        garminConfigured: garmin?.garminConfigured ?? false,
+        garminConnected: garmin?.garminConnected ?? false,
         isLoading: false,
       }));
     } catch (error) {
@@ -88,5 +94,48 @@ export function useHealthData() {
     return result;
   }, [loadData]);
 
-  return { ...data, loadData, logNote, updateTemplate };
+  const syncFromGarmin = useCallback(async (days: number = 7) => {
+    setData(prev => ({
+      ...prev,
+      syncStatus: { ...prev.syncStatus, syncStatus: 'syncing', syncError: null },
+    }));
+
+    try {
+      const response = await fetch('/api/garmin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'fetch-garmin', days }),
+      });
+
+      const result = await response.json();
+
+      if (!response.ok || !result.success) {
+        setData(prev => ({
+          ...prev,
+          syncStatus: {
+            lastSyncedAt: prev.syncStatus.lastSyncedAt,
+            syncStatus: 'error',
+            syncError: result.error || 'Sync failed',
+          },
+        }));
+        return result;
+      }
+
+      await loadData();
+      return result;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Network error';
+      setData(prev => ({
+        ...prev,
+        syncStatus: {
+          lastSyncedAt: prev.syncStatus.lastSyncedAt,
+          syncStatus: 'error',
+          syncError: message,
+        },
+      }));
+      return { success: false, error: message };
+    }
+  }, [loadData]);
+
+  return { ...data, loadData, syncFromGarmin, logNote, updateTemplate };
 }

@@ -20,8 +20,10 @@ const tabs: { id: TabId; label: string; icon: React.ReactNode }[] = [
 ];
 
 export function HealthIntelligenceDashboard() {
-  const { metrics, notes, latest, averages, syncStatus, templates, isLoading, loadData, logNote, updateTemplate } =
+  const { metrics, notes, latest, averages, syncStatus, templates, garminConfigured, garminConnected, isLoading, syncFromGarmin, logNote, updateTemplate } =
     useHealthData();
+
+  const isSyncing = syncStatus.syncStatus === 'syncing';
 
   const [activeTab, setActiveTab] = useState<TabId>('charts');
   const [timeRange, setTimeRange] = useState<number>(30);
@@ -77,16 +79,23 @@ export function HealthIntelligenceDashboard() {
 
           {/* Sync button */}
           <button
-            onClick={loadData}
-            disabled={isLoading}
+            onClick={() => syncFromGarmin(7)}
+            disabled={isSyncing}
             className="flex items-center gap-1.5 px-3 py-1.5 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-            title="Sync health data"
+            title="Sync health data from Garmin Connect"
           >
-            <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-            Sync
+            <RefreshCw className={`w-4 h-4 ${isSyncing ? 'animate-spin' : ''}`} />
+            {isSyncing ? 'Syncing...' : 'Sync'}
           </button>
         </div>
       </div>
+
+      {/* Sync error banner */}
+      {syncStatus.syncError && (
+        <div className="mb-4 text-xs text-red-500 bg-red-50 rounded-lg px-3 py-2">
+          Sync error: {syncStatus.syncError}
+        </div>
+      )}
 
       {/* Today Summary — always visible */}
       <TodaySummaryCard latest={latest} averages={averages} />
@@ -137,8 +146,10 @@ export function HealthIntelligenceDashboard() {
             <HealthSettingsPanel
               templates={templates}
               syncStatus={syncStatus}
+              garminConfigured={garminConfigured}
+              garminConnected={garminConnected}
               onUpdateTemplate={updateTemplate}
-              onSync={loadData}
+              onSync={() => syncFromGarmin(7)}
             />
           )}
         </>
