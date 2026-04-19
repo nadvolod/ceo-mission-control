@@ -51,6 +51,11 @@ async function getClientWithCachedTokens(): Promise<GarminConnect | null> {
  * The caller must then call `completeMFALogin(sessionId, code)` with the
  * code sent to the user's email.
  */
+// Track background login so MFA code submission can complete it
+let pendingLoginClient: GarminConnect | null = null;
+let pendingLoginPromise: Promise<void> | null = null;
+let pendingSessionId: string | null = null;
+
 export async function initiateGarminLogin(): Promise<{
   success: boolean;
   mfaRequired?: boolean;
@@ -70,31 +75,31 @@ export async function initiateGarminLogin(): Promise<{
     return { success: true };
   }
 
+  // Generate a unique session ID for MFA coordination
+  const sessionId = `mfa-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
   const client = new GarminConnect({
     username: email,
     password,
     mfa: { type: 'file', dir: '/tmp' },
   });
 
-  try {
-    await client.login(email, password);
-    // Login succeeded without MFA
+  // Start login with sessionId — the library will block at waitForMFACode(sessionId)
+  // This runs in the background; the MFA code submission unblocks it
+  pendingLoginClient = client;
+  pendingSessionId = sessionId;
+  pendingLoginPromise = client.login(email, password, sessionId).then(async () => {
     await saveTokens(client);
-    return { success: true };
-  } catch (err) {
-    const message = err instanceof Error ? err.message : String(err);
-    // Check if this is an MFA requirement
-    if (message.includes('MFA') || message.includes('验证')) {
-      // MFA is required — get the session ID from MFAManager
-      const mfaManager = MFAManager.getInstance({ type: 'file', dir: '/tmp' });
-      const sessions = await mfaManager.getActiveSessions();
-      if (sessions.length > 0) {
-        return { success: false, mfaRequired: true, sessionId: sessions[sessions.length - 1] };
-      }
-      return { success: false, mfaRequired: true, error: 'MFA required but no session created. Check Garmin credentials.' };
-    }
-    return { success: false, error: message };
-  }
+    console.log('Garmin: MFA login completed successfully');
+  }).catch((err) => {
+    console.error('Garmin: MFA login failed:', err);
+  });
+
+  // Give the login a moment to reach the MFA waiting point
+  await new Promise(resolve => setTimeout(resolve, 3000));
+
+  // The login is now blocking on waitForMFACode — tell the user to check email
+  return { success: false, mfaRequired: true, sessionId };
 }
 
 /**
@@ -104,34 +109,37 @@ export async function completeMFALogin(sessionId: string, code: string): Promise
   success: boolean;
   error?: string;
 }> {
-  const email = process.env.GARMIN_EMAIL;
-  const password = process.env.GARMIN_PASSWORD;
-
-  if (!email || !password) {
-    return { success: false, error: 'GARMIN_EMAIL and GARMIN_PASSWORD not configured' };
-  }
-
   try {
+    // Submit the MFA code — this unblocks the background login's waitForMFACode()
     const mfaManager = MFAManager.getInstance({ type: 'file', dir: '/tmp' });
-    await mfaManager.submitMFACode(sessionId, code);
+    const submitted = await mfaManager.submitMFACode(sessionId, code);
+    console.log('Garmin: MFA code submitted, result:', submitted);
 
-    // Wait briefly for the login to complete with the MFA code
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    // Wait for the background login promise to complete
+    if (pendingLoginPromise) {
+      await Promise.race([
+        pendingLoginPromise,
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Login timed out after MFA submission')), 20000)),
+      ]);
+    }
 
-    // Try to get tokens now
-    const client = new GarminConnect({
-      username: email,
-      password,
-      mfa: { type: 'file', dir: '/tmp' },
-    });
+    // Clean up
+    pendingLoginClient = null;
+    pendingLoginPromise = null;
+    pendingSessionId = null;
 
-    // Attempt login again — should complete now with MFA code submitted
-    await client.login(email, password, sessionId);
-    await saveTokens(client);
+    // Verify tokens were saved and work
+    const client = await getClientWithCachedTokens();
+    if (client) {
+      return { success: true };
+    }
 
-    return { success: true };
+    return { success: false, error: 'MFA accepted but login did not complete. Try connecting again.' };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
+    pendingLoginClient = null;
+    pendingLoginPromise = null;
+    pendingSessionId = null;
     return { success: false, error: `MFA verification failed: ${message}` };
   }
 }
