@@ -17,6 +17,12 @@ jest.mock('@/lib/auth', () => ({
   }),
 }));
 
+jest.mock('@/lib/garmin-client', () => ({
+  fetchGarminMetrics: jest.fn(),
+  initiateGarminLogin: jest.fn(),
+  completeMFALogin: jest.fn(),
+}));
+
 const mockLoadJSON = storage.loadJSON as jest.MockedFunction<typeof storage.loadJSON>;
 
 function makeRequest(method: string, body?: unknown, headers?: Record<string, string>): NextRequest {
