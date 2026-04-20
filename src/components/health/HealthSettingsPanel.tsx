@@ -66,6 +66,10 @@ export function HealthSettingsPanel({
   const [isConnected, setIsConnected] = useState(garminConnected ?? false);
 
   useEffect(() => {
+    setIsConnected(garminConnected ?? false);
+  }, [garminConnected]);
+
+  useEffect(() => {
     const stored = localStorage.getItem('garmin-training-threshold');
     if (stored !== null) {
       const parsed = parseInt(stored, 10);
@@ -192,7 +196,7 @@ export function HealthSettingsPanel({
   }
 
   async function handleSubmitMFA() {
-    if (!mfaSessionId || mfaCode.length < 4) return;
+    if (!mfaSessionId || !/^\d{6}$/.test(mfaCode)) return;
     setIsConnecting(true);
     setConnectError(null);
     try {
@@ -510,14 +514,14 @@ export function HealthSettingsPanel({
                   type="text"
                   value={mfaCode}
                   onChange={(e) => setMfaCode(e.target.value)}
-                  onKeyDown={(e) => e.key === 'Enter' && mfaCode.length >= 4 && handleSubmitMFA()}
+                  onKeyDown={(e) => e.key === 'Enter' && /^\d{6}$/.test(mfaCode) && handleSubmitMFA()}
                   placeholder="Enter code..."
                   className="flex-1 px-3 py-1.5 border border-blue-200 rounded-lg text-sm text-center tracking-widest focus:outline-none focus:ring-1 focus:ring-blue-300"
                   autoFocus
                 />
                 <button
                   onClick={handleSubmitMFA}
-                  disabled={isConnecting || mfaCode.length < 4}
+                  disabled={isConnecting || !/^\d{6}$/.test(mfaCode)}
                   className="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50"
                 >
                   {isConnecting ? 'Verifying...' : 'Verify'}

@@ -101,10 +101,20 @@ export function useHealthData() {
     }));
 
     try {
+      // Read training threshold from localStorage (set in Settings panel)
+      const storedThreshold = typeof window !== 'undefined'
+        ? localStorage.getItem('garmin-training-threshold')
+        : null;
+      const trainingThreshold = storedThreshold ? parseInt(storedThreshold, 10) : undefined;
+
       const response = await fetch('/api/garmin', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'fetch-garmin', days }),
+        body: JSON.stringify({
+          action: 'fetch-garmin',
+          days,
+          ...(trainingThreshold && trainingThreshold > 0 ? { trainingThreshold } : {}),
+        }),
       });
 
       const result = await response.json();

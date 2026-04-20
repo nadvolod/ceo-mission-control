@@ -42,7 +42,7 @@ const config = {
 module.exports = async () => {
   const jestConfig = await createJestConfig(config)()
   jestConfig.transformIgnorePatterns = [
-    '/node_modules/(?!(monarch-money-api|graphql-request|node-fetch|data-uri-to-buffer|fetch-blob|formdata-polyfill|form-data)/)',
+    '/node_modules/(?!(monarch-money-api|graphql-request|node-fetch|data-uri-to-buffer|fetch-blob|formdata-polyfill|form-data|@gooin\\/garmin-connect)/)',
   ]
   return jestConfig
 }

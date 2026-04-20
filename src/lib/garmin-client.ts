@@ -52,9 +52,7 @@ async function getClientWithCachedTokens(): Promise<GarminConnect | null> {
  * code sent to the user's email.
  */
 // Track background login so MFA code submission can complete it
-let pendingLoginClient: GarminConnect | null = null;
 let pendingLoginPromise: Promise<void> | null = null;
-let pendingSessionId: string | null = null;
 
 export async function initiateGarminLogin(): Promise<{
   success: boolean;
@@ -86,8 +84,6 @@ export async function initiateGarminLogin(): Promise<{
 
   // Start login with sessionId — the library will block at waitForMFACode(sessionId)
   // This runs in the background; the MFA code submission unblocks it
-  pendingLoginClient = client;
-  pendingSessionId = sessionId;
   pendingLoginPromise = client.login(email, password, sessionId).then(async () => {
     await saveTokens(client);
     console.log('Garmin: MFA login completed successfully');
@@ -124,9 +120,7 @@ export async function completeMFALogin(sessionId: string, code: string): Promise
     }
 
     // Clean up
-    pendingLoginClient = null;
     pendingLoginPromise = null;
-    pendingSessionId = null;
 
     // Verify tokens were saved and work
     const client = await getClientWithCachedTokens();
@@ -137,9 +131,7 @@ export async function completeMFALogin(sessionId: string, code: string): Promise
     return { success: false, error: 'MFA accepted but login did not complete. Try connecting again.' };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    pendingLoginClient = null;
     pendingLoginPromise = null;
-    pendingSessionId = null;
     return { success: false, error: `MFA verification failed: ${message}` };
   }
 }
@@ -280,23 +272,29 @@ export async function fetchGarminMetrics(days: number): Promise<{
     };
   }
 
+  // Use local date to match what the user sees in Garmin Connect
   const now = new Date();
+  const localDateStr = (d: Date) => {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+  };
   const metrics: GarminDayMetrics[] = [];
 
   for (let i = days - 1; i >= 0; i--) {
     const date = new Date(now);
     date.setDate(date.getDate() - i);
-    const dateStr = date.toISOString().slice(0, 10);
+    const dateStr = localDateStr(date);
 
     console.log(`Garmin: fetching ${dateStr} ...`);
 
-    const [sleep, hr, stressSteps, bodyBattery, weight] = await Promise.all([
-      fetchSleep(client, date),
-      fetchHeartRate(client, date),
-      fetchStressAndSteps(client, dateStr),
-      fetchBodyBattery(client, dateStr),
-      fetchWeight(client, dateStr),
-    ]);
+    // Sequential fetches to avoid Garmin 429 rate limiting
+    const sleep = await fetchSleep(client, date);
+    const hr = await fetchHeartRate(client, date);
+    const stressSteps = await fetchStressAndSteps(client, dateStr);
+    const bodyBattery = await fetchBodyBattery(client, dateStr);
+    const weight = await fetchWeight(client, dateStr);
 
     const dayMetrics: GarminDayMetrics = {
       date: dateStr,

@@ -20,7 +20,10 @@ export async function GET() {
       averages: garmin.getAverages(7),
       syncStatus: garmin.getSyncStatus(),
       garminConfigured: !!(process.env.GARMIN_EMAIL && process.env.GARMIN_PASSWORD),
-      garminConnected: !!(await loadJSON('garmin-tokens.json', null)),
+      garminConnected: await (async () => {
+        const tokens = await loadJSON<{ oauth1?: unknown; oauth2?: unknown } | null>('garmin-tokens.json', null);
+        return !!(tokens?.oauth1 && tokens?.oauth2);
+      })(),
       notes: notes.getAllData().notes,
       templates: notes.getTemplates(),
       timestamp: new Date().toISOString(),
@@ -92,11 +95,11 @@ export async function POST(request: NextRequest) {
         if (result.success) {
           return NextResponse.json({ success: true, connected: true });
         }
-        return NextResponse.json({ success: false, error: result.error }, { status: 401 });
+        return NextResponse.json({ success: false, error: result.error }, { status: 400 });
       }
 
       case 'fetch-garmin': {
-        const days = typeof data.days === 'number' && data.days > 0 && data.days <= 90
+        const days = typeof data.days === 'number' && data.days > 0 && data.days <= 30
           ? data.days
           : 7;
 

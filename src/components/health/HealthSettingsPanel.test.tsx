@@ -45,6 +45,8 @@ const baseSyncStatus = {
 const baseProps = {
   templates: baseTemplates,
   syncStatus: baseSyncStatus,
+  garminConfigured: true,
+  garminConnected: true,
   onUpdateTemplate: jest.fn().mockResolvedValue({ success: true }),
   onSync: jest.fn(),
 };
@@ -148,21 +150,47 @@ describe('HealthSettingsPanel — Sync Button', () => {
 
   // --- Positive: displays sync status information ---
 
-  it('shows "Connected" status when lastSyncedAt is present', () => {
-    render(<HealthSettingsPanel {...baseProps} />);
+  it('shows "Connected" status when garminConnected is true', () => {
+    render(<HealthSettingsPanel {...baseProps} garminConnected={true} />);
 
     expect(screen.getByText('Connected')).toBeInTheDocument();
   });
 
-  it('shows "Not synced" status when lastSyncedAt is empty', () => {
-    const noSyncStatus = {
-      lastSyncedAt: '',
-      syncStatus: 'idle',
-      syncError: null,
-    };
+  it('shows "Not connected" status when garminConnected is false', () => {
+    render(
+      <HealthSettingsPanel
+        {...baseProps}
+        garminConnected={false}
+        syncStatus={{ lastSyncedAt: '', syncStatus: 'idle', syncError: null }}
+      />
+    );
 
-    render(<HealthSettingsPanel {...baseProps} syncStatus={noSyncStatus} />);
+    expect(screen.getByText('Not connected')).toBeInTheDocument();
+  });
 
-    expect(screen.getByText('Not synced')).toBeInTheDocument();
+  // --- Connect button shows when not connected ---
+
+  it('shows Connect Garmin Account button when not connected', () => {
+    render(
+      <HealthSettingsPanel
+        {...baseProps}
+        garminConfigured={true}
+        garminConnected={false}
+      />
+    );
+
+    expect(screen.getByRole('button', { name: /connect garmin/i })).toBeInTheDocument();
+  });
+
+  it('shows env var warning when garminConfigured is false', () => {
+    render(
+      <HealthSettingsPanel
+        {...baseProps}
+        garminConfigured={false}
+        garminConnected={false}
+      />
+    );
+
+    expect(screen.getByText(/GARMIN_EMAIL/)).toBeInTheDocument();
   });
 });
