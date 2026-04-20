@@ -165,8 +165,11 @@ describe('GarminTracker', () => {
   describe('getAverages', () => {
     it('computes 7-day rolling averages', async () => {
       const metrics: Record<string, GarminDayMetrics> = {};
+      const now = new Date();
       for (let i = 0; i < 7; i++) {
-        const d = `2026-04-${String(7 + i).padStart(2, '0')}`;
+        const dt = new Date(now);
+        dt.setDate(dt.getDate() - (6 - i));
+        const d = dt.toISOString().slice(0, 10);
         metrics[d] = makeMetrics({ date: d, sleepScore: 70 + i * 2 });
       }
       mockLoadJSON.mockResolvedValue({
