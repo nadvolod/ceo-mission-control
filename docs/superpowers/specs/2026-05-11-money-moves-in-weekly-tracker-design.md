@@ -125,20 +125,87 @@ interface WeeklyPerformanceTrackerProps {
 
 ## Testing
 
-Per repo rules, integration tests should outnumber unit tests; E2E must exercise real functionality (no visibility-only).
+Per repo rules: integration tests should outnumber unit tests; E2E must exercise real functionality (no visibility-only); the majority of tests hit real storage / API with no mocking; test data is cleaned up rather than mocked away.
 
-- **Unit / component tests** (`src/components/WeeklyPerformanceTracker.test.tsx`)
-  - Renders Net Today card with correct value and breakdown.
-  - Renders day-grid `$` value per day, color reflects sign.
-  - Hovering a day's `$` reveals that day's entries; focused day reveals the same.
-  - "Add Money Move" form: submits with each category, calls `onAddFinancialEntry` with the right args, collapses on success, shows the success line.
-  - Weekly Net Impact card pulls from `weekFinancialTotals`, not from any review-form value.
-  - Trends dual-axis chart renders both series when both have data; renders only deep work when financial trend is empty.
-- **Integration tests** (`src/__tests__/integration/api.integration.test.ts`)
-  - `POST /api/financial` followed by reloading dashboard data: tracker receives the new entry; weekly totals reflect it.
-- **E2E (Playwright)** — add at least one new test to keep the suite ≥ 5:
-  - User logs a money move via the tracker → page reloads → Net Today card updates → day's `$` value appears in the grid → hovering reveals the entry description.
-- **Test data cleanup**: tests write to a temp data dir per existing convention; no mocking of `financial-tracker`.
+### Calculation tests (the highest-value layer)
+
+The aggregation math is the part most likely to regress silently and the cheapest to test thoroughly. These run as pure-library tests in `src/lib/financial-tracker.test.ts` (new) — no React, no API, just `FinancialTracker` and a temp data dir.
+
+**Daily total / `netImpact`**
+
+- Empty day → `{ moved: 0, generated: 0, cut: 0, netImpact: 0 }`.
+- Single entry per category → totals reflect that single value; the other two categories stay `0`.
+- Multiple entries in the same category on the same day sum correctly (e.g., three `cut` entries of `100`, `50`, `25` → `cut: 175`).
+- All three categories on the same day → `netImpact` equals the sum of the three category totals exactly.
+- Decimal amounts (cents): `49.99 + 0.01 + 100.00 → 150.00` exactly. Use `Math.round((a + b) * 100) / 100` semantics or a cent-based integer accumulator inside `recalculateTotals` to avoid `0.1 + 0.2 === 0.30000000000000004` drift. **This is a behavior change**: add an explicit test that proves the result is `150` and not `149.99…` or `150.00000…1`.
+- Large amounts (e.g., `1_500_000`) sum without precision loss.
+- Zero-amount entry is rejected by `addEntry` (today the function would store it; the new contract requires `amount > 0` and throws / returns an error). New test asserts the rejection.
+- Removing an entry (if/when supported) recomputes totals correctly — out of scope here; left as a TODO if delete support is added later.
+
+**Weekly totals (`getWeeklyTotals` / `getDailyMetricsForWeek`)**
+
+- No entries anywhere in the week → all four totals `0`; `getDailyMetricsForWeek` returns a length-7 array of empty `DailyFinancialMetrics`, one per Mon–Sun.
+- Sparse week (only Wednesday has entries) → array length still 7; only index 2 (Wed) has non-empty entries; weekly totals equal the Wednesday totals.
+- Full week of entries → weekly totals equal the sum across all 7 daily totals.
+- Week starts on Monday (`weekStartDate` matches `currentWeekSummary.weekStartDate`). An entry timestamped on the prior Sunday is **not** in the current week; an entry timestamped on the upcoming Sunday **is**.
+- Week spanning a month boundary (e.g., Mon Apr 28 → Sun May 4): all seven days included; totals correct.
+- Week spanning a year boundary (Dec 29 → Jan 4): same — verify no off-by-one.
+- DST transition week (US spring-forward and fall-back): seven entries on seven calendar days still produce length-7 array with correct day indexing.
+
+**Previous-week totals & week-over-week**
+
+- No previous week data → `previousWeekFinancialTotals` returns all `0`s; the WoW row in the UI shows `$0 → $X`.
+- Previous week `0`, current `> 0` → delta positive, "better" flag true.
+- Previous week `> 0`, current `0` → delta negative, "better" flag false.
+- Both zero → delta `0`, neutral (not flagged red).
+- Identical totals → delta `0`, "better" defaults to true (matches existing `>=` convention in `ComparisonRow`).
+
+**30-day trend (`getDailyMetricsForRange`)**
+
+- Range with no entries → returns 30 entries (one per day), each empty.
+- Range with sparse entries (only 3 of 30 days have data) → all 30 days present; gap days are zero-filled.
+- Range whose end date is "today" includes today's partial entries.
+- Range that crosses a month boundary still produces contiguous, in-order daily metrics.
+
+**Trends-tab derived stats**
+
+- **Avg net/day** over 30 days: when only 5 days have entries, the average is `sum / 30` (not `sum / 5`) — anchor the denominator decision in a test so it can't drift silently. (Decision: divide by **days in range**, not days with entries, because empty days are real zero-impact days.)
+- **Best money day**: returns the date and value of the single max `netImpact`. Ties broken by **earliest date** (deterministic, easy to reason about). Test both a no-tie case and a tie case.
+- Empty trend window → Avg net/day is `0`, Best money day is `null` (UI renders `—`).
+
+**Format / display**
+
+- Currency formatter rendering: `0 → $0`, `1234 → $1,234`, `1500 → $1,500` (no K-collapse below 10k for tracker context — different from the dashboard's `formatCurrency` which uses K at 1k). Pin this in a test; the new formatter lives next to the component.
+- Sign color logic: `> 0 → green`, `< 0 → red`, `=== 0 → gray` — tested at the component layer once the formatter is verified at the lib layer.
+
+### Component tests (`src/components/WeeklyPerformanceTracker.test.tsx`)
+
+- Renders Net Today card with correct value and the three-category breakdown line.
+- Renders day-grid `$` value per day; color class reflects sign per the rules above.
+- Hovering a day's `$` reveals that day's entries; keyboard focus on the same target reveals the same popover. Empty-day popover shows "No moves logged".
+- "Add Money Move" form: clicking each of the three category buttons preselects that category; submitting calls `onAddFinancialEntry(category, amount, description)` with the exact args; form collapses on success; success line renders for ~2s.
+- Invalid input (empty description, `0`, negative) keeps the Submit button disabled or surfaces inline errors; `onAddFinancialEntry` is not called.
+- Weekly Net Impact card pulls from `weekFinancialTotals`, not from any review-form value (regression guard against the old Revenue field path).
+- Trends dual-axis chart renders both series when both have data; renders only deep work when financial trend is all zeros; renders empty state when both are empty.
+
+### Integration tests (`src/__tests__/integration/api.integration.test.ts`)
+
+Real DB / real API — no mocks. The point is that the math survives the round-trip.
+
+- `POST /api/financial` for three categories on the same day, then `GET` the dashboard data: today's totals match the sums; daily metrics for the week reflect the new entry; weekly Net Impact equals the sum of all three.
+- Two `POST`s for different days within the same week: weekly totals equal the sum across days; per-day metrics are isolated to their dates.
+- `POST` an entry timestamped at 23:59 on Sunday vs. 00:01 on Monday: the entries land in the correct week. (Use explicit date strings, not "now".)
+- Reload after server restart: stored entries survive; aggregations are identical (proves recalculation is deterministic, not stateful).
+
+### E2E (Playwright)
+
+Must exercise real functionality. Maintain the existing ≥ 5 count; this change adds at least one new test:
+
+- User logs a money move via the tracker → page reloads → Net Today card updates with the new sum → that day's `$` value appears in the grid → hovering / focusing the `$` reveals the entry's description.
+
+### Test data cleanup
+
+Tests write to a temp data dir per existing convention (`workspace-reader` pattern). After each test, the dir is removed. No mocking of `financial-tracker` — real storage, real reads, real reads-after-writes.
 
 ## Migration / backward compatibility
 
