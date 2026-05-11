@@ -16,10 +16,15 @@
 
 - **Week start**: Monday. Use `startOfWeek(date, { weekStartsOn: 1 })` from `date-fns`, matching `weekly-tracker.ts`.
 - **Date keys**: `YYYY-MM-DD` strings, local time (not UTC) — matches existing code at `useDashboardData.ts:152`.
-- **Cent arithmetic**: every sum runs through `centSum(values: number[]) => number` which converts each value to integer cents (`Math.round(v * 100)`), sums, divides by 100. Avoids `0.1 + 0.2` drift.
-- **Test runner**: Vitest. Run with `pnpm vitest run <path>` for a single file.
-- **E2E runner**: Playwright. Run with `pnpm playwright test`.
-- **No mocks** for storage / API in integration / E2E tests. Use real `financial-tracker` against a temp data dir (existing convention).
+- **Cent arithmetic**: every sum runs through a private `centSum(values: number[]) => number` helper that converts each value to integer cents (`Math.round(v * 100)`), sums, divides by 100. Avoids `0.1 + 0.2` drift.
+- **Package manager**: `npm` (no pnpm-lock present). Use `npm test -- <args>`, `npm run lint`, `npm run build`.
+- **Test runner**: **Jest** (not Vitest). The repo's convention is to mock `./storage` with `jest.mock('./storage', …)` exposing a `_reset()` helper — see `src/lib/weekly-tracker.test.ts:1-19` for the canonical pattern. When the plan shows `vitest` / `vi.fn()` / `vitest` imports, substitute:
+  - `vi.fn()` → `jest.fn()`
+  - `import { describe, expect, it, beforeEach, afterEach, vi } from 'vitest';` → drop the import (jest globals) and use the storage-mock pattern from `weekly-tracker.test.ts` for any test that touches persisted data.
+  - Run a single file: `npx jest <path>` or `npm test -- <path>`.
+  - Filter by name: `npx jest <path> -t "<pattern>"`.
+- **E2E runner**: Playwright. Run with `npm run test:e2e:playwright`.
+- **For library tests** (e.g. `financial-tracker.test.ts`): mirror `weekly-tracker.test.ts`'s storage-mock pattern verbatim. Do **not** use a temp `DATA_DIR` — that's not how this repo's tests work.
 
 ---
 
