@@ -272,4 +272,20 @@ describe('WeeklyPerformanceTracker - Per-day money line', () => {
     expect(dayCells[2].className).toMatch(/text-emerald|text-green/);
     expect(dayCells[0]).toHaveTextContent('—');
   });
+
+  it('hovering a populated day money cell reveals its entries', async () => {
+    const user = userEvent.setup();
+    const week = Array.from({ length: 7 }, (_, i) => ({
+      date: `2026-05-${String(11 + i).padStart(2, '0')}`,
+      entries: i === 2 ? [{
+        id: 'wed', category: 'cut' as const, amount: 150,
+        description: 'storage units', timestamp: '2026-05-13T10:00:00Z',
+      }] : [],
+      totals: { moved: 0, generated: 0, cut: i === 2 ? 150 : 0, netImpact: i === 2 ? 150 : 0 },
+    }));
+    render(<WeeklyPerformanceTracker {...baseProps} weekFinancialByDay={week} />);
+    const wed = screen.getByTestId('day-money-2');
+    await user.hover(wed);
+    expect(screen.getByText('storage units')).toBeInTheDocument();
+  });
 });

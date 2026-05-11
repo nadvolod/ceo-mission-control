@@ -11,6 +11,7 @@ import {
 } from 'recharts';
 import type { PerformanceDayEntry, WeeklySummary, WeeklyReview, FocusCategory } from '@/lib/types';
 import type { DailyFinancialMetrics } from '@/lib/financial-tracker';
+import { MoneyMovePopover } from './MoneyMovePopover';
 
 type FinancialTotals = { moved: number; generated: number; cut: number; netImpact: number };
 
@@ -706,15 +707,17 @@ export function WeeklyPerformanceTracker({
                         const net = fin?.totals.netImpact ?? 0;
                         const hasData = fin && fin.entries.length > 0;
                         return (
-                          <div
-                            data-testid={`day-money-${i}`}
-                            tabIndex={hasData ? 0 : -1}
-                            className={`mt-1 text-xs font-medium ${
-                              !hasData ? 'text-gray-300' : net > 0 ? 'text-emerald-600' : net < 0 ? 'text-red-600' : 'text-gray-500'
-                            }`}
-                          >
-                            {hasData ? formatCurrency(net) : '—'}
-                          </div>
+                          <MoneyMovePopover entries={fin?.entries ?? []}>
+                            <div
+                              data-testid={`day-money-${i}`}
+                              tabIndex={hasData ? 0 : -1}
+                              className={`mt-1 text-xs font-medium ${
+                                !hasData ? 'text-gray-300' : net > 0 ? 'text-emerald-600' : net < 0 ? 'text-red-600' : 'text-gray-500'
+                              }`}
+                            >
+                              {hasData ? formatCurrency(net) : '—'}
+                            </div>
+                          </MoneyMovePopover>
                         );
                       })()}
                     </div>
