@@ -95,8 +95,8 @@ export function WeeklyPerformanceTracker({
   todaysFocusTotal = 0,
   todaysFinancial,
   weekFinancialByDay,
-  weekFinancialTotals: _weekFinancialTotals,
-  previousWeekFinancialTotals: _previousWeekFinancialTotals,
+  weekFinancialTotals,
+  previousWeekFinancialTotals,
   dailyFinancialTrend: _dailyFinancialTrend,
   onAddFinancialEntry,
 }: WeeklyPerformanceTrackerProps) {
@@ -764,16 +764,14 @@ export function WeeklyPerformanceTracker({
           <div className="space-y-6">
             {/* Metric Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="p-4 bg-green-50 rounded-lg">
-                <p className="text-sm font-medium text-gray-600">Revenue</p>
-                <p className="text-2xl font-bold text-green-700">
-                  ${currentWeekSummary.revenue.toLocaleString()}
+              <div className="p-4 bg-emerald-50 rounded-lg">
+                <p className="text-sm font-medium text-gray-600">Net Impact</p>
+                <p data-testid="weekly-net-impact" className="text-2xl font-bold text-emerald-700">
+                  {formatCurrency(weekFinancialTotals.netImpact)}
                 </p>
-                {previousWeekSummary.revenue > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Last week: ${previousWeekSummary.revenue.toLocaleString()}
-                  </p>
-                )}
+                <p data-testid="weekly-net-impact-prev" className="text-xs text-gray-500 mt-1">
+                  Last week: {formatCurrency(previousWeekFinancialTotals.netImpact)}
+                </p>
               </div>
               <div className="p-4 bg-purple-50 rounded-lg">
                 <p className="text-sm font-medium text-gray-600">Pipeline Total</p>
@@ -807,6 +805,22 @@ export function WeeklyPerformanceTracker({
               </div>
             </div>
 
+            {/* Money Category Cards */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="p-3 bg-blue-50 rounded-lg text-center">
+                <p className="text-xs text-gray-600">Moved</p>
+                <p data-testid="weekly-moved" className="text-lg font-bold text-blue-700">{formatCurrency(weekFinancialTotals.moved)}</p>
+              </div>
+              <div className="p-3 bg-emerald-50 rounded-lg text-center">
+                <p className="text-xs text-gray-600">Generated</p>
+                <p data-testid="weekly-generated" className="text-lg font-bold text-emerald-700">{formatCurrency(weekFinancialTotals.generated)}</p>
+              </div>
+              <div className="p-3 bg-purple-50 rounded-lg text-center">
+                <p className="text-xs text-gray-600">Cut</p>
+                <p data-testid="weekly-cut" className="text-lg font-bold text-purple-700">{formatCurrency(weekFinancialTotals.cut)}</p>
+              </div>
+            </div>
+
             {/* Days Summary */}
             <div className="grid grid-cols-3 gap-3">
               <div className="text-center p-3 rounded-lg bg-gray-50">
@@ -836,6 +850,12 @@ export function WeeklyPerformanceTracker({
                   <ComparisonRow label="Pipeline" current={`${currentWeekSummary.pipelineTotal}`} previous={`${previousWeekSummary.pipelineTotal}`} better={currentWeekSummary.pipelineTotal >= previousWeekSummary.pipelineTotal} />
                   <ComparisonRow label="Consistency" current={`${currentWeekSummary.consistencyScore}%`} previous={`${previousWeekSummary.consistencyScore}%`} better={currentWeekSummary.consistencyScore >= previousWeekSummary.consistencyScore} />
                   <ComparisonRow label="Good Days" current={`${currentWeekSummary.goodDays}`} previous={`${previousWeekSummary.goodDays}`} better={currentWeekSummary.goodDays >= previousWeekSummary.goodDays} />
+                  <ComparisonRow
+                    label="Net Impact"
+                    current={formatCurrency(weekFinancialTotals.netImpact)}
+                    previous={formatCurrency(previousWeekFinancialTotals.netImpact)}
+                    better={weekFinancialTotals.netImpact >= previousWeekFinancialTotals.netImpact}
+                  />
                 </div>
               </div>
             )}

@@ -1,4 +1,4 @@
-import { render, screen, act, waitFor } from '@testing-library/react';
+import { render, screen, act, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { WeeklyPerformanceTracker } from './WeeklyPerformanceTracker';
 import type { DailyFinancialMetrics } from '@/lib/financial-tracker';
@@ -287,5 +287,23 @@ describe('WeeklyPerformanceTracker - Per-day money line', () => {
     const wed = screen.getByTestId('day-money-2');
     await user.hover(wed);
     expect(screen.getByText('storage units')).toBeInTheDocument();
+  });
+});
+
+describe('WeeklyPerformanceTracker - Weekly Net Impact', () => {
+  it('weekly Net Impact card uses weekFinancialTotals, not review revenue', () => {
+    render(
+      <WeeklyPerformanceTracker
+        {...baseProps}
+        weekFinancialTotals={{ moved: 100, generated: 250, cut: 50, netImpact: 400 }}
+        previousWeekFinancialTotals={{ moved: 0, generated: 100, cut: 0, netImpact: 100 }}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^Weekly$/i }));
+    expect(screen.getByTestId('weekly-net-impact')).toHaveTextContent('$400');
+    expect(screen.getByTestId('weekly-net-impact-prev')).toHaveTextContent('$100');
+    expect(screen.getByTestId('weekly-moved')).toHaveTextContent('$100');
+    expect(screen.getByTestId('weekly-generated')).toHaveTextContent('$250');
+    expect(screen.getByTestId('weekly-cut')).toHaveTextContent('$50');
   });
 });
