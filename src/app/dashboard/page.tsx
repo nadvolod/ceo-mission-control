@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { TaskDashboard } from '@/components/TaskDashboard';
 import { FocusOptimization } from '@/components/FocusOptimization';
 import { MissionTracker } from '@/components/MissionTracker';
-import { FinancialMetricsDashboard } from '@/components/FinancialMetricsDashboard';
 import { FinancialCommandCenter } from '@/components/FinancialCommandCenter';
 import { WeeklyPerformanceTracker } from '@/components/WeeklyPerformanceTracker';
 import { MonthlyReviewTracker } from '@/components/MonthlyReviewTracker';
@@ -111,19 +110,6 @@ export default function HomePage() {
         {/* Dashboard Tab - Daily items */}
         {activeTab === 'dashboard' && (
           <>
-            {/* Financial Impact Tracking */}
-            {financialData && (
-              <div className="mb-8">
-                <FinancialMetricsDashboard
-                  todaysMetrics={financialData.todaysMetrics}
-                  weeklyTotals={financialData.weeklyTotals}
-                  monthlyTotals={financialData.monthlyTotals}
-                  recentEntries={financialData.recentEntries}
-                  onAddEntry={handleAddFinancialEntry}
-                />
-              </div>
-            )}
-
             {/* Weekly Performance Tracker */}
             {weeklyTrackerData && (
               <div className="mb-8">
