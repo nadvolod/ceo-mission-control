@@ -79,20 +79,23 @@ export class FinancialTracker {
     return entry;
   }
 
+  /** Sums monetary values via integer cents to avoid float drift (0.1 + 0.2 !== 0.3). */
+  private centSum(values: number[]): number {
+    const cents = values.reduce((acc, v) => acc + Math.round(v * 100), 0);
+    return cents / 100;
+  }
+
   private recalculateTotals(date: string): void {
     const dayMetrics = this.data.dailyMetrics[date];
     if (!dayMetrics) return;
 
-    const totals = { moved: 0, generated: 0, cut: 0, netImpact: 0 };
-
-    dayMetrics.entries.forEach(entry => {
-      totals[entry.category] += entry.amount;
-    });
-
+    const moved = this.centSum(dayMetrics.entries.filter(e => e.category === 'moved').map(e => e.amount));
+    const generated = this.centSum(dayMetrics.entries.filter(e => e.category === 'generated').map(e => e.amount));
+    const cut = this.centSum(dayMetrics.entries.filter(e => e.category === 'cut').map(e => e.amount));
     // Net impact = money moved + revenue generated + expenses cut
-    totals.netImpact = totals.moved + totals.generated + totals.cut;
+    const netImpact = this.centSum([moved, generated, cut]);
 
-    dayMetrics.totals = totals;
+    dayMetrics.totals = { moved, generated, cut, netImpact };
   }
 
   getTodaysMetrics(): DailyFinancialMetrics {
