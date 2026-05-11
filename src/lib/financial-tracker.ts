@@ -1,3 +1,4 @@
+import { addDays, format } from 'date-fns';
 import { loadJSON, saveJSON } from './storage';
 
 export class FinancialValidationError extends Error {
@@ -120,6 +121,23 @@ export class FinancialTracker {
       entries: [],
       totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 }
     };
+  }
+
+  /**
+   * Returns a length-7 array of DailyFinancialMetrics, one per day from
+   * `weekStartDate` (Monday, YYYY-MM-DD) through the following Sunday inclusive.
+   * Days with no recorded entries return zero-filled placeholders.
+   */
+  getDailyMetricsForWeek(weekStartDate: string): DailyFinancialMetrics[] {
+    const start = new Date(`${weekStartDate}T12:00:00`);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = format(addDays(start, i), 'yyyy-MM-dd');
+      return this.data.dailyMetrics[d] ?? {
+        date: d,
+        entries: [],
+        totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 },
+      };
+    });
   }
 
   getWeeklyTotals(): { moved: number; generated: number; cut: number; netImpact: number } {

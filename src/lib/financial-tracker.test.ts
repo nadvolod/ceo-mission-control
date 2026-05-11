@@ -151,3 +151,108 @@ describe('FinancialTracker.addEntry (input validation)', () => {
     expect(data.dailyMetrics[DATE].entries[0].description).toBe('hello world');
   });
 });
+
+describe('FinancialTracker.getDailyMetricsForWeek', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    storage._reset();
+  });
+
+  it('returns 7 zero-filled days for an empty week starting 2026-05-11', async () => {
+    const tracker = await FinancialTracker.create();
+    const result = tracker.getDailyMetricsForWeek('2026-05-11');
+
+    expect(result).toHaveLength(7);
+    const expectedDates = [
+      '2026-05-11',
+      '2026-05-12',
+      '2026-05-13',
+      '2026-05-14',
+      '2026-05-15',
+      '2026-05-16',
+      '2026-05-17',
+    ];
+    result.forEach((day, i) => {
+      expect(day.date).toBe(expectedDates[i]);
+      expect(day.entries).toEqual([]);
+      expect(day.totals).toEqual({ moved: 0, generated: 0, cut: 0, netImpact: 0 });
+    });
+  });
+
+  it('returns 7 days for a sparse week with entries only on Wednesday at index 2', async () => {
+    const tracker = await FinancialTracker.create();
+    await tracker.addEntry('generated', 100, 'wed revenue', '2026-05-13');
+
+    const result = tracker.getDailyMetricsForWeek('2026-05-11');
+
+    expect(result).toHaveLength(7);
+    expect(result[2].date).toBe('2026-05-13');
+    expect(result[2].entries).toHaveLength(1);
+    expect(result[2].entries[0].description).toBe('wed revenue');
+    expect(result[2].totals.generated).toBe(100);
+    expect(result[2].totals.netImpact).toBe(100);
+
+    // All other days are empty placeholders
+    [0, 1, 3, 4, 5, 6].forEach((i) => {
+      expect(result[i].entries).toEqual([]);
+      expect(result[i].totals).toEqual({ moved: 0, generated: 0, cut: 0, netImpact: 0 });
+    });
+  });
+
+  it('excludes the previous Sunday (2026-05-10) and includes the upcoming Sunday (2026-05-17)', async () => {
+    const tracker = await FinancialTracker.create();
+    await tracker.addEntry('moved', 500, 'prev sunday', '2026-05-10');
+    await tracker.addEntry('cut', 75, 'sunday cut', '2026-05-17');
+
+    const result = tracker.getDailyMetricsForWeek('2026-05-11');
+
+    expect(result).toHaveLength(7);
+    expect(result.map((d) => d.date)).toEqual([
+      '2026-05-11',
+      '2026-05-12',
+      '2026-05-13',
+      '2026-05-14',
+      '2026-05-15',
+      '2026-05-16',
+      '2026-05-17',
+    ]);
+    // Previous Sunday entry is excluded — no day in the result contains 'prev sunday'
+    const allDescriptions = result.flatMap((d) => d.entries.map((e) => e.description));
+    expect(allDescriptions).not.toContain('prev sunday');
+
+    // Upcoming Sunday entry sits at index 6
+    expect(result[6].date).toBe('2026-05-17');
+    expect(result[6].entries).toHaveLength(1);
+    expect(result[6].entries[0].description).toBe('sunday cut');
+    expect(result[6].totals.cut).toBe(75);
+  });
+
+  it('handles a month boundary: week starting 2026-04-27 spans April 27 through May 3', async () => {
+    const tracker = await FinancialTracker.create();
+    await tracker.addEntry('generated', 200, 'apr 30 entry', '2026-04-30');
+    await tracker.addEntry('moved', 1000, 'may 3 entry', '2026-05-03');
+
+    const result = tracker.getDailyMetricsForWeek('2026-04-27');
+
+    expect(result).toHaveLength(7);
+    expect(result.map((d) => d.date)).toEqual([
+      '2026-04-27',
+      '2026-04-28',
+      '2026-04-29',
+      '2026-04-30',
+      '2026-05-01',
+      '2026-05-02',
+      '2026-05-03',
+    ]);
+
+    expect(result[3].date).toBe('2026-04-30');
+    expect(result[3].entries).toHaveLength(1);
+    expect(result[3].entries[0].description).toBe('apr 30 entry');
+    expect(result[3].totals.generated).toBe(200);
+
+    expect(result[6].date).toBe('2026-05-03');
+    expect(result[6].entries).toHaveLength(1);
+    expect(result[6].entries[0].description).toBe('may 3 entry');
+    expect(result[6].totals.moved).toBe(1000);
+  });
+});
