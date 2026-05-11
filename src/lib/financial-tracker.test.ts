@@ -256,3 +256,80 @@ describe('FinancialTracker.getDailyMetricsForWeek', () => {
     expect(result[6].totals.moved).toBe(1000);
   });
 });
+
+describe('FinancialTracker.getDailyMetricsForRange', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    storage._reset();
+  });
+
+  it('returns 5 zero-filled days for an empty range 2026-05-01..2026-05-05', async () => {
+    const tracker = await FinancialTracker.create();
+    const result = tracker.getDailyMetricsForRange('2026-05-01', '2026-05-05');
+
+    expect(result).toHaveLength(5);
+    expect(result.map((d) => d.date)).toEqual([
+      '2026-05-01',
+      '2026-05-02',
+      '2026-05-03',
+      '2026-05-04',
+      '2026-05-05',
+    ]);
+    result.forEach((day) => {
+      expect(day.entries).toEqual([]);
+      expect(day.totals).toEqual({ moved: 0, generated: 0, cut: 0, netImpact: 0 });
+    });
+  });
+
+  it('reflects boundary entries on start and end days at indices 0 and 4', async () => {
+    const tracker = await FinancialTracker.create();
+    await tracker.addEntry('moved', 500, 'start day entry', '2026-05-01');
+    await tracker.addEntry('cut', 75, 'end day entry', '2026-05-05');
+
+    const result = tracker.getDailyMetricsForRange('2026-05-01', '2026-05-05');
+
+    expect(result).toHaveLength(5);
+    expect(result[0].date).toBe('2026-05-01');
+    expect(result[0].entries).toHaveLength(1);
+    expect(result[0].entries[0].description).toBe('start day entry');
+    expect(result[0].totals.moved).toBe(500);
+
+    expect(result[4].date).toBe('2026-05-05');
+    expect(result[4].entries).toHaveLength(1);
+    expect(result[4].entries[0].description).toBe('end day entry');
+    expect(result[4].totals.cut).toBe(75);
+
+    // Middle days remain empty placeholders
+    [1, 2, 3].forEach((i) => {
+      expect(result[i].entries).toEqual([]);
+      expect(result[i].totals).toEqual({ moved: 0, generated: 0, cut: 0, netImpact: 0 });
+    });
+  });
+
+  it('handles month crossing: 2026-04-29..2026-05-02 returns the exact 4 dates', async () => {
+    const tracker = await FinancialTracker.create();
+    const result = tracker.getDailyMetricsForRange('2026-04-29', '2026-05-02');
+
+    expect(result).toHaveLength(4);
+    expect(result.map((d) => d.date)).toEqual([
+      '2026-04-29',
+      '2026-04-30',
+      '2026-05-01',
+      '2026-05-02',
+    ]);
+  });
+
+  it('returns a length-1 array for a single-day range (start === end)', async () => {
+    const tracker = await FinancialTracker.create();
+    await tracker.addEntry('generated', 42, 'solo day', '2026-05-11');
+
+    const result = tracker.getDailyMetricsForRange('2026-05-11', '2026-05-11');
+
+    expect(result).toHaveLength(1);
+    expect(result[0].date).toBe('2026-05-11');
+    expect(result[0].entries).toHaveLength(1);
+    expect(result[0].entries[0].description).toBe('solo day');
+    expect(result[0].totals.generated).toBe(42);
+    expect(result[0].totals.netImpact).toBe(42);
+  });
+});

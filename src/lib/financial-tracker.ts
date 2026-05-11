@@ -140,6 +140,25 @@ export class FinancialTracker {
     });
   }
 
+  /**
+   * Returns DailyFinancialMetrics for each day in [startDate, endDate] inclusive.
+   * Days with no recorded entries return zero-filled placeholders.
+   */
+  getDailyMetricsForRange(startDate: string, endDate: string): DailyFinancialMetrics[] {
+    const start = new Date(`${startDate}T12:00:00`);
+    const end = new Date(`${endDate}T12:00:00`);
+    const days = Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+    if (days <= 0) return [];
+    return Array.from({ length: days }, (_, i) => {
+      const d = format(addDays(start, i), 'yyyy-MM-dd');
+      return this.data.dailyMetrics[d] ?? {
+        date: d,
+        entries: [],
+        totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 },
+      };
+    });
+  }
+
   getWeeklyTotals(): { moved: number; generated: number; cut: number; netImpact: number } {
     const now = new Date();
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
