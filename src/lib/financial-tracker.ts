@@ -1,4 +1,4 @@
-import { addDays, format } from 'date-fns';
+import { addDays, format, startOfWeek } from 'date-fns';
 import { loadJSON, saveJSON } from './storage';
 
 export class FinancialValidationError extends Error {
@@ -157,6 +157,23 @@ export class FinancialTracker {
         totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 },
       };
     });
+  }
+
+  /**
+   * Returns totals across the previous Mon-Sun week (relative to today).
+   * Uses cent-based arithmetic via centSum for precision.
+   */
+  getPreviousWeekTotals(): { moved: number; generated: number; cut: number; netImpact: number } {
+    const now = new Date();
+    const prevWeekStart = addDays(startOfWeek(now, { weekStartsOn: 1 }), -7);
+    const prevWeekStartStr = format(prevWeekStart, 'yyyy-MM-dd');
+    const days = this.getDailyMetricsForWeek(prevWeekStartStr);
+    return {
+      moved: this.centSum(days.map(d => d.totals.moved)),
+      generated: this.centSum(days.map(d => d.totals.generated)),
+      cut: this.centSum(days.map(d => d.totals.cut)),
+      netImpact: this.centSum(days.map(d => d.totals.netImpact)),
+    };
   }
 
   getWeeklyTotals(): { moved: number; generated: number; cut: number; netImpact: number } {

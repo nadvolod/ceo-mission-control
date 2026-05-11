@@ -15,6 +15,7 @@ jest.mock('./storage', () => {
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const storage = require('./storage');
 
+import { addDays, format, startOfWeek } from 'date-fns';
 import { FinancialTracker } from './financial-tracker';
 
 const DATE = '2026-05-11';
@@ -331,5 +332,47 @@ describe('FinancialTracker.getDailyMetricsForRange', () => {
     expect(result[0].entries[0].description).toBe('solo day');
     expect(result[0].totals.generated).toBe(42);
     expect(result[0].totals.netImpact).toBe(42);
+  });
+});
+
+describe('FinancialTracker.getPreviousWeekTotals', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    storage._reset();
+  });
+
+  it('returns zero totals when no entries exist anywhere', async () => {
+    const tracker = await FinancialTracker.create();
+    expect(tracker.getPreviousWeekTotals()).toEqual({
+      moved: 0,
+      generated: 0,
+      cut: 0,
+      netImpact: 0,
+    });
+  });
+
+  it('sums only entries from the previous Mon-Sun week (ignores this week and other days)', async () => {
+    const tracker = await FinancialTracker.create();
+
+    const thisWeekMonday = startOfWeek(new Date(), { weekStartsOn: 1 });
+    const prevWeekMonday = addDays(thisWeekMonday, -7);
+    const prevWeekWednesday = addDays(prevWeekMonday, 2);
+
+    const thisWeekMondayStr = format(thisWeekMonday, 'yyyy-MM-dd');
+    const prevWeekMondayStr = format(prevWeekMonday, 'yyyy-MM-dd');
+    const prevWeekWednesdayStr = format(prevWeekWednesday, 'yyyy-MM-dd');
+
+    // This week entry — must be excluded
+    await tracker.addEntry('generated', 100, 'this week mon', thisWeekMondayStr);
+    // Previous week entries — must be summed
+    await tracker.addEntry('generated', 50, 'prev week mon', prevWeekMondayStr);
+    await tracker.addEntry('cut', 25, 'prev week wed', prevWeekWednesdayStr);
+
+    expect(tracker.getPreviousWeekTotals()).toEqual({
+      moved: 0,
+      generated: 50,
+      cut: 25,
+      netImpact: 75,
+    });
   });
 });
