@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FinancialTracker, FinancialValidationError } from '@/lib/financial-tracker';
 import { checkAuth } from '@/lib/auth';
+import { startOfWeek, format, subDays } from 'date-fns';
 
 export async function GET() {
   try {
@@ -8,12 +9,24 @@ export async function GET() {
     const todaysMetrics = financialTracker.getTodaysMetrics();
     const weeklyTotals = financialTracker.getWeeklyTotals();
     const monthlyTotals = financialTracker.getMonthlyTotals();
+    const previousWeekTotals = financialTracker.getPreviousWeekTotals();
     const recentEntries = financialTracker.getRecentEntries(10);
+
+    const now = new Date();
+    const weekStart = format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    const weekFinancialByDay = financialTracker.getDailyMetricsForWeek(weekStart);
+
+    const rangeEnd = format(now, 'yyyy-MM-dd');
+    const rangeStart = format(subDays(now, 29), 'yyyy-MM-dd');
+    const dailyFinancialTrend = financialTracker.getDailyMetricsForRange(rangeStart, rangeEnd);
 
     return NextResponse.json({
       todaysMetrics,
       weeklyTotals,
       monthlyTotals,
+      previousWeekTotals,
+      weekFinancialByDay,
+      dailyFinancialTrend,
       recentEntries,
       timestamp: new Date().toISOString()
     });
