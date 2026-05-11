@@ -257,3 +257,19 @@ describe('WeeklyPerformanceTracker - Money Move quick-add', () => {
     expect(screen.getByRole('button', { name: /save move/i })).toBeDisabled();
   });
 });
+
+describe('WeeklyPerformanceTracker - Per-day money line', () => {
+  it('renders a $ line per day reflecting that day\'s netImpact', () => {
+    const week = Array.from({ length: 7 }, (_, i) => ({
+      date: `2026-05-${String(11 + i).padStart(2, '0')}`,
+      entries: i === 2 ? [{ id: 'x', category: 'generated' as const, amount: 500, description: 'invoice', timestamp: '2026-05-13T10:00:00Z' }] : [],
+      totals: { moved: 0, generated: 0, cut: 0, netImpact: i === 2 ? 500 : 0 },
+    }));
+    render(<WeeklyPerformanceTracker {...baseProps} weekFinancialByDay={week} />);
+    const dayCells = screen.getAllByTestId(/^day-money-/);
+    expect(dayCells).toHaveLength(7);
+    expect(dayCells[2]).toHaveTextContent('$500');
+    expect(dayCells[2].className).toMatch(/text-emerald|text-green/);
+    expect(dayCells[0]).toHaveTextContent('—');
+  });
+});

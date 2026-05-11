@@ -93,7 +93,7 @@ export function WeeklyPerformanceTracker({
   todaysFocusSessions = [],
   todaysFocusTotal = 0,
   todaysFinancial,
-  weekFinancialByDay: _weekFinancialByDay,
+  weekFinancialByDay,
   weekFinancialTotals: _weekFinancialTotals,
   previousWeekFinancialTotals: _previousWeekFinancialTotals,
   dailyFinancialTrend: _dailyFinancialTrend,
@@ -701,6 +701,22 @@ export function WeeklyPerformanceTracker({
                           <AlertTriangle className="h-3 w-3 text-red-500 mx-auto" />
                         </div>
                       )}
+                      {(() => {
+                        const fin = weekFinancialByDay[i];
+                        const net = fin?.totals.netImpact ?? 0;
+                        const hasData = fin && fin.entries.length > 0;
+                        return (
+                          <div
+                            data-testid={`day-money-${i}`}
+                            tabIndex={hasData ? 0 : -1}
+                            className={`mt-1 text-xs font-medium ${
+                              !hasData ? 'text-gray-300' : net > 0 ? 'text-emerald-600' : net < 0 ? 'text-red-600' : 'text-gray-500'
+                            }`}
+                          >
+                            {hasData ? formatCurrency(net) : '—'}
+                          </div>
+                        );
+                      })()}
                     </div>
                   );
                 })}
