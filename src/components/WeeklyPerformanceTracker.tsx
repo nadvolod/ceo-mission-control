@@ -96,7 +96,7 @@ export function WeeklyPerformanceTracker({
   weekFinancialByDay,
   weekFinancialTotals,
   previousWeekFinancialTotals,
-  dailyFinancialTrend: _dailyFinancialTrend,
+  dailyFinancialTrend,
   onAddFinancialEntry,
 }: WeeklyPerformanceTrackerProps) {
   const [activeTab, setActiveTab] = useState<TabId>('daily');
@@ -235,6 +235,17 @@ export function WeeklyPerformanceTracker({
     date: d.date,
     deepWork: d.deepWorkHours,
   }));
+
+  // Merge financial Net $/day into the 30-day trend chart
+  const moneyHasData = dailyFinancialTrend.some(d => d.totals.netImpact !== 0);
+  const financialByDate = new Map(dailyFinancialTrend.map(d => [d.date, d.totals.netImpact]));
+  const trendChartMerged = deepWorkTrendData.map(d => ({
+    date: d.date,
+    deepWork: d.deepWork,
+    netImpact: financialByDate.get(d.date) ?? 0,
+  }));
+  const hasDeepWorkData = deepWorkTrendData.some(d => d.deepWork > 0);
+  const showTrendChart = hasDeepWorkData || moneyHasData;
 
   // Weekly entries for the daily grid
   const weekEntries = currentWeekSummary.dailyEntries;
@@ -858,29 +869,60 @@ export function WeeklyPerformanceTracker({
         {/* Trends Tab */}
         {activeTab === 'trends' && (
           <div className="space-y-6">
-            {deepWorkTrendData.some(d => d.deepWork > 0) ? (
+            {showTrendChart ? (
               <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-3">Deep Work (30 Days)</h4>
-                <ResponsiveContainer width="100%" height={280}>
-                  <LineChart data={deepWorkTrendData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" tickFormatter={formatDate} fontSize={11} />
-                    <YAxis fontSize={11} domain={[0, 8]} label={{ value: 'Hours', angle: -90, position: 'insideLeft', fontSize: 11 }} />
-                    <Tooltip
-                      labelFormatter={(label) => formatDate(String(label))}
-                      formatter={(value) => [`${value}h`, 'Deep Work']}
-                    />
-                    <ReferenceLine y={3} stroke="#10B981" strokeDasharray="5 5" label={{ value: '3h target', position: 'right', fontSize: 10, fill: '#10B981' }} />
-                    <Line
-                      type="monotone"
-                      dataKey="deepWork"
-                      stroke="#3B82F6"
-                      strokeWidth={2}
-                      dot={{ r: 2, fill: '#3B82F6' }}
-                      name="Deep Work"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                <h4 className="text-sm font-medium text-gray-700 mb-3">Deep Work (30 Days){moneyHasData ? ' + Net $/day' : ''}</h4>
+                <div data-testid={moneyHasData ? 'trends-chart-money' : 'trends-chart'}>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <LineChart data={trendChartMerged}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" tickFormatter={formatDate} fontSize={11} />
+                      <YAxis
+                        yAxisId="hours"
+                        fontSize={11}
+                        domain={[0, 8]}
+                        label={{ value: 'Hours', angle: -90, position: 'insideLeft', fontSize: 11 }}
+                      />
+                      {moneyHasData && (
+                        <YAxis
+                          yAxisId="dollars"
+                          orientation="right"
+                          fontSize={11}
+                          tickFormatter={(v) => formatCurrency(Number(v))}
+                        />
+                      )}
+                      <Tooltip
+                        labelFormatter={(label) => formatDate(String(label))}
+                        formatter={(value, name) => {
+                          if (name === 'Deep Work') return [`${value}h`, 'Deep Work'];
+                          if (name === 'Net $/day') return [formatCurrency(Number(value)), 'Net $/day'];
+                          return [value, String(name)];
+                        }}
+                      />
+                      <ReferenceLine yAxisId="hours" y={3} stroke="#10B981" strokeDasharray="5 5" label={{ value: '3h target', position: 'right', fontSize: 10, fill: '#10B981' }} />
+                      <Line
+                        yAxisId="hours"
+                        type="monotone"
+                        dataKey="deepWork"
+                        stroke="#3B82F6"
+                        strokeWidth={2}
+                        dot={{ r: 2, fill: '#3B82F6' }}
+                        name="Deep Work"
+                      />
+                      {moneyHasData && (
+                        <Line
+                          yAxisId="dollars"
+                          type="monotone"
+                          dataKey="netImpact"
+                          stroke="#10B981"
+                          strokeWidth={2}
+                          dot={{ r: 2, fill: '#10B981' }}
+                          name="Net $/day"
+                        />
+                      )}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             ) : (
               <div className="text-center py-8 text-gray-500">

@@ -308,6 +308,25 @@ describe('WeeklyPerformanceTracker - Weekly Net Impact', () => {
   });
 });
 
+describe('WeeklyPerformanceTracker - Trends chart money series', () => {
+  it('Trends chart renders a money series when financial trend has data', () => {
+    const trend = Array.from({ length: 30 }, (_, i) => ({
+      date: `2026-04-${String(11 + i).padStart(2, '0')}`,
+      entries: [],
+      totals: { moved: 0, generated: 0, cut: 0, netImpact: i === 15 ? 500 : 0 },
+    }));
+    render(<WeeklyPerformanceTracker {...baseProps} dailyFinancialTrend={trend} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Trends$/i }));
+    expect(screen.getByTestId('trends-chart-money')).toBeInTheDocument();
+  });
+
+  it('Trends chart omits the money series when financial trend is all zeros', () => {
+    render(<WeeklyPerformanceTracker {...baseProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Trends$/i }));
+    expect(screen.queryByTestId('trends-chart-money')).not.toBeInTheDocument();
+  });
+});
+
 describe('WeeklyPerformanceTracker - Review form without revenue', () => {
   it('does not render a Revenue input in the review form', () => {
     render(<WeeklyPerformanceTracker {...baseProps} />);
