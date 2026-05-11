@@ -1,5 +1,12 @@
 import { loadJSON, saveJSON } from './storage';
 
+export class FinancialValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'FinancialValidationError';
+  }
+}
+
 export interface FinancialEntry {
   id: string;
   amount: number;
@@ -49,13 +56,21 @@ export class FinancialTracker {
   }
 
   async addEntry(category: 'moved' | 'generated' | 'cut', amount: number, description: string, date?: string): Promise<FinancialEntry> {
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new FinancialValidationError(`Invalid amount: amount must be greater than 0 (received ${amount})`);
+    }
+    const trimmedDescription = (description ?? '').trim();
+    if (trimmedDescription.length === 0) {
+      throw new FinancialValidationError('Invalid description: description is required');
+    }
+
     const entryDate = date || new Date().toISOString().split('T')[0];
     const timestamp = new Date().toISOString();
-    
+
     const entry: FinancialEntry = {
       id: `${category}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
       amount,
-      description,
+      description: trimmedDescription,
       timestamp,
       category
     };

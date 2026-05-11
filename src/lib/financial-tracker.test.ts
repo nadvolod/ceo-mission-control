@@ -87,3 +87,67 @@ describe('FinancialTracker.recalculateTotals (cent-based accumulation)', () => {
     expect(totals.netImpact).toBe(0.9);
   });
 });
+
+describe('FinancialTracker.addEntry (input validation)', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    storage._reset();
+  });
+
+  it('rejects amount = 0', async () => {
+    const tracker = await FinancialTracker.create();
+    await expect(tracker.addEntry('cut', 0, 'zero', DATE)).rejects.toThrow(
+      /amount must be greater than 0/i
+    );
+  });
+
+  it('rejects negative amount', async () => {
+    const tracker = await FinancialTracker.create();
+    await expect(tracker.addEntry('generated', -10, 'neg', DATE)).rejects.toThrow(
+      /amount must be greater than 0/i
+    );
+  });
+
+  it('rejects NaN amount', async () => {
+    const tracker = await FinancialTracker.create();
+    await expect(tracker.addEntry('moved', Number.NaN, 'nan', DATE)).rejects.toThrow(
+      /amount must be greater than 0/i
+    );
+  });
+
+  it('rejects Infinity amount', async () => {
+    const tracker = await FinancialTracker.create();
+    await expect(
+      tracker.addEntry('moved', Number.POSITIVE_INFINITY, 'inf', DATE)
+    ).rejects.toThrow(/amount must be greater than 0/i);
+  });
+
+  it('rejects whitespace-only description', async () => {
+    const tracker = await FinancialTracker.create();
+    await expect(tracker.addEntry('cut', 10, '   ', DATE)).rejects.toThrow(
+      /description.*required/i
+    );
+  });
+
+  it('rejects empty description', async () => {
+    const tracker = await FinancialTracker.create();
+    await expect(tracker.addEntry('cut', 10, '', DATE)).rejects.toThrow(
+      /description.*required/i
+    );
+  });
+
+  it('does not create a dailyMetrics entry for the day when validation fails', async () => {
+    const tracker = await FinancialTracker.create();
+    await expect(tracker.addEntry('cut', 0, 'zero', DATE)).rejects.toThrow();
+    const data = tracker.getAllData();
+    expect(data.dailyMetrics[DATE]).toBeUndefined();
+  });
+
+  it('trims a valid description before storing it on the entry', async () => {
+    const tracker = await FinancialTracker.create();
+    const entry = await tracker.addEntry('generated', 5, '  hello world  ', DATE);
+    expect(entry.description).toBe('hello world');
+    const data = tracker.getAllData();
+    expect(data.dailyMetrics[DATE].entries[0].description).toBe('hello world');
+  });
+});

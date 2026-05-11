@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { FinancialTracker } from '@/lib/financial-tracker';
+import { FinancialTracker, FinancialValidationError } from '@/lib/financial-tracker';
 import { checkAuth } from '@/lib/auth';
 
 export async function GET() {
@@ -38,8 +38,15 @@ export async function POST(request: NextRequest) {
     switch (action) {
       case 'addEntry': {
         const { category, amount, description, date } = data;
-        const entry = await financialTracker.addEntry(category, amount, description, date);
-        return NextResponse.json({ entry });
+        try {
+          const entry = await financialTracker.addEntry(category, amount, description, date);
+          return NextResponse.json({ entry });
+        } catch (err) {
+          if (err instanceof FinancialValidationError) {
+            return NextResponse.json({ error: err.message }, { status: 400 });
+          }
+          throw err;
+        }
       }
 
       case 'processMessage': {
