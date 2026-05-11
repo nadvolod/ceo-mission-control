@@ -39,7 +39,6 @@ interface WeeklyPerformanceTrackerProps {
   recentReviews: WeeklyReview[];
   onLogDay: (deepWorkHours: number, pipelineActions: number, trained: boolean) => Promise<void>;
   onSubmitReview: (review: {
-    revenue: number;
     slipAnalysis: string;
     systemAdjustment: string;
     nextWeekTargets: string;
@@ -140,7 +139,6 @@ export function WeeklyPerformanceTracker({
   const existingReview = recentReviews.find(
     r => r.weekStartDate === currentWeekSummary.weekStartDate
   );
-  const [reviewRevenue, setReviewRevenue] = useState(existingReview?.revenue?.toString() ?? '');
   const [reviewSlip, setReviewSlip] = useState(existingReview?.slipAnalysis ?? '');
   const [reviewSystem, setReviewSystem] = useState(existingReview?.systemAdjustment ?? '');
   const [reviewTargets, setReviewTargets] = useState(existingReview?.nextWeekTargets ?? '');
@@ -151,7 +149,6 @@ export function WeeklyPerformanceTracker({
   // Sync review form when existing review data changes (e.g. after submit)
   useEffect(() => {
     if (existingReview) {
-      setReviewRevenue(existingReview.revenue?.toString() ?? '');
       setReviewSlip(existingReview.slipAnalysis ?? '');
       setReviewSystem(existingReview.systemAdjustment ?? '');
       setReviewTargets(existingReview.nextWeekTargets ?? '');
@@ -193,21 +190,17 @@ export function WeeklyPerformanceTracker({
 
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const rev = parseFloat(reviewRevenue);
-    if (isNaN(rev) || rev < 0) return;
 
     setIsSubmittingReview(true);
     try {
       const tt = parseFloat(reviewTemporalTarget);
       await onSubmitReview({
-        revenue: rev,
         slipAnalysis: reviewSlip,
         systemAdjustment: reviewSystem,
         nextWeekTargets: reviewTargets,
         bottleneck: reviewBottleneck,
         temporalTarget: isNaN(tt) || tt < 0 ? 5 : tt,
       });
-      setReviewRevenue('');
       setReviewSlip('');
       setReviewSystem('');
       setReviewTargets('');
@@ -966,22 +959,6 @@ export function WeeklyPerformanceTracker({
                   />
                 </div>
                 <div>
-                  <label htmlFor="wt-revenue" className="block text-sm font-medium text-gray-700 mb-1">
-                    Revenue This Week ($)
-                  </label>
-                  <input
-                    id="wt-revenue"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={reviewRevenue}
-                    onChange={(e) => setReviewRevenue(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900"
-                    placeholder="e.g., 5000"
-                    required
-                  />
-                </div>
-                <div>
                   <label htmlFor="wt-slip" className="block text-sm font-medium text-gray-700 mb-1">
                     Where did I slip? Why? <span className="text-gray-400">(be precise, not emotional)</span>
                   </label>
@@ -1035,7 +1012,7 @@ export function WeeklyPerformanceTracker({
                 </div>
                 <button
                   type="submit"
-                  disabled={isSubmittingReview || !reviewRevenue}
+                  disabled={isSubmittingReview}
                   className="w-full px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isSubmittingReview ? 'Submitting...' : 'Submit Weekly Review'}

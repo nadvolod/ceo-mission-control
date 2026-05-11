@@ -307,3 +307,23 @@ describe('WeeklyPerformanceTracker - Weekly Net Impact', () => {
     expect(screen.getByTestId('weekly-cut')).toHaveTextContent('$50');
   });
 });
+
+describe('WeeklyPerformanceTracker - Review form without revenue', () => {
+  it('does not render a Revenue input in the review form', () => {
+    render(<WeeklyPerformanceTracker {...baseProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Review$/i }));
+    expect(screen.queryByLabelText(/revenue this week/i)).not.toBeInTheDocument();
+  });
+
+  it('submits the review without a revenue field', async () => {
+    const user = userEvent.setup();
+    const onSubmitReview = jest.fn().mockResolvedValue(undefined);
+    render(<WeeklyPerformanceTracker {...baseProps} onSubmitReview={onSubmitReview} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Review$/i }));
+    await user.type(screen.getByLabelText(/where did I slip/i), 'wed deep work missed');
+    await user.click(screen.getByRole('button', { name: /submit weekly review/i }));
+    expect(onSubmitReview).toHaveBeenCalledWith(
+      expect.not.objectContaining({ revenue: expect.anything() })
+    );
+  });
+});
