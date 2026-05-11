@@ -870,7 +870,7 @@ export function WeeklyPerformanceTracker({
                           Week of {formatDate(review.weekStartDate)}
                         </span>
                         <span className="text-sm font-bold text-green-600">
-                          ${review.revenue.toLocaleString()}
+                          ${(review.revenue ?? 0).toLocaleString()}
                         </span>
                       </div>
                       {review.slipAnalysis && (

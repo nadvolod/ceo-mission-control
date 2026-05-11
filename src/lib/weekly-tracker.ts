@@ -78,24 +78,30 @@ export class WeeklyTracker {
     return entry;
   }
 
-  async submitWeeklyReview(review: Omit<WeeklyReview, 'id' | 'createdAt' | 'weekStartDate' | 'weekEndDate' | 'temporalTarget'> & {
+  async submitWeeklyReview(review: {
+    slipAnalysis: string;
+    systemAdjustment: string;
+    nextWeekTargets: string;
+    bottleneck: string;
+    temporalTarget?: number;
+    revenue?: number;
     weekStartDate?: string;
     weekEndDate?: string;
-    temporalTarget?: number;
   }): Promise<WeeklyReview> {
-    if (typeof review.revenue !== 'number' || !isFinite(review.revenue) || review.revenue < 0) {
+    if (review.revenue !== undefined && (typeof review.revenue !== 'number' || !isFinite(review.revenue) || review.revenue < 0)) {
       throw new Error('revenue must be a non-negative number');
     }
 
     const now = new Date();
     const weekStart = review.weekStartDate || format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
     const weekEnd = review.weekEndDate || format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    const revenue = review.revenue ?? 0;
 
     const fullReview: WeeklyReview = {
       id: `review_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
       weekStartDate: weekStart,
       weekEndDate: weekEnd,
-      revenue: review.revenue,
+      revenue,
       slipAnalysis: review.slipAnalysis || '',
       systemAdjustment: review.systemAdjustment || '',
       nextWeekTargets: review.nextWeekTargets || '',
@@ -115,10 +121,10 @@ export class WeeklyTracker {
     await appendAuditLog(
       weekStart,
       'weekly-tracker',
-      `Weekly review submitted: $${review.revenue} revenue, bottleneck: ${review.bottleneck || 'none'}`
+      `Weekly review submitted: $${revenue} revenue, bottleneck: ${review.bottleneck || 'none'}`
     );
 
-    console.log('Weekly review submitted:', { weekStart, weekEnd, revenue: review.revenue });
+    console.log('Weekly review submitted:', { weekStart, weekEnd, revenue });
 
     return fullReview;
   }
