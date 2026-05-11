@@ -160,11 +160,11 @@ describe('WeeklyPerformanceTracker - Quick-Add Focus Buttons', () => {
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     render(<WeeklyPerformanceTracker {...baseProps} onAddFocusSession={slowAdd} />);
 
-    const buttons = screen.getAllByRole('button', { name: /^\+/ });
+    const buttons = screen.getAllByRole('button', { name: /^\+\d/ });
     await user.click(buttons[0]);
 
     // All quick-add buttons should be disabled while adding
-    const quickAddButtons = screen.getAllByRole('button', { name: /^\+/ });
+    const quickAddButtons = screen.getAllByRole('button', { name: /^\+\d/ });
     quickAddButtons.forEach(btn => {
       expect(btn).toBeDisabled();
     });
@@ -231,5 +231,29 @@ describe('WeeklyPerformanceTracker - Net Today card', () => {
     expect(screen.getByTestId('net-today-breakdown')).toHaveTextContent('mv $100');
     expect(screen.getByTestId('net-today-breakdown')).toHaveTextContent('gen $250');
     expect(screen.getByTestId('net-today-breakdown')).toHaveTextContent('cut $50');
+  });
+});
+
+describe('WeeklyPerformanceTracker - Money Move quick-add', () => {
+  it('clicking + Cut opens the form with cut preselected and submits to onAddFinancialEntry', async () => {
+    const user = userEvent.setup();
+    const onAddFinancialEntry = jest.fn().mockResolvedValue(undefined);
+    render(<WeeklyPerformanceTracker {...baseProps} onAddFinancialEntry={onAddFinancialEntry} />);
+
+    await user.click(screen.getByRole('button', { name: /\+ cut/i }));
+    await user.type(screen.getByLabelText(/amount/i), '150');
+    await user.type(screen.getByLabelText(/description/i), 'storage');
+    await user.click(screen.getByRole('button', { name: /save move/i }));
+
+    expect(onAddFinancialEntry).toHaveBeenCalledWith('cut', 150, 'storage');
+  });
+
+  it('disables Save move when amount is 0/empty or description is empty', async () => {
+    const user = userEvent.setup();
+    render(<WeeklyPerformanceTracker {...baseProps} />);
+    await user.click(screen.getByRole('button', { name: /\+ generated/i }));
+    expect(screen.getByRole('button', { name: /save move/i })).toBeDisabled();
+    await user.type(screen.getByLabelText(/amount/i), '10');
+    expect(screen.getByRole('button', { name: /save move/i })).toBeDisabled();
   });
 });

@@ -97,7 +97,7 @@ export function WeeklyPerformanceTracker({
   weekFinancialTotals: _weekFinancialTotals,
   previousWeekFinancialTotals: _previousWeekFinancialTotals,
   dailyFinancialTrend: _dailyFinancialTrend,
-  onAddFinancialEntry: _onAddFinancialEntry,
+  onAddFinancialEntry,
 }: WeeklyPerformanceTrackerProps) {
   const [activeTab, setActiveTab] = useState<TabId>('daily');
   const [isLogging, setIsLogging] = useState(false);
@@ -105,6 +105,13 @@ export function WeeklyPerformanceTracker({
 
   const [isAddingFocus, setIsAddingFocus] = useState(false);
   const [lastAdded, setLastAdded] = useState<{ category: string; hours: number } | null>(null);
+
+  // Money Move quick-add state
+  const [moveCategory, setMoveCategory] = useState<'moved' | 'generated' | 'cut' | null>(null);
+  const [moveAmount, setMoveAmount] = useState('');
+  const [moveDescription, setMoveDescription] = useState('');
+  const [isAddingMove, setIsAddingMove] = useState(false);
+  const [moveError, setMoveError] = useState<string | null>(null);
 
   // Auto-clear success confirmation after 2 seconds
   useEffect(() => {
@@ -389,6 +396,101 @@ export function WeeklyPerformanceTracker({
                 +{hours}h {category}
               </button>
             ))}
+          </div>
+        )}
+
+        {/* Money Move quick-add */}
+        {onAddFinancialEntry && (
+          <div className="mt-3 border-t border-gray-100 pt-3">
+            <div className="flex flex-wrap gap-2">
+              {(['moved', 'generated', 'cut'] as const).map(cat => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setMoveCategory(cat)}
+                  className="px-3 py-1.5 text-sm font-medium border border-emerald-300 text-emerald-700 rounded-full bg-white hover:bg-emerald-50"
+                >
+                  + {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                </button>
+              ))}
+            </div>
+            {moveCategory && (
+              <form
+                className="mt-2 flex flex-wrap items-end gap-2 bg-gray-50 p-3 rounded-lg"
+                onSubmit={async e => {
+                  e.preventDefault();
+                  const amt = parseFloat(moveAmount);
+                  if (!Number.isFinite(amt) || amt <= 0 || !moveDescription.trim()) return;
+                  setIsAddingMove(true);
+                  setMoveError(null);
+                  try {
+                    await onAddFinancialEntry(moveCategory, amt, moveDescription.trim());
+                    setMoveAmount('');
+                    setMoveDescription('');
+                    setMoveCategory(null);
+                  } catch (err) {
+                    setMoveError(err instanceof Error ? err.message : 'Failed to save move');
+                  } finally {
+                    setIsAddingMove(false);
+                  }
+                }}
+              >
+                <label className="text-xs font-medium text-gray-600 flex flex-col">
+                  Category
+                  <select
+                    value={moveCategory}
+                    onChange={e => setMoveCategory(e.target.value as 'moved' | 'generated' | 'cut')}
+                    className="mt-0.5 px-2 py-1 border border-gray-300 rounded text-sm"
+                  >
+                    <option value="moved">Moved</option>
+                    <option value="generated">Generated</option>
+                    <option value="cut">Cut</option>
+                  </select>
+                </label>
+                <label className="text-xs font-medium text-gray-600 flex flex-col">
+                  Amount
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={moveAmount}
+                    onChange={e => setMoveAmount(e.target.value)}
+                    className="mt-0.5 px-2 py-1 border border-gray-300 rounded text-sm w-28"
+                    aria-label="amount"
+                  />
+                </label>
+                <label className="text-xs font-medium text-gray-600 flex flex-col flex-1 min-w-[180px]">
+                  Description
+                  <input
+                    type="text"
+                    value={moveDescription}
+                    onChange={e => setMoveDescription(e.target.value)}
+                    className="mt-0.5 px-2 py-1 border border-gray-300 rounded text-sm"
+                    aria-label="description"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  disabled={
+                    isAddingMove ||
+                    !moveDescription.trim() ||
+                    !Number.isFinite(parseFloat(moveAmount)) ||
+                    parseFloat(moveAmount) <= 0
+                  }
+                  className="px-3 py-1.5 text-sm bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {isAddingMove ? 'Saving…' : 'Save move'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMoveCategory(null); setMoveError(null); }}
+                  className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+                {moveError && <div className="w-full text-xs text-red-600">{moveError}</div>}
+              </form>
+            )}
           </div>
         )}
 
