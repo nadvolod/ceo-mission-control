@@ -1,6 +1,7 @@
 import { render, screen, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { WeeklyPerformanceTracker } from './WeeklyPerformanceTracker';
+import type { DailyFinancialMetrics } from '@/lib/financial-tracker';
 
 // Mock recharts to avoid canvas/SVG rendering issues in tests
 jest.mock('recharts', () => ({
@@ -31,6 +32,13 @@ const baseWeekSummary = {
   temporalTarget: 5,
 };
 
+const emptyFin: DailyFinancialMetrics = {
+  date: '2026-05-11',
+  entries: [],
+  totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 },
+};
+const emptyTotals = { moved: 0, generated: 0, cut: 0, netImpact: 0 };
+
 const baseProps = {
   todaysEntry: null,
   currentWeekSummary: baseWeekSummary,
@@ -41,6 +49,18 @@ const baseProps = {
   onSubmitReview: jest.fn().mockResolvedValue(undefined),
   onAddFocusSession: jest.fn().mockResolvedValue(undefined),
   temporalActual: 0,
+  todaysFinancial: emptyFin,
+  weekFinancialByDay: Array.from({ length: 7 }, (_, i) => ({
+    ...emptyFin,
+    date: `2026-05-${String(11 + i).padStart(2, '0')}`,
+  })),
+  weekFinancialTotals: emptyTotals,
+  previousWeekFinancialTotals: emptyTotals,
+  dailyFinancialTrend: Array.from({ length: 30 }, (_, i) => ({
+    ...emptyFin,
+    date: `2026-04-${String(11 + i).padStart(2, '0')}`,
+  })),
+  onAddFinancialEntry: jest.fn().mockResolvedValue(undefined),
 };
 
 function makeFocusSession(overrides: Record<string, unknown> = {}) {
@@ -192,5 +212,24 @@ describe('WeeklyPerformanceTracker - Quick-Add Focus Buttons', () => {
     // Should show max 5 sessions
     const sessionItems = screen.getAllByText(/^Session \d+$/);
     expect(sessionItems.length).toBeLessThanOrEqual(5);
+  });
+});
+
+describe('WeeklyPerformanceTracker - Net Today card', () => {
+  it('renders Net Today card with currency value and category breakdown', () => {
+    render(
+      <WeeklyPerformanceTracker
+        {...baseProps}
+        todaysFinancial={{
+          date: '2026-05-11',
+          entries: [],
+          totals: { moved: 100, generated: 250, cut: 50, netImpact: 400 },
+        }}
+      />
+    );
+    expect(screen.getByTestId('net-today-value')).toHaveTextContent('$400');
+    expect(screen.getByTestId('net-today-breakdown')).toHaveTextContent('mv $100');
+    expect(screen.getByTestId('net-today-breakdown')).toHaveTextContent('gen $250');
+    expect(screen.getByTestId('net-today-breakdown')).toHaveTextContent('cut $50');
   });
 });

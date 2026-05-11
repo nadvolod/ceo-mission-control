@@ -147,6 +147,29 @@ export default function HomePage() {
                   temporalActual={focusData?.weeklyTotals?.Temporal ?? scorecard.temporalActual ?? 0}
                   todaysFocusSessions={focusData?.recentSessions?.filter((s: { date: string }) => s.date === scorecard.date)}
                   todaysFocusTotal={focusData?.todaysMetrics?.totalHours ?? 0}
+                  todaysFinancial={
+                    financialData?.todaysMetrics ?? {
+                      date: '',
+                      entries: [],
+                      totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 },
+                    }
+                  }
+                  weekFinancialByDay={
+                    financialData?.weekFinancialByDay ??
+                    Array.from({ length: 7 }, () => ({
+                      date: '',
+                      entries: [],
+                      totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 },
+                    }))
+                  }
+                  weekFinancialTotals={
+                    financialData?.weeklyTotals ?? { moved: 0, generated: 0, cut: 0, netImpact: 0 }
+                  }
+                  previousWeekFinancialTotals={
+                    financialData?.previousWeekTotals ?? { moved: 0, generated: 0, cut: 0, netImpact: 0 }
+                  }
+                  dailyFinancialTrend={financialData?.dailyFinancialTrend ?? []}
+                  onAddFinancialEntry={handleAddFinancialEntry}
                 />
               </div>
             )}

@@ -10,6 +10,16 @@ import {
   LineChart, Line, ReferenceLine
 } from 'recharts';
 import type { PerformanceDayEntry, WeeklySummary, WeeklyReview, FocusCategory } from '@/lib/types';
+import type { DailyFinancialMetrics } from '@/lib/financial-tracker';
+
+type FinancialTotals = { moved: number; generated: number; cut: number; netImpact: number };
+
+function formatCurrency(value: number): string {
+  const abs = Math.abs(value);
+  const formatted = abs.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  const sign = value < 0 ? '-' : '';
+  return `${sign}$${formatted}`;
+}
 
 const QUICK_ADD_BUTTONS: Array<{ hours: number; category: FocusCategory; color: string; borderColor: string }> = [
   { hours: 0.5, category: 'Temporal', color: 'text-blue-600', borderColor: 'border-blue-300 hover:bg-blue-50' },
@@ -39,6 +49,16 @@ interface WeeklyPerformanceTrackerProps {
   temporalActual?: number;
   todaysFocusSessions?: Array<{ category: string; hours: number; description: string; timestamp: string }>;
   todaysFocusTotal?: number;
+  todaysFinancial: DailyFinancialMetrics;
+  weekFinancialByDay: DailyFinancialMetrics[];
+  weekFinancialTotals: FinancialTotals;
+  previousWeekFinancialTotals: FinancialTotals;
+  dailyFinancialTrend: DailyFinancialMetrics[];
+  onAddFinancialEntry: (
+    category: 'moved' | 'generated' | 'cut',
+    amount: number,
+    description: string
+  ) => Promise<void>;
 }
 
 type TabId = 'daily' | 'weekly' | 'trends' | 'review';
@@ -72,6 +92,12 @@ export function WeeklyPerformanceTracker({
   temporalActual = 0,
   todaysFocusSessions = [],
   todaysFocusTotal = 0,
+  todaysFinancial,
+  weekFinancialByDay: _weekFinancialByDay,
+  weekFinancialTotals: _weekFinancialTotals,
+  previousWeekFinancialTotals: _previousWeekFinancialTotals,
+  dailyFinancialTrend: _dailyFinancialTrend,
+  onAddFinancialEntry: _onAddFinancialEntry,
 }: WeeklyPerformanceTrackerProps) {
   const [activeTab, setActiveTab] = useState<TabId>('daily');
   const [isLogging, setIsLogging] = useState(false);
@@ -257,7 +283,7 @@ export function WeeklyPerformanceTracker({
         </div>
 
         {/* Today's Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <div className="text-center p-3 bg-blue-50 rounded-lg">
             <div className="text-2xl font-bold text-blue-600">
               {todaysEntry?.deepWorkHours ?? '--'}
@@ -308,6 +334,24 @@ export function WeeklyPerformanceTracker({
                 }`}
                 style={{ width: `${Math.min(100, currentWeekSummary.temporalTarget > 0 ? (temporalActual / currentWeekSummary.temporalTarget) * 100 : 0)}%` }}
               />
+            </div>
+          </div>
+          <div className="text-center p-3 bg-emerald-50 rounded-lg">
+            <div
+              data-testid="net-today-value"
+              className={`text-2xl font-bold ${
+                todaysFinancial.totals.netImpact > 0
+                  ? 'text-emerald-700'
+                  : todaysFinancial.totals.netImpact < 0
+                    ? 'text-red-600'
+                    : 'text-gray-500'
+              }`}
+            >
+              {formatCurrency(todaysFinancial.totals.netImpact)}
+            </div>
+            <div className="text-xs text-gray-500">Net Today</div>
+            <div data-testid="net-today-breakdown" className="text-[10px] text-gray-500 mt-1">
+              mv {formatCurrency(todaysFinancial.totals.moved)} · gen {formatCurrency(todaysFinancial.totals.generated)} · cut {formatCurrency(todaysFinancial.totals.cut)}
             </div>
           </div>
           <div className={`text-center p-3 rounded-lg ${dayStatus.bgColor}`}>
