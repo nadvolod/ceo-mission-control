@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import type { DailyHealthNote } from '@/lib/types';
 
 // ---------------------------------------------------------------------------
@@ -157,6 +157,9 @@ function buildEnv(
 export function MorningLogForm({ templates, notes, onSave, onUpdateTemplate }: MorningLogFormProps) {
   const today = todayStr();
 
+  // ── Ref for scrolling to top when an entry is loaded via Edit ─────────────
+  const formTopRef = useRef<HTMLDivElement>(null);
+
   // ── Date ──────────────────────────────────────────────────────────────────
   const [date, setDate] = useState<string>(today);
 
@@ -283,7 +286,7 @@ export function MorningLogForm({ templates, notes, onSave, onUpdateTemplate }: M
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="max-w-2xl mx-auto">
+    <div ref={formTopRef} className="max-w-2xl mx-auto">
 
       {/* Date selector */}
       <div className="flex items-center space-x-3 mb-6">
@@ -602,7 +605,10 @@ export function MorningLogForm({ templates, notes, onSave, onUpdateTemplate }: M
                   </div>
                   <button
                     type="button"
-                    onClick={() => handleDateChange(entryDate)}
+                    onClick={() => {
+                      handleDateChange(entryDate);
+                      formTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                    }}
                     className="text-xs text-blue-500 hover:text-blue-700 flex-shrink-0"
                   >
                     Edit
