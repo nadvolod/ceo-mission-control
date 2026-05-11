@@ -1062,3 +1062,41 @@ test.describe('Health Intelligence UI interactions', () => {
     expect(jsErrors).toHaveLength(0);
   });
 });
+
+test.describe('Money move logging in Weekly Performance Tracker', () => {
+  test('logs a money move and reflects it in Net Today + day cell', async ({ page }) => {
+    await page.goto('/dashboard');
+    await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+    const hasFullDashboard = await page
+      .getByRole('heading', { name: 'Weekly Performance Tracker' })
+      .isVisible()
+      .catch(() => false);
+    test.skip(!hasFullDashboard, 'Weekly Performance Tracker not rendered (workspace data unavailable)');
+
+    // Capture Net Today's starting value so we can verify the delta after submit
+    const netTodayValue = page.getByTestId('net-today-value');
+    await expect(netTodayValue).toBeVisible();
+    const before = (await netTodayValue.textContent()) ?? '$0';
+
+    // Open the Cut quick-add form and submit a unique description so we can find it later
+    await page.getByRole('button', { name: /^\+ Cut$/ }).click();
+    const uniqueDescription = `e2e-storage-${Date.now()}`;
+    await page.getByLabel('amount').fill('150');
+    await page.getByLabel('description').fill(uniqueDescription);
+    await page.getByRole('button', { name: /Save move/i }).click();
+
+    // After submit, the form collapses (Save move button no longer visible) and Net Today updates
+    await expect(page.getByRole('button', { name: /Save move/i })).toBeHidden({ timeout: 10_000 });
+    await expect(netTodayValue).not.toHaveText(before, { timeout: 10_000 });
+
+    // The matching day's grid cell shows a $ value. Today's column index = (getDay() + 6) % 7.
+    const todayIdx = (new Date().getDay() + 6) % 7;
+    const dayMoney = page.getByTestId(`day-money-${todayIdx}`);
+    await expect(dayMoney).not.toHaveText('—');
+
+    // Hover reveals the popover with our unique description
+    await dayMoney.hover();
+    await expect(page.getByText(uniqueDescription)).toBeVisible({ timeout: 5_000 });
+  });
+});
