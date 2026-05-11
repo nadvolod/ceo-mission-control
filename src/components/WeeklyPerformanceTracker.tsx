@@ -236,6 +236,18 @@ export function WeeklyPerformanceTracker({
     deepWork: d.deepWorkHours,
   }));
 
+  // Performance Summary stats for money trend
+  const moneyTrend = dailyFinancialTrend;
+  const totalNet = moneyTrend.reduce((acc, d) => acc + d.totals.netImpact, 0);
+  const avgNetPerDay = moneyTrend.length > 0 ? totalNet / moneyTrend.length : 0;
+  const bestMoneyDay = moneyTrend.reduce<{ date: string; value: number } | null>((best, d) => {
+    if (d.totals.netImpact <= 0) return best;
+    if (!best || d.totals.netImpact > best.value) {
+      return { date: d.date, value: d.totals.netImpact };
+    }
+    return best;
+  }, null);
+
   // Merge financial Net $/day into the 30-day trend chart
   const moneyHasData = dailyFinancialTrend.some(d => d.totals.netImpact !== 0);
   const financialByDate = new Map(dailyFinancialTrend.map(d => [d.date, d.totals.netImpact]));
@@ -968,6 +980,18 @@ export function WeeklyPerformanceTracker({
                       {currentWeekSummary.daysTracked > 0
                         ? Math.round((currentWeekSummary.zeroDays / currentWeekSummary.daysTracked) * 100)
                         : 0}%
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Avg net/day:</span>
+                    <span data-testid="avg-net-per-day" className="ml-2 font-semibold text-gray-900">
+                      {formatCurrency(Math.round(avgNetPerDay))}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Best money day:</span>
+                    <span data-testid="best-money-day" className="ml-2 font-semibold text-gray-900">
+                      {bestMoneyDay ? `${formatDate(bestMoneyDay.date)} ${formatCurrency(bestMoneyDay.value)}` : '—'}
                     </span>
                   </div>
                 </div>

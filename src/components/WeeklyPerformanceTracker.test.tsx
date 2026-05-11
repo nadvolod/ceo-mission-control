@@ -327,6 +327,59 @@ describe('WeeklyPerformanceTracker - Trends chart money series', () => {
   });
 });
 
+describe('WeeklyPerformanceTracker - Performance Summary', () => {
+  it('Avg net/day divides by days-in-range (30) and Best money day ties broken by earliest date', () => {
+    const trend = Array.from({ length: 30 }, (_, i) => ({
+      date: `2026-04-${String(11 + i).padStart(2, '0')}`,
+      entries: [],
+      totals: { moved: 0, generated: 0, cut: 0, netImpact: i === 5 ? 600 : i === 20 ? 600 : 0 },
+    }));
+    // Need at least one tracked day so Performance Summary is rendered.
+    const dailyTrend = Array.from({ length: 1 }, () => ({
+      date: '2026-05-11',
+      deepWorkHours: 1,
+      pipelineActions: 1,
+      trained: true,
+      timestamp: '',
+      isEmpty: false,
+    }));
+    render(
+      <WeeklyPerformanceTracker
+        {...baseProps}
+        dailyFinancialTrend={trend}
+        dailyTrend={dailyTrend}
+        currentWeekSummary={{ ...baseProps.currentWeekSummary, daysTracked: 1 }}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^Trends$/i }));
+    // 1200 / 30 = 40
+    expect(screen.getByTestId('avg-net-per-day')).toHaveTextContent('$40');
+    // Earlier date (Apr 16) wins the tie
+    expect(screen.getByTestId('best-money-day')).toHaveTextContent('Apr 16');
+    expect(screen.getByTestId('best-money-day')).toHaveTextContent('$600');
+  });
+
+  it('Best money day renders "—" when trend has no positive entries', () => {
+    const dailyTrend = Array.from({ length: 1 }, () => ({
+      date: '2026-05-11',
+      deepWorkHours: 1,
+      pipelineActions: 1,
+      trained: true,
+      timestamp: '',
+      isEmpty: false,
+    }));
+    render(
+      <WeeklyPerformanceTracker
+        {...baseProps}
+        dailyTrend={dailyTrend}
+        currentWeekSummary={{ ...baseProps.currentWeekSummary, daysTracked: 1 }}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^Trends$/i }));
+    expect(screen.getByTestId('best-money-day')).toHaveTextContent('—');
+  });
+});
+
 describe('WeeklyPerformanceTracker - Review form without revenue', () => {
   it('does not render a Revenue input in the review form', () => {
     render(<WeeklyPerformanceTracker {...baseProps} />);
