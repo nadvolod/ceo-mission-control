@@ -276,7 +276,7 @@ export interface WeeklyReview {
   id: string;
   weekStartDate: string;     // Monday YYYY-MM-DD
   weekEndDate: string;       // Sunday YYYY-MM-DD
-  revenue: number;           // $ weekly total
+  revenue?: number;          // $ weekly total (legacy; new submissions omit)
   slipAnalysis: string;      // "Where/why did I slip?"
   systemAdjustment: string;  // "What system do I adjust?"
   nextWeekTargets: string;

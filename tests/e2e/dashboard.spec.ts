@@ -123,40 +123,17 @@ test.describe('Dashboard page rendering', () => {
     }
   });
 
-  test('financial impact tracking shows daily prompt or metrics', async ({ page }) => {
+  test('money move quick-add buttons render on the Weekly Performance Tracker', async ({ page }) => {
     await page.goto('/dashboard');
     await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
 
     const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
     if (hasFullDashboard) {
-      // Financial Impact Tracking section should be visible
-      await expect(page.getByText('Financial Impact Tracking')).toBeVisible();
-
-      // Should show either the daily prompt or the metrics
-      const hasDailyPrompt = await page.getByText('How much money was moved today?').isVisible().catch(() => false);
-      const hasMetrics = await page.getByText('Money Moved').isVisible().catch(() => false);
-      expect(hasDailyPrompt || hasMetrics, 'should show daily prompt or financial metrics').toBeTruthy();
-
-      // Log Entry button should be visible
-      await expect(page.getByRole('button', { name: 'Log Entry' })).toBeVisible();
-    }
-  });
-
-  test('dashboard default tab shows Financial Impact before Weekly Performance', async ({ page }) => {
-    await page.goto('/dashboard');
-    await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
-
-    const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
-    if (hasFullDashboard) {
-      const allText = await page.textContent('main');
-      if (allText) {
-        const financialImpactPos = allText.indexOf('Financial Impact Tracking');
-        const weeklyPos = allText.indexOf('Weekly Performance Tracker');
-
-        if (financialImpactPos !== -1 && weeklyPos !== -1) {
-          expect(financialImpactPos).toBeLessThan(weeklyPos);
-        }
-      }
+      await expect(page.getByRole('heading', { name: 'Weekly Performance Tracker' })).toBeVisible();
+      await expect(page.getByRole('button', { name: /^\+ Moved$/ })).toBeVisible();
+      await expect(page.getByRole('button', { name: /^\+ Generated$/ })).toBeVisible();
+      await expect(page.getByRole('button', { name: /^\+ Cut$/ })).toBeVisible();
+      await expect(page.getByTestId('net-today-value')).toBeVisible();
     }
   });
 
@@ -182,8 +159,8 @@ test.describe('Dashboard page rendering', () => {
       // Task dashboard should now be visible
       const allText = await page.textContent('main');
       expect(allText).toContain('Tasks');
-      // Financial Impact should NOT be visible on Tasks tab
-      await expect(page.getByText('Financial Impact Tracking')).toBeHidden();
+      // Weekly Performance Tracker should NOT be visible on Tasks tab
+      await expect(page.getByRole('heading', { name: 'Weekly Performance Tracker' })).toBeHidden();
     }
   });
 
@@ -195,8 +172,8 @@ test.describe('Dashboard page rendering', () => {
     if (hasFullDashboard) {
       await page.getByRole('button', { name: /Monthly Review/i }).click();
       await expect(page.getByText('Mission Command')).toBeVisible();
-      // Financial Impact should NOT be visible on Monthly Review tab
-      await expect(page.getByText('Financial Impact Tracking')).toBeHidden();
+      // Weekly Performance Tracker should NOT be visible on Monthly Review tab
+      await expect(page.getByRole('heading', { name: 'Weekly Performance Tracker' })).toBeHidden();
     }
   });
 
@@ -229,16 +206,6 @@ test.describe('Dashboard page rendering', () => {
       // Weekly Performance Tracker should be visible on default Dashboard tab
       await expect(page.getByText('Weekly Performance Tracker')).toBeVisible();
       await expect(page.getByRole('button', { name: 'Log Today' })).toBeVisible();
-
-      // Verify it appears after Financial Impact Tracking
-      const allText = await page.textContent('main');
-      if (allText) {
-        const financialPos = allText.indexOf('Financial Impact Tracking');
-        const trackerPos = allText.indexOf('Weekly Performance Tracker');
-        if (financialPos !== -1 && trackerPos !== -1) {
-          expect(financialPos).toBeLessThan(trackerPos);
-        }
-      }
     }
   });
 
@@ -1060,5 +1027,43 @@ test.describe('Health Intelligence UI interactions', () => {
     await page.waitForTimeout(300);
 
     expect(jsErrors).toHaveLength(0);
+  });
+});
+
+test.describe('Money move logging in Weekly Performance Tracker', () => {
+  test('logs a money move and reflects it in Net Today + day cell', async ({ page }) => {
+    await page.goto('/dashboard');
+    await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+    const hasFullDashboard = await page
+      .getByRole('heading', { name: 'Weekly Performance Tracker' })
+      .isVisible()
+      .catch(() => false);
+    test.skip(!hasFullDashboard, 'Weekly Performance Tracker not rendered (workspace data unavailable)');
+
+    // Capture Net Today's starting value so we can verify the delta after submit
+    const netTodayValue = page.getByTestId('net-today-value');
+    await expect(netTodayValue).toBeVisible();
+    const before = (await netTodayValue.textContent()) ?? '$0';
+
+    // Open the Cut quick-add form and submit a unique description so we can find it later
+    await page.getByRole('button', { name: /^\+ Cut$/ }).click();
+    const uniqueDescription = `e2e-storage-${Date.now()}`;
+    await page.getByLabel('amount').fill('150');
+    await page.getByLabel('description').fill(uniqueDescription);
+    await page.getByRole('button', { name: /Save move/i }).click();
+
+    // After submit, the form collapses (Save move button no longer visible) and Net Today updates
+    await expect(page.getByRole('button', { name: /Save move/i })).toBeHidden({ timeout: 10_000 });
+    await expect(netTodayValue).not.toHaveText(before, { timeout: 10_000 });
+
+    // The matching day's grid cell shows a $ value. Today's column index = (getDay() + 6) % 7.
+    const todayIdx = (new Date().getDay() + 6) % 7;
+    const dayMoney = page.getByTestId(`day-money-${todayIdx}`);
+    await expect(dayMoney).not.toHaveText('—');
+
+    // Hover reveals the popover with our unique description
+    await dayMoney.hover();
+    await expect(page.getByText(uniqueDescription)).toBeVisible({ timeout: 5_000 });
   });
 });

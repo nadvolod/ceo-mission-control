@@ -145,6 +145,19 @@ describe('WeeklyTracker', () => {
       });
       expect(review.revenue).toBe(0);
     });
+
+    it('accepts a payload without revenue and stores 0', async () => {
+      const tracker = await WeeklyTracker.create();
+      await tracker.submitWeeklyReview({
+        slipAnalysis: 'x',
+        systemAdjustment: 'y',
+        nextWeekTargets: 'z',
+        bottleneck: 'b',
+        temporalTarget: 5,
+      } as never);
+      const reviews = tracker.getWeeklyReviews(1);
+      expect(reviews[0].revenue ?? 0).toBe(0);
+    });
   });
 
   describe('getTodaysEntry', () => {

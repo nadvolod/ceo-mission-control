@@ -1,4 +1,12 @@
+import { addDays, format, startOfWeek } from 'date-fns';
 import { loadJSON, saveJSON } from './storage';
+
+export class FinancialValidationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'FinancialValidationError';
+  }
+}
 
 export interface FinancialEntry {
   id: string;
@@ -49,13 +57,21 @@ export class FinancialTracker {
   }
 
   async addEntry(category: 'moved' | 'generated' | 'cut', amount: number, description: string, date?: string): Promise<FinancialEntry> {
+    if (!Number.isFinite(amount) || amount <= 0) {
+      throw new FinancialValidationError(`Invalid amount: amount must be greater than 0 (received ${amount})`);
+    }
+    const trimmedDescription = (description ?? '').trim();
+    if (trimmedDescription.length === 0) {
+      throw new FinancialValidationError('Invalid description: description is required');
+    }
+
     const entryDate = date || new Date().toISOString().split('T')[0];
     const timestamp = new Date().toISOString();
-    
+
     const entry: FinancialEntry = {
       id: `${category}_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
       amount,
-      description,
+      description: trimmedDescription,
       timestamp,
       category
     };
@@ -79,20 +95,23 @@ export class FinancialTracker {
     return entry;
   }
 
+  /** Sums monetary values via integer cents to avoid float drift (0.1 + 0.2 !== 0.3). */
+  private centSum(values: number[]): number {
+    const cents = values.reduce((acc, v) => acc + Math.round(v * 100), 0);
+    return cents / 100;
+  }
+
   private recalculateTotals(date: string): void {
     const dayMetrics = this.data.dailyMetrics[date];
     if (!dayMetrics) return;
 
-    const totals = { moved: 0, generated: 0, cut: 0, netImpact: 0 };
-
-    dayMetrics.entries.forEach(entry => {
-      totals[entry.category] += entry.amount;
-    });
-
+    const moved = this.centSum(dayMetrics.entries.filter(e => e.category === 'moved').map(e => e.amount));
+    const generated = this.centSum(dayMetrics.entries.filter(e => e.category === 'generated').map(e => e.amount));
+    const cut = this.centSum(dayMetrics.entries.filter(e => e.category === 'cut').map(e => e.amount));
     // Net impact = money moved + revenue generated + expenses cut
-    totals.netImpact = totals.moved + totals.generated + totals.cut;
+    const netImpact = this.centSum([moved, generated, cut]);
 
-    dayMetrics.totals = totals;
+    dayMetrics.totals = { moved, generated, cut, netImpact };
   }
 
   getTodaysMetrics(): DailyFinancialMetrics {
@@ -101,6 +120,59 @@ export class FinancialTracker {
       date: today,
       entries: [],
       totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 }
+    };
+  }
+
+  /**
+   * Returns a length-7 array of DailyFinancialMetrics, one per day from
+   * `weekStartDate` (Monday, YYYY-MM-DD) through the following Sunday inclusive.
+   * Days with no recorded entries return zero-filled placeholders.
+   */
+  getDailyMetricsForWeek(weekStartDate: string): DailyFinancialMetrics[] {
+    const start = new Date(`${weekStartDate}T12:00:00`);
+    return Array.from({ length: 7 }, (_, i) => {
+      const d = format(addDays(start, i), 'yyyy-MM-dd');
+      return this.data.dailyMetrics[d] ?? {
+        date: d,
+        entries: [],
+        totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 },
+      };
+    });
+  }
+
+  /**
+   * Returns DailyFinancialMetrics for each day in [startDate, endDate] inclusive.
+   * Days with no recorded entries return zero-filled placeholders.
+   */
+  getDailyMetricsForRange(startDate: string, endDate: string): DailyFinancialMetrics[] {
+    const start = new Date(`${startDate}T12:00:00`);
+    const end = new Date(`${endDate}T12:00:00`);
+    const days = Math.round((end.getTime() - start.getTime()) / (24 * 60 * 60 * 1000)) + 1;
+    if (days <= 0) return [];
+    return Array.from({ length: days }, (_, i) => {
+      const d = format(addDays(start, i), 'yyyy-MM-dd');
+      return this.data.dailyMetrics[d] ?? {
+        date: d,
+        entries: [],
+        totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 },
+      };
+    });
+  }
+
+  /**
+   * Returns totals across the previous Mon-Sun week (relative to today).
+   * Uses cent-based arithmetic via centSum for precision.
+   */
+  getPreviousWeekTotals(): { moved: number; generated: number; cut: number; netImpact: number } {
+    const now = new Date();
+    const prevWeekStart = addDays(startOfWeek(now, { weekStartsOn: 1 }), -7);
+    const prevWeekStartStr = format(prevWeekStart, 'yyyy-MM-dd');
+    const days = this.getDailyMetricsForWeek(prevWeekStartStr);
+    return {
+      moved: this.centSum(days.map(d => d.totals.moved)),
+      generated: this.centSum(days.map(d => d.totals.generated)),
+      cut: this.centSum(days.map(d => d.totals.cut)),
+      netImpact: this.centSum(days.map(d => d.totals.netImpact)),
     };
   }
 

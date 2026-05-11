@@ -59,7 +59,11 @@ export interface DashboardHandlers {
   handleAddFocusSession: (category: FocusCategory, hours: number, description: string) => Promise<void>;
   handleLogDay: (deepWorkHours: number, pipelineActions: number, trained: boolean) => Promise<void>;
   handleSubmitWeeklyReview: (review: {
-    revenue: number; slipAnalysis: string; systemAdjustment: string; nextWeekTargets: string; bottleneck: string; temporalTarget: number;
+    slipAnalysis: string;
+    systemAdjustment: string;
+    nextWeekTargets: string;
+    bottleneck: string;
+    temporalTarget: number;
   }) => Promise<void>;
   handleSubmitMonthlyReview: (review: Omit<MonthlyReview, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   handleDeleteMonthlyReview: (month: string) => Promise<void>;
@@ -347,7 +351,11 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
   }, [loadAllData]);
 
   const handleSubmitWeeklyReview = useCallback(async (review: {
-    revenue: number; slipAnalysis: string; systemAdjustment: string; nextWeekTargets: string; bottleneck: string; temporalTarget: number;
+    slipAnalysis: string;
+    systemAdjustment: string;
+    nextWeekTargets: string;
+    bottleneck: string;
+    temporalTarget: number;
   }) => {
     try {
       const response = await fetch('/api/weekly-tracker', {
