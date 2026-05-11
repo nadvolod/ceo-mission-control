@@ -134,7 +134,15 @@ export default function HomePage() {
                   dailyTrend={weeklyTrackerData.dailyTrend}
                   recentReviews={weeklyTrackerData.recentReviews}
                   onLogDay={handleLogDay}
-                  onSubmitReview={handleSubmitWeeklyReview}
+                  onSubmitReview={(review) =>
+                    handleSubmitWeeklyReview({
+                      slipAnalysis: review.slipAnalysis,
+                      systemAdjustment: review.systemAdjustment,
+                      nextWeekTargets: review.nextWeekTargets,
+                      bottleneck: review.bottleneck,
+                      temporalTarget: review.temporalTarget,
+                    })
+                  }
                   onAddFocusSession={handleAddFocusSession}
                   temporalActual={focusData?.weeklyTotals?.Temporal ?? scorecard.temporalActual ?? 0}
                   todaysFocusSessions={focusData?.recentSessions?.filter((s: { date: string }) => s.date === scorecard.date)}
