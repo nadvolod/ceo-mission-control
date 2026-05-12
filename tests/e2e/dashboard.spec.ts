@@ -754,6 +754,43 @@ test.describe('Garmin sync round-trip', () => {
 test.describe('editSupplement API', () => {
   const UNIQUE_SUPP = `E2E-Edit-Test-${Date.now()}`;
 
+  test.beforeAll(async ({ playwright }) => {
+    // Sweep any leftover E2E-prefixed supplements from previous failed test runs.
+    // Uses playwright.request (worker-scoped) since test-scoped `request` is not
+    // available in beforeAll hooks.
+    const baseURL = process.env.DASHBOARD_URL || 'https://ceo-mission-control-nine.vercel.app';
+    const ctx = await playwright.request.newContext({ baseURL });
+    try {
+      const res = await ctx.get('/api/health-notes');
+      if (!res.ok()) {
+        console.warn(`[editSupplement beforeAll] Could not fetch supplements for cleanup sweep (HTTP ${res.status()})`);
+        return;
+      }
+      const data = await res.json();
+      const staleTestSupplements: Array<{ name: string }> = (data.templates?.supplementTemplate ?? [])
+        .filter((s: { name: string }) => /^E2E-/.test(s.name));
+      for (const supp of staleTestSupplements) {
+        await ctx.post('/api/health-notes', {
+          data: { action: 'update-templates', operation: 'removeSupplement', name: supp.name },
+        });
+      }
+    } finally {
+      await ctx.dispose();
+    }
+  });
+
+  test.afterEach(async ({ request }) => {
+    // Guarantee cleanup even when tests fail or are skipped mid-way.
+    // removeSupplement is a no-op for names that don't exist, so this is safe to call
+    // unconditionally after every test in this describe block.
+    await request.post('/api/health-notes', {
+      data: { action: 'update-templates', operation: 'removeSupplement', name: UNIQUE_SUPP },
+    });
+    await request.post('/api/health-notes', {
+      data: { action: 'update-templates', operation: 'removeSupplement', name: `${UNIQUE_SUPP}-Edited` },
+    });
+  });
+
   test('add, edit, and remove a supplement end-to-end', async ({ request }) => {
     // 1. Add a test supplement
     const addRes = await request.post('/api/health-notes', {
@@ -857,6 +894,21 @@ test.describe('editSupplement API', () => {
 });
 
 test.describe('Health Intelligence UI interactions', () => {
+  // Supplement names used across tests in this block — kept here to stay in sync with cleanup.
+  const UI_TEST_SUPPLEMENT = 'E2E-Edit-UI-Test';
+  const SAVE_TEST_SUPPLEMENT = 'E2E-Save-Test';
+  const SAVE_TEST_RENAMED = 'E2E-Save-Test-Renamed';
+
+  test.afterEach(async ({ request }) => {
+    // Guarantee cleanup of all supplement test data, even if tests fail or are skipped mid-way.
+    // removeSupplement is a no-op for names that don't exist, so this is safe unconditionally.
+    for (const name of [UI_TEST_SUPPLEMENT, SAVE_TEST_SUPPLEMENT, SAVE_TEST_RENAMED]) {
+      await request.post('/api/health-notes', {
+        data: { action: 'update-templates', operation: 'removeSupplement', name },
+      });
+    }
+  });
+
   test('charts tab shows empty state or rendered chart (not blank)', async ({ page, request }) => {
     const jsErrors: string[] = [];
     page.on('pageerror', error => jsErrors.push(error.message));
@@ -894,12 +946,12 @@ test.describe('Health Intelligence UI interactions', () => {
 
     // Clean up any leftovers from prior runs
     await request.post('/api/health-notes', {
-      data: { action: 'update-templates', operation: 'removeSupplement', name: 'E2E-Edit-UI-Test' },
+      data: { action: 'update-templates', operation: 'removeSupplement', name: UI_TEST_SUPPLEMENT },
     });
 
     // Ensure exactly one test supplement exists
     const addRes = await request.post('/api/health-notes', {
-      data: { action: 'update-templates', operation: 'addSupplement', name: 'E2E-Edit-UI-Test', defaultDosageMg: 50 },
+      data: { action: 'update-templates', operation: 'addSupplement', name: UI_TEST_SUPPLEMENT, defaultDosageMg: 50 },
     });
     if (addRes.status() === 401) {
       test.skip();
@@ -914,7 +966,7 @@ test.describe('Health Intelligence UI interactions', () => {
     await page.getByRole('button', { name: /Settings/i }).click();
 
     // Find the Edit button for our test supplement (exact match)
-    const editButton = page.getByRole('button', { name: 'Edit E2E-Edit-UI-Test', exact: true });
+    const editButton = page.getByRole('button', { name: `Edit ${UI_TEST_SUPPLEMENT}`, exact: true });
     await expect(editButton).toBeVisible();
     await editButton.click();
 
@@ -929,10 +981,7 @@ test.describe('Health Intelligence UI interactions', () => {
     await expect(supplementSection.getByRole('button', { name: 'Save', exact: true })).toBeHidden();
     await expect(editButton).toBeVisible();
 
-    // Clean up
-    await request.post('/api/health-notes', {
-      data: { action: 'update-templates', operation: 'removeSupplement', name: 'E2E-Edit-UI-Test' },
-    });
+    // Clean up is handled by the afterEach hook
 
     expect(jsErrors).toHaveLength(0);
   });
@@ -940,15 +989,15 @@ test.describe('Health Intelligence UI interactions', () => {
   test('Settings Edit button saves changes and persists via API', async ({ page, request }) => {
     // Clean up any leftovers from prior runs
     await request.post('/api/health-notes', {
-      data: { action: 'update-templates', operation: 'removeSupplement', name: 'E2E-Save-Test' },
+      data: { action: 'update-templates', operation: 'removeSupplement', name: SAVE_TEST_SUPPLEMENT },
     });
     await request.post('/api/health-notes', {
-      data: { action: 'update-templates', operation: 'removeSupplement', name: 'E2E-Save-Test-Renamed' },
+      data: { action: 'update-templates', operation: 'removeSupplement', name: SAVE_TEST_RENAMED },
     });
 
     // Add a supplement to edit
     const addRes = await request.post('/api/health-notes', {
-      data: { action: 'update-templates', operation: 'addSupplement', name: 'E2E-Save-Test', defaultDosageMg: 10 },
+      data: { action: 'update-templates', operation: 'addSupplement', name: SAVE_TEST_SUPPLEMENT, defaultDosageMg: 10 },
     });
     if (addRes.status() === 401) {
       test.skip();
@@ -962,8 +1011,8 @@ test.describe('Health Intelligence UI interactions', () => {
     await healthSection.scrollIntoViewIfNeeded();
     await page.getByRole('button', { name: /Settings/i }).click();
 
-    // Click Edit (exact match to avoid matching "E2E-Save-Test-Renamed")
-    const editButton = page.getByRole('button', { name: 'Edit E2E-Save-Test', exact: true });
+    // Click Edit (exact match to avoid matching the renamed version)
+    const editButton = page.getByRole('button', { name: `Edit ${SAVE_TEST_SUPPLEMENT}`, exact: true });
     await expect(editButton).toBeVisible();
     await editButton.click();
 
@@ -974,7 +1023,7 @@ test.describe('Health Intelligence UI interactions', () => {
     // Modify the name input
     const nameInput = editRow.locator('input[type="text"]');
     await nameInput.clear();
-    await nameInput.fill('E2E-Save-Test-Renamed');
+    await nameInput.fill(SAVE_TEST_RENAMED);
 
     // Modify dosage
     const dosageInput = editRow.locator('input[type="number"]');
@@ -991,19 +1040,16 @@ test.describe('Health Intelligence UI interactions', () => {
     const getRes = await request.get('/api/health-notes');
     const getData = await getRes.json();
     const renamed = getData.templates.supplementTemplate.find(
-      (s: { name: string }) => s.name === 'E2E-Save-Test-Renamed'
+      (s: { name: string }) => s.name === SAVE_TEST_RENAMED
     );
     expect(renamed, 'renamed supplement should exist in API response').toBeTruthy();
     expect(renamed.defaultDosageMg).toBe(99);
     // Old name should be gone
     expect(getData.templates.supplementTemplate.find(
-      (s: { name: string }) => s.name === 'E2E-Save-Test'
+      (s: { name: string }) => s.name === SAVE_TEST_SUPPLEMENT
     )).toBeFalsy();
 
-    // Clean up
-    await request.post('/api/health-notes', {
-      data: { action: 'update-templates', operation: 'removeSupplement', name: 'E2E-Save-Test-Renamed' },
-    });
+    // Clean up is handled by the afterEach hook
   });
 
   test('Settings tab has no JS errors during tab switching', async ({ page }) => {
