@@ -310,8 +310,6 @@ export interface WeeklyTrackerData {
 export interface MonthlyReviewRatings {
   discipline: number;       // 1-10
   focus: number;            // 1-10
-  executive: number;        // 1-10
-  math: number;             // 1-10
   nutrition: number;        // 1-10
   fitness: number;          // 1-10
   sleep: number;            // 1-10

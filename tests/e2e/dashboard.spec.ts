@@ -412,7 +412,7 @@ test.describe('Dashboard page rendering', () => {
         decisionSource: 'discipline',
         badHabits: 'Skipping tests',
         goodPatterns: 'TDD',
-        ratings: { discipline: 8, focus: 7, executive: 6, math: 5, nutrition: 7, fitness: 6, sleep: 7 },
+        ratings: { discipline: 8, focus: 7, nutrition: 7, fitness: 6, sleep: 7 },
         oneThingToFix: 'More test coverage',
         disciplinedVersionAction: 'Write tests first always',
       },
