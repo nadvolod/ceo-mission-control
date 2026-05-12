@@ -15,8 +15,6 @@ import type { MonthlyReview, MonthlyReviewRatings } from '@/lib/types';
 const RATING_KEYS: Array<{ key: keyof MonthlyReviewRatings; label: string; color: string }> = [
   { key: 'discipline', label: 'Discipline', color: '#2563eb' },
   { key: 'focus', label: 'Focus', color: '#7c3aed' },
-  { key: 'executive', label: 'Executive', color: '#0891b2' },
-  { key: 'math', label: 'Math', color: '#059669' },
   { key: 'nutrition', label: 'Nutrition', color: '#d97706' },
   { key: 'fitness', label: 'Fitness', color: '#dc2626' },
   { key: 'sleep', label: 'Sleep', color: '#6366f1' },
@@ -41,7 +39,7 @@ const TABS: Array<{ id: TabId; label: string }> = [
 // ---------------------------------------------------------------------------
 
 function emptyRatings(): MonthlyReviewRatings {
-  return { discipline: 5, focus: 5, executive: 5, math: 5, nutrition: 5, fitness: 5, sleep: 5 };
+  return { discipline: 5, focus: 5, nutrition: 5, fitness: 5, sleep: 5 };
 }
 
 function avgRating(r: MonthlyReviewRatings): string {

@@ -4,7 +4,7 @@ import { loadJSON, saveJSON, appendAuditLog } from './storage';
 const STORAGE_KEY = 'monthly-review.json';
 
 const RATING_KEYS: (keyof MonthlyReviewRatings)[] = [
-  'discipline', 'focus', 'executive', 'math', 'nutrition', 'fitness', 'sleep',
+  'discipline', 'focus', 'nutrition', 'fitness', 'sleep',
 ];
 
 const VALID_DECISION_SOURCES = ['discipline', 'emotion', 'mixed'] as const;
