@@ -8,7 +8,24 @@ import type { DailyHealthNote } from '@/lib/types';
 // ---------------------------------------------------------------------------
 
 const scrollIntoViewMock = jest.fn();
-window.HTMLElement.prototype.scrollIntoView = scrollIntoViewMock;
+let originalScrollIntoView: typeof window.HTMLElement.prototype.scrollIntoView;
+
+beforeAll(() => {
+  originalScrollIntoView = window.HTMLElement.prototype.scrollIntoView;
+  Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
+    configurable: true,
+    writable: true,
+    value: scrollIntoViewMock,
+  });
+});
+
+afterAll(() => {
+  Object.defineProperty(window.HTMLElement.prototype, 'scrollIntoView', {
+    configurable: true,
+    writable: true,
+    value: originalScrollIntoView,
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Test fixtures
