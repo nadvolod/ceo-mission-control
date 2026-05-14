@@ -13,7 +13,7 @@ function hasDb(): boolean {
   return !!process.env.DATABASE_URL;
 }
 
-const DEFAULT_OWNER_ID = '00000000-0000-0000-0000-000000000000';
+const SYSTEM_OWNER_ID = '00000000-0000-0000-0000-000000000000';
 
 function isOwnerIdRequiredError(error: unknown): boolean {
   const candidate = error as { code?: string; message?: string };
@@ -71,7 +71,7 @@ export async function saveJSON(filename: string, data: unknown): Promise<void> {
           throw error;
         }
         await db`INSERT INTO data_store (key, data, updated_at, owner_id)
-                 VALUES (${filename}, ${payload}, NOW(), ${DEFAULT_OWNER_ID})`;
+                 VALUES (${filename}, ${payload}, NOW(), ${SYSTEM_OWNER_ID})`;
       }
     }
     return;
@@ -128,7 +128,7 @@ export async function saveText(filename: string, content: string): Promise<void>
           throw error;
         }
         await db`INSERT INTO text_store (key, content, updated_at, owner_id)
-                 VALUES (${filename}, ${content}, NOW(), ${DEFAULT_OWNER_ID})`;
+                 VALUES (${filename}, ${content}, NOW(), ${SYSTEM_OWNER_ID})`;
       }
     }
     return;
@@ -155,7 +155,7 @@ export async function appendAuditLog(date: string, entryType: string, content: s
       if (isOwnerIdRequiredError(error)) {
         try {
           await db`INSERT INTO audit_log (date, entry_type, content, owner_id)
-                   VALUES (${date}, ${entryType}, ${content}, ${DEFAULT_OWNER_ID})`;
+                   VALUES (${date}, ${entryType}, ${content}, ${SYSTEM_OWNER_ID})`;
           return;
         } catch (retryError) {
           console.error('DB audit log error:', retryError);
