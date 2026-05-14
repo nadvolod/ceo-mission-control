@@ -16,6 +16,8 @@ import { GET as weeklyTrackerGet, POST as weeklyTrackerPost } from '@/app/api/we
 
 // Do NOT mock storage — these tests use the real DB
 const REQUIRED_ENV = 'DATABASE_URL';
+const DEFAULT_OWNER_ID = '00000000-0000-0000-0000-000000000000';
+let seededDefaultOwner = false;
 
 beforeAll(() => {
   if (!process.env[REQUIRED_ENV]) {
@@ -25,6 +27,27 @@ beforeAll(() => {
       'or set DATABASE_URL in your environment.'
     );
   }
+});
+
+beforeAll(async () => {
+  await ensureDbReady();
+  const db = getDb();
+  if (!db) return;
+  const inserted = await db`
+    INSERT INTO users (id, email)
+    VALUES (${DEFAULT_OWNER_ID}, 'integration-test@example.com')
+    ON CONFLICT (id) DO NOTHING
+    RETURNING id
+  `;
+  seededDefaultOwner = inserted.length > 0;
+});
+
+afterAll(async () => {
+  if (!seededDefaultOwner) return;
+  await ensureDbReady();
+  const db = getDb();
+  if (!db) return;
+  await db`DELETE FROM users WHERE id = ${DEFAULT_OWNER_ID}`;
 });
 
 // Auth headers for requests when SYNC_API_KEY is configured
