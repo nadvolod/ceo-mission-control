@@ -396,81 +396,73 @@ test.describe('Dashboard page rendering', () => {
 
   test('monthly review compact layout: hours worked and temporal hours persist independently', async ({ page, request }) => {
     const TEST_MONTH = '2099-11';
-    await request.post('/api/monthly-review', {
+    const cleanup = () => request.post('/api/monthly-review', {
       data: { action: 'deleteReview', month: TEST_MONTH },
-    });
+    }).catch(() => null);
 
-    await page.goto('/dashboard');
-    await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+    await cleanup();
 
-    const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
-    if (!hasFullDashboard) {
-      test.skip();
-      return;
+    try {
+      await page.goto('/dashboard');
+      await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+      const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
+      if (!hasFullDashboard) {
+        test.skip();
+        return;
+      }
+
+      await page.getByRole('button', { name: /Monthly Review/i }).click();
+      await expect(page.getByRole('button', { name: /New Review/ })).toBeVisible();
+      await page.getByRole('button', { name: /New Review/ }).click();
+
+      await page.locator('#mr-month').fill(TEST_MONTH);
+
+      const hoursInput = page.locator('#mr-hours');
+      const temporalInput = page.locator('#mr-temporal');
+      await expect(hoursInput).toBeVisible();
+      await expect(temporalInput).toBeVisible();
+
+      const hoursBox = await hoursInput.boundingBox();
+      const temporalBox = await temporalInput.boundingBox();
+      expect(hoursBox?.width ?? 0).toBeLessThan(150);
+      expect(temporalBox?.width ?? 0).toBeLessThan(150);
+
+      await hoursInput.fill('97');
+      await temporalInput.fill('40');
+      await page.locator('#mr-alignment').fill('alignment text');
+      await page.locator('#mr-lesson').fill('lesson text');
+
+      const alignBox = await page.locator('#mr-alignment').boundingBox();
+      const lessonBox = await page.locator('#mr-lesson').boundingBox();
+      if (alignBox && lessonBox) {
+        expect(Math.abs(alignBox.y - lessonBox.y)).toBeLessThan(20);
+        expect(lessonBox.x).toBeGreaterThan(alignBox.x);
+      }
+
+      const submitRes = page.waitForResponse(
+        r => r.url().includes('/api/monthly-review') && r.request().method() === 'POST',
+        { timeout: 10_000 }
+      ).catch(() => null);
+      await page.getByRole('button', { name: /Save Review|Update Review/ }).click();
+      const response = await submitRes;
+
+      if (!response || response.status() === 401 || response.status() === 500) {
+        test.skip();
+        return;
+      }
+
+      const getRes = await request.get('/api/monthly-review');
+      const getData = await getRes.json();
+      const review = getData.recentReviews.find((r: any) => r.month === TEST_MONTH);
+      expect(review).toBeTruthy();
+      expect(review.hoursWorked).toBe(97);
+      expect(review.temporalHours).toBe(40);
+      expect(review.alignmentCheck).toBe('alignment text');
+      expect(review.monthLesson).toBe('lesson text');
+    } finally {
+      await cleanup();
     }
-
-    await page.getByRole('button', { name: /Monthly Review/i }).click();
-    await expect(page.getByRole('button', { name: /New Review/ })).toBeVisible();
-    await page.getByRole('button', { name: /New Review/ }).click();
-
-    // Set month
-    await page.locator('#mr-month').fill(TEST_MONTH);
-
-    // Verify the compact inputs are narrow (w-24 in our layout)
-    const hoursInput = page.locator('#mr-hours');
-    const temporalInput = page.locator('#mr-temporal');
-    await expect(hoursInput).toBeVisible();
-    await expect(temporalInput).toBeVisible();
-
-    const hoursBox = await hoursInput.boundingBox();
-    const temporalBox = await temporalInput.boundingBox();
-    // Compact width — should be roughly w-24 (96px), allow some slack for borders/padding
-    expect(hoursBox?.width ?? 0).toBeLessThan(150);
-    expect(temporalBox?.width ?? 0).toBeLessThan(150);
-
-    await hoursInput.fill('97');
-    await temporalInput.fill('40');
-    await page.locator('#mr-alignment').fill('alignment text');
-    await page.locator('#mr-lesson').fill('lesson text');
-
-    // Verify the alignment/lesson textareas are side-by-side (compact layout)
-    const alignBox = await page.locator('#mr-alignment').boundingBox();
-    const lessonBox = await page.locator('#mr-lesson').boundingBox();
-    if (alignBox && lessonBox) {
-      // They should be on roughly the same vertical row, not stacked
-      expect(Math.abs(alignBox.y - lessonBox.y)).toBeLessThan(20);
-      // lesson should be to the right of alignment
-      expect(lessonBox.x).toBeGreaterThan(alignBox.x);
-    }
-
-    // Submit via UI
-    const submitRes = page.waitForResponse(
-      r => r.url().includes('/api/monthly-review') && r.request().method() === 'POST',
-      { timeout: 10_000 }
-    ).catch(() => null);
-    await page.getByRole('button', { name: /Save Review|Update Review/ }).click();
-    const response = await submitRes;
-
-    if (!response || response.status() === 401 || response.status() === 500) {
-      await request.post('/api/monthly-review', { data: { action: 'deleteReview', month: TEST_MONTH } });
-      test.skip();
-      return;
-    }
-
-    // Verify via API
-    const getRes = await request.get('/api/monthly-review');
-    const getData = await getRes.json();
-    const review = getData.recentReviews.find((r: any) => r.month === TEST_MONTH);
-    expect(review).toBeTruthy();
-    expect(review.hoursWorked).toBe(97);
-    expect(review.temporalHours).toBe(40);
-    expect(review.alignmentCheck).toBe('alignment text');
-    expect(review.monthLesson).toBe('lesson text');
-
-    // Clean up
-    await request.post('/api/monthly-review', {
-      data: { action: 'deleteReview', month: TEST_MONTH },
-    });
   });
 
   test('weekly review with temporalTarget persists and appears in GET', async ({ request }) => {
@@ -621,9 +613,10 @@ test.describe('Dashboard page rendering', () => {
 
       // Click History tab and verify it switches
       await historyTab.click();
-      // Should show either reviews or empty state
-      const hasReviews = await page.getByText(/\d{4}/).isVisible().catch(() => false);
-      const hasEmptyState = await page.getByText('No monthly reviews yet').isVisible().catch(() => false);
+      // Should show either reviews or empty state. Use .first() because multiple reviews
+      // (and other 4-digit numbers on the page) can match /\d{4}/ in strict mode.
+      const hasReviews = await page.getByText(/\d{4}/).first().isVisible().catch(() => false);
+      const hasEmptyState = await page.getByText('No monthly reviews yet').first().isVisible().catch(() => false);
       expect(hasReviews || hasEmptyState, 'History tab should show reviews or empty state').toBeTruthy();
     }
   });
