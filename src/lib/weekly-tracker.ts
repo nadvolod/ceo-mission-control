@@ -155,15 +155,17 @@ export class WeeklyTracker {
 
   /** Delete a weekly review by id. Returns true if it existed. */
   async deleteWeeklyReview(id: string): Promise<boolean> {
-    const before = this.data.weeklyReviews.length;
+    const matched = this.data.weeklyReviews.find((r) => r.id === id);
+    if (!matched) return false;
     this.data.weeklyReviews = this.data.weeklyReviews.filter((r) => r.id !== id);
-    if (this.data.weeklyReviews.length === before) return false;
     await this.saveData();
+    // Audit-log under the week the review covered, not today — preserves
+    // forensic locality when reviewing the trail months later.
     await appendAuditLog(
       this.ownerId,
-      new Date().toISOString().slice(0, 10),
+      matched.weekStartDate,
       'weekly-tracker',
-      `Weekly review deleted: ${id}`,
+      `Weekly review deleted: ${id} (week of ${matched.weekStartDate})`,
     );
     return true;
   }

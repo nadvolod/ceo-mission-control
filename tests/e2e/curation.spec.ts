@@ -9,17 +9,16 @@ test.describe('Curation (delete affordances)', () => {
   test.describe.configure({ mode: 'serial' });
 
   test('test user can create a daily entry then delete it through the API', async ({ request }) => {
+    // Use a fixed date in the recent past so this test isn't flaky around
+    // midnight boundaries (where logDay-without-date could land on day N
+    // and the readback could fall on day N+1).
+    const date = '2025-01-15';
     const create = await request.post('/api/weekly-tracker', {
-      data: { action: 'logDay', deepWorkHours: 3, pipelineActions: 2, trained: true },
+      data: { action: 'logDay', deepWorkHours: 3, pipelineActions: 2, trained: true, date },
     });
     expect(create.status()).toBe(200);
     const created = await create.json();
-    const date = created.entry.date;
-
-    const beforeRead = await request.get('/api/weekly-tracker');
-    const before = await beforeRead.json();
-    expect(before.todaysEntry).not.toBeNull();
-    expect(before.todaysEntry.date).toBe(date);
+    expect(created.entry.date).toBe(date);
 
     const del = await request.post('/api/weekly-tracker', {
       data: { action: 'deleteDay', date },
@@ -29,9 +28,12 @@ test.describe('Curation (delete affordances)', () => {
     expect(delBody.success).toBe(true);
     expect(delBody.deleted).toBe(true);
 
-    const afterRead = await request.get('/api/weekly-tracker');
-    const after = await afterRead.json();
-    expect(after.todaysEntry).toBeNull();
+    // Confirm the row is gone via getAllData (date may be outside the
+    // current-week summary, so todaysEntry is the wrong assertion).
+    const after = await (await request.post('/api/weekly-tracker', {
+      data: { action: 'getAllData' },
+    })).json();
+    expect(after.data.dailyEntries[date]).toBeUndefined();
   });
 
   test('deleteDay returns deleted:false for a date that does not exist', async ({ request }) => {

@@ -6,13 +6,7 @@ import { requireEffectiveUserId, isRealAdminRequest } from '@/lib/session';
 // empty cache could otherwise trigger a fresh fetch and store admin's real
 // financial accounts under their own owner_id. Until per-user Monarch
 // credentials exist, gate this route to the real admin (not impersonated).
-async function guard(request: NextRequest): Promise<NextResponse | null> {
-  if (!process.env.MONARCH_TOKEN) {
-    return NextResponse.json(
-      { error: 'Monarch Money not configured. Set MONARCH_TOKEN environment variable.' },
-      { status: 503 },
-    );
-  }
+async function requireRealAdmin(request: NextRequest): Promise<NextResponse | null> {
   if (!(await isRealAdminRequest(request))) {
     return NextResponse.json(
       { error: 'Monarch data is admin-only until per-user credentials are supported.' },
@@ -23,11 +17,25 @@ async function guard(request: NextRequest): Promise<NextResponse | null> {
 }
 
 export async function GET(request: NextRequest) {
-  const blocked = await guard(request);
+  const blocked = await requireRealAdmin(request);
   if (blocked) return blocked;
 
+  // No MONARCH_TOKEN? Serve stale cache when we have one, 503 otherwise.
+  // The earlier "fail fast on missing token" regressed the stale-cache
+  // path that admins relied on during brief token outages.
+  const ownerId = await requireEffectiveUserId(request);
+  if (!process.env.MONARCH_TOKEN) {
+    const stale = await getCachedSnapshot(ownerId);
+    if (stale) {
+      return NextResponse.json({ ...stale, stale: true });
+    }
+    return NextResponse.json(
+      { error: 'Monarch Money not configured. Set MONARCH_TOKEN environment variable.' },
+      { status: 503 },
+    );
+  }
+
   try {
-    const ownerId = await requireEffectiveUserId(request);
     const snapshot = await getFinancialSnapshot(ownerId);
     return NextResponse.json(snapshot);
   } catch (error) {
@@ -35,7 +43,6 @@ export async function GET(request: NextRequest) {
 
     // Try to serve stale cache on error
     try {
-      const ownerId = await requireEffectiveUserId(request);
       const stale = await getCachedSnapshot(ownerId);
       if (stale) {
         return NextResponse.json({ ...stale, stale: true });
@@ -52,8 +59,16 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const blocked = await guard(request);
+  const blocked = await requireRealAdmin(request);
   if (blocked) return blocked;
+
+  // POST exclusively triggers fresh fetches — token MUST be present.
+  if (!process.env.MONARCH_TOKEN) {
+    return NextResponse.json(
+      { error: 'Monarch Money not configured. Set MONARCH_TOKEN environment variable.' },
+      { status: 503 },
+    );
+  }
 
   try {
     const body = await request.json();

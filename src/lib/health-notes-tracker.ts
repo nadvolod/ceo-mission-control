@@ -80,6 +80,12 @@ export class HealthNotesTracker {
 
   /** Delete the note for a specific YYYY-MM-DD. Returns true if it existed. */
   async deleteNote(date: string): Promise<boolean> {
+    // Defense in depth: validate even though API routes also check.
+    // Without this, a caller could pass `__proto__` or similar and walk
+    // the prototype chain.
+    if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new Error('date must be a valid YYYY-MM-DD string');
+    }
     if (!this.data.notes[date]) return false;
     delete this.data.notes[date];
     await this.saveData();
