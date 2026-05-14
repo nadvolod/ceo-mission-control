@@ -48,7 +48,8 @@ export class FinancialTracker {
 
   private async loadData(): Promise<void> {
     const defaultData: FinancialData = { dailyMetrics: {}, lastUpdated: new Date().toISOString() };
-    this.data = await loadJSON('financial-metrics.json', defaultData);
+    const loaded = await loadJSON('financial-metrics.json', defaultData);
+    this.data = this.normalizeLoadedData(loaded, defaultData);
   }
 
   private async saveData(): Promise<void> {
@@ -84,6 +85,7 @@ export class FinancialTracker {
         totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 }
       };
     }
+    this.ensureDayShape(entryDate);
 
     // Add entry
     this.data.dailyMetrics[entryDate].entries.push(entry);
@@ -102,6 +104,7 @@ export class FinancialTracker {
   }
 
   private recalculateTotals(date: string): void {
+    this.ensureDayShape(date);
     const dayMetrics = this.data.dailyMetrics[date];
     if (!dayMetrics) return;
 
@@ -112,6 +115,53 @@ export class FinancialTracker {
     const netImpact = this.centSum([moved, generated, cut]);
 
     dayMetrics.totals = { moved, generated, cut, netImpact };
+  }
+
+  private normalizeLoadedData(data: unknown, fallback: FinancialData): FinancialData {
+    if (!data || typeof data !== 'object') return fallback;
+
+    const loaded = data as Partial<FinancialData>;
+    const normalized: FinancialData = {
+      dailyMetrics: {},
+      lastUpdated: typeof loaded.lastUpdated === 'string' ? loaded.lastUpdated : fallback.lastUpdated,
+    };
+
+    if (loaded.dailyMetrics && typeof loaded.dailyMetrics === 'object') {
+      normalized.dailyMetrics = loaded.dailyMetrics;
+    }
+
+    Object.keys(normalized.dailyMetrics).forEach(date => this.ensureDayShape(date, normalized.dailyMetrics));
+    return normalized;
+  }
+
+  private ensureDayShape(date: string, dailyMetrics = this.data.dailyMetrics): void {
+    const existing = dailyMetrics[date];
+    if (!existing || typeof existing !== 'object') {
+      dailyMetrics[date] = {
+        date,
+        entries: [],
+        totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 },
+      };
+      return;
+    }
+
+    const withDefaults = existing as Partial<DailyFinancialMetrics>;
+    if (!Array.isArray(withDefaults.entries)) {
+      withDefaults.entries = [];
+    }
+    const totals = withDefaults.totals as Partial<DailyFinancialMetrics['totals']> | undefined;
+    if (!totals || typeof totals !== 'object') {
+      withDefaults.totals = { moved: 0, generated: 0, cut: 0, netImpact: 0 };
+    } else {
+      withDefaults.totals = {
+        moved: Number.isFinite(totals.moved) ? totals.moved : 0,
+        generated: Number.isFinite(totals.generated) ? totals.generated : 0,
+        cut: Number.isFinite(totals.cut) ? totals.cut : 0,
+        netImpact: Number.isFinite(totals.netImpact) ? totals.netImpact : 0,
+      };
+    }
+    withDefaults.date = withDefaults.date || date;
+    dailyMetrics[date] = withDefaults as DailyFinancialMetrics;
   }
 
   getTodaysMetrics(): DailyFinancialMetrics {

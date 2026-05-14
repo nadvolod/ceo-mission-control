@@ -151,6 +151,31 @@ describe('FinancialTracker.addEntry (input validation)', () => {
     const data = tracker.getAllData();
     expect(data.dailyMetrics[DATE].entries[0].description).toBe('hello world');
   });
+
+  it('adds entries when existing day data is legacy and missing entries array', async () => {
+    await storage.saveJSON('financial-metrics.json', {
+      dailyMetrics: {
+        [DATE]: {
+          date: DATE,
+          totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 },
+        },
+      },
+      lastUpdated: new Date().toISOString(),
+    });
+
+    const tracker = await FinancialTracker.create();
+
+    await expect(tracker.addEntry('cut', 250, 'Legacy day fix', DATE)).resolves.toMatchObject({
+      category: 'cut',
+      amount: 250,
+      description: 'Legacy day fix',
+    });
+
+    const data = tracker.getAllData();
+    expect(data.dailyMetrics[DATE].entries).toHaveLength(1);
+    expect(data.dailyMetrics[DATE].totals.cut).toBe(250);
+    expect(data.dailyMetrics[DATE].totals.netImpact).toBe(250);
+  });
 });
 
 describe('FinancialTracker.getDailyMetricsForWeek', () => {

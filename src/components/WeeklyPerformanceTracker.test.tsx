@@ -256,6 +256,22 @@ describe('WeeklyPerformanceTracker - Money Move quick-add', () => {
     await user.type(screen.getByLabelText(/amount/i), '10');
     expect(screen.getByRole('button', { name: /save move/i })).toBeDisabled();
   });
+
+  it.each([
+    ['moved', /\+ moved/i, 'Moved funds'],
+    ['generated', /\+ generated/i, 'Generated revenue'],
+  ] as const)('submits %s category from quick-add', async (category, trigger, description) => {
+    const user = userEvent.setup();
+    const onAddFinancialEntry = jest.fn().mockResolvedValue(undefined);
+    render(<WeeklyPerformanceTracker {...baseProps} onAddFinancialEntry={onAddFinancialEntry} />);
+
+    await user.click(screen.getByRole('button', { name: trigger }));
+    await user.type(screen.getByLabelText(/amount/i), '250');
+    await user.type(screen.getByLabelText(/description/i), description);
+    await user.click(screen.getByRole('button', { name: /save move/i }));
+
+    expect(onAddFinancialEntry).toHaveBeenCalledWith(category, 250, description);
+  });
 });
 
 describe('WeeklyPerformanceTracker - Per-day money line', () => {
