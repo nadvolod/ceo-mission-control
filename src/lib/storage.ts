@@ -13,6 +13,16 @@ function hasDb(): boolean {
   return !!process.env.DATABASE_URL;
 }
 
+const DEFAULT_OWNER_ID = '00000000-0000-0000-0000-000000000000';
+
+function isOwnerIdRequiredError(error: unknown): boolean {
+  const candidate = error as { code?: string; message?: string };
+  return (
+    candidate?.code === '23502' &&
+    candidate?.message?.includes('owner_id') === true
+  );
+}
+
 // --- JSON data (tasks.json, focus-tracking.json, etc.) ---
 
 export async function loadJSON<T>(filename: string, defaultValue: T): Promise<T> {
@@ -53,8 +63,16 @@ export async function saveJSON(filename: string, data: unknown): Promise<void> {
                              WHERE key = ${filename}
                              RETURNING key`;
     if (updated.length === 0) {
-      await db`INSERT INTO data_store (key, data, updated_at)
-               VALUES (${filename}, ${payload}, NOW())`;
+      try {
+        await db`INSERT INTO data_store (key, data, updated_at)
+                 VALUES (${filename}, ${payload}, NOW())`;
+      } catch (error) {
+        if (!isOwnerIdRequiredError(error)) {
+          throw error;
+        }
+        await db`INSERT INTO data_store (key, data, updated_at, owner_id)
+                 VALUES (${filename}, ${payload}, NOW(), ${DEFAULT_OWNER_ID})`;
+      }
     }
     return;
   }
@@ -102,8 +120,16 @@ export async function saveText(filename: string, content: string): Promise<void>
                              WHERE key = ${filename}
                              RETURNING key`;
     if (updated.length === 0) {
-      await db`INSERT INTO text_store (key, content, updated_at)
-               VALUES (${filename}, ${content}, NOW())`;
+      try {
+        await db`INSERT INTO text_store (key, content, updated_at)
+                 VALUES (${filename}, ${content}, NOW())`;
+      } catch (error) {
+        if (!isOwnerIdRequiredError(error)) {
+          throw error;
+        }
+        await db`INSERT INTO text_store (key, content, updated_at, owner_id)
+                 VALUES (${filename}, ${content}, NOW(), ${DEFAULT_OWNER_ID})`;
+      }
     }
     return;
   }
@@ -126,6 +152,16 @@ export async function appendAuditLog(date: string, entryType: string, content: s
     try {
       await db`INSERT INTO audit_log (date, entry_type, content) VALUES (${date}, ${entryType}, ${content})`;
     } catch (error) {
+      if (isOwnerIdRequiredError(error)) {
+        try {
+          await db`INSERT INTO audit_log (date, entry_type, content, owner_id)
+                   VALUES (${date}, ${entryType}, ${content}, ${DEFAULT_OWNER_ID})`;
+          return;
+        } catch (retryError) {
+          console.error('DB audit log error:', retryError);
+          return;
+        }
+      }
       console.error('DB audit log error:', error);
     }
     return;
