@@ -143,7 +143,6 @@ export function WeeklyPerformanceTracker({
   const [reviewSystem, setReviewSystem] = useState(existingReview?.systemAdjustment ?? '');
   const [reviewTargets, setReviewTargets] = useState(existingReview?.nextWeekTargets ?? '');
   const [reviewBottleneck, setReviewBottleneck] = useState(existingReview?.bottleneck ?? '');
-  const [reviewTemporalTarget, setReviewTemporalTarget] = useState(existingReview?.temporalTarget?.toString() ?? '5');
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
   // Inline Temporal Target edit state
@@ -159,7 +158,6 @@ export function WeeklyPerformanceTracker({
       setReviewSystem(existingReview.systemAdjustment ?? '');
       setReviewTargets(existingReview.nextWeekTargets ?? '');
       setReviewBottleneck(existingReview.bottleneck ?? '');
-      setReviewTemporalTarget(existingReview.temporalTarget?.toString() ?? '5');
     }
   }, [existingReview?.id]);
 
@@ -242,13 +240,12 @@ export function WeeklyPerformanceTracker({
 
     setIsSubmittingReview(true);
     try {
-      const tt = parseFloat(reviewTemporalTarget);
       await onSubmitReview({
         slipAnalysis: reviewSlip,
         systemAdjustment: reviewSystem,
         nextWeekTargets: reviewTargets,
         bottleneck: reviewBottleneck,
-        temporalTarget: isNaN(tt) || tt < 0 ? 5 : tt,
+        temporalTarget: existingReview?.temporalTarget ?? currentWeekSummary.temporalTarget ?? 5,
       });
       setReviewSlip('');
       setReviewSystem('');
@@ -416,7 +413,9 @@ export function WeeklyPerformanceTracker({
                         cancelEditTarget();
                       }
                     }}
-                    onBlur={() => { void saveTarget(); }}
+                    onBlur={() => {
+                      if (isEditingTarget) void saveTarget();
+                    }}
                     className="w-16 text-center text-2xl font-bold text-indigo-600 bg-white border border-indigo-300 rounded px-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
                   />
                   <span className="text-sm font-normal">h</span>
