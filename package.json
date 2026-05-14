@@ -12,7 +12,8 @@
     "test:coverage": "jest --coverage",
     "test:e2e:playwright": "playwright test",
     "db:migrate": "tsx scripts/db-migrate.ts",
-    "db:hash-rows": "tsx scripts/db-hash-rows.ts"
+    "db:hash-rows": "tsx scripts/db-hash-rows.ts",
+    "db:reseed-users": "tsx scripts/db-reseed-users.ts"
   },
   "dependencies": {
     "@gooin/garmin-connect": "^1.7.6",

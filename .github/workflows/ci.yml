@@ -191,6 +191,14 @@ jobs:
           DEMO_USER_PASSWORD: ${{ secrets.DEMO_USER_PASSWORD }}
           TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
 
+      - name: Reseed user passwords from env (idempotent; fixes placeholder hashes)
+        run: npm run db:reseed-users
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ADMIN_INITIAL_PASSWORD: ${{ secrets.ADMIN_INITIAL_PASSWORD }}
+          DEMO_USER_PASSWORD: ${{ secrets.DEMO_USER_PASSWORD }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
