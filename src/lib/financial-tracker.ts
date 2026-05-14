@@ -67,6 +67,9 @@ export class FinancialTracker {
     }
 
     const entryDate = date || new Date().toISOString().split('T')[0];
+    if (!this.isSafeDateKey(entryDate)) {
+      throw new FinancialValidationError(`Invalid date: expected YYYY-MM-DD (received ${entryDate})`);
+    }
     const timestamp = new Date().toISOString();
 
     const entry: FinancialEntry = {
@@ -122,12 +125,15 @@ export class FinancialTracker {
 
     const loaded = data as Partial<FinancialData>;
     const normalized: FinancialData = {
-      dailyMetrics: {},
+      dailyMetrics: Object.create(null) as Record<string, DailyFinancialMetrics>,
       lastUpdated: typeof loaded.lastUpdated === 'string' ? loaded.lastUpdated : fallback.lastUpdated,
     };
 
     if (loaded.dailyMetrics && typeof loaded.dailyMetrics === 'object') {
-      normalized.dailyMetrics = loaded.dailyMetrics;
+      for (const [date, dayMetrics] of Object.entries(loaded.dailyMetrics)) {
+        if (!this.isSafeDateKey(date)) continue;
+        normalized.dailyMetrics[date] = dayMetrics as DailyFinancialMetrics;
+      }
     }
 
     Object.keys(normalized.dailyMetrics).forEach(date => this.ensureDayShape(date, normalized.dailyMetrics));
@@ -135,6 +141,7 @@ export class FinancialTracker {
   }
 
   private ensureDayShape(date: string, dailyMetrics = this.data.dailyMetrics): void {
+    if (!this.isSafeDateKey(date)) return;
     const existing = dailyMetrics[date];
     if (!existing || typeof existing !== 'object') {
       dailyMetrics[date] = {
@@ -162,6 +169,10 @@ export class FinancialTracker {
     }
     withDefaults.date = withDefaults.date || date;
     dailyMetrics[date] = withDefaults as DailyFinancialMetrics;
+  }
+
+  private isSafeDateKey(value: string): boolean {
+    return /^\d{4}-\d{2}-\d{2}$/.test(value);
   }
 
   getTodaysMetrics(): DailyFinancialMetrics {
