@@ -317,77 +317,81 @@ test.describe('Dashboard page rendering', () => {
     expect(data.error).toContain('date');
   });
 
-  test('inline Temporal Target edit on dashboard card persists via API', async ({ page, request }) => {
-    const jsErrors: string[] = [];
-    page.on('pageerror', error => jsErrors.push(error.message));
+  test.describe.serial('Inline Temporal Target editor (UI → API)', () => {
+    test('typing a new value and pressing Enter persists via API', async ({ page, request }) => {
+      const jsErrors: string[] = [];
+      page.on('pageerror', error => jsErrors.push(error.message));
 
-    await page.goto('/dashboard');
-    await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+      await page.goto('/dashboard');
+      await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
 
-    const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
-    if (!hasFullDashboard) {
-      test.skip();
-      return;
-    }
+      const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
+      if (!hasFullDashboard) {
+        test.skip();
+        return;
+      }
 
-    const editTargetButton = page.getByRole('button', { name: /Edit Temporal Target/i });
-    await expect(editTargetButton).toBeVisible({ timeout: 10_000 });
+      const editTargetButton = page.getByRole('button', { name: /Edit Temporal Target/i });
+      await expect(editTargetButton).toBeVisible({ timeout: 10_000 });
 
-    // Capture current target from API to choose a new distinct value
-    const beforeRes = await request.get('/api/weekly-tracker');
-    const beforeData = await beforeRes.json();
-    const currentTarget: number = beforeData.currentWeekSummary?.temporalTarget ?? 5;
-    const nextTarget = currentTarget === 13 ? 14 : 13;
+      const beforeRes = await request.get('/api/weekly-tracker');
+      const beforeData = await beforeRes.json();
+      if (!beforeData.success) {
+        test.skip();
+        return;
+      }
+      const currentTarget: number = beforeData.currentWeekSummary?.temporalTarget ?? 5;
+      // Pick a value that's distinct from the current one (avoids the unchanged-no-op path)
+      const nextTarget = currentTarget === 13 ? 14 : 13;
 
-    await editTargetButton.click();
-    const input = page.getByRole('spinbutton', { name: /Temporal Target/i });
-    await expect(input).toBeVisible();
-    await input.fill(String(nextTarget));
-    await input.press('Enter');
+      await editTargetButton.click();
+      const input = page.getByRole('spinbutton', { name: /Temporal Target/i });
+      await expect(input).toBeVisible();
+      await input.fill(String(nextTarget));
+      await input.press('Enter');
 
-    // Wait for the edit input to disappear (save round-trip completed)
-    await expect(input).toBeHidden({ timeout: 10_000 });
+      // Poll the API until the new target value appears (decouples test from UI animation timing)
+      await expect.poll(async () => {
+        const res = await request.get('/api/weekly-tracker');
+        const data = await res.json();
+        return data?.currentWeekSummary?.temporalTarget;
+      }, { timeout: 20_000 }).toBe(nextTarget);
 
-    // Verify via API that the new target persisted
-    const afterRes = await request.get('/api/weekly-tracker');
-    const afterData = await afterRes.json();
-    if (afterRes.status() === 200 && afterData.success) {
-      // Only assert when storage backend is available
-      expect(afterData.currentWeekSummary.temporalTarget).toBe(nextTarget);
-    }
+      expect(jsErrors).toHaveLength(0);
+    });
 
-    expect(jsErrors).toHaveLength(0);
-  });
+    test('Escape cancels without changing the API value', async ({ page, request }) => {
+      await page.goto('/dashboard');
+      await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
 
-  test('inline Temporal Target edit cancels on Escape without API call', async ({ page, request }) => {
-    await page.goto('/dashboard');
-    await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+      const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
+      if (!hasFullDashboard) {
+        test.skip();
+        return;
+      }
 
-    const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
-    if (!hasFullDashboard) {
-      test.skip();
-      return;
-    }
+      const beforeRes = await request.get('/api/weekly-tracker');
+      const beforeData = await beforeRes.json();
+      if (!beforeData.success) {
+        test.skip();
+        return;
+      }
+      const targetBefore: number = beforeData.currentWeekSummary?.temporalTarget ?? 5;
 
-    const beforeRes = await request.get('/api/weekly-tracker');
-    const beforeData = await beforeRes.json();
-    const targetBefore: number = beforeData.currentWeekSummary?.temporalTarget ?? 5;
+      const editTargetButton = page.getByRole('button', { name: /Edit Temporal Target/i });
+      await editTargetButton.click();
+      const input = page.getByRole('spinbutton', { name: /Temporal Target/i });
+      await input.fill('999');
+      await input.press('Escape');
 
-    const editTargetButton = page.getByRole('button', { name: /Edit Temporal Target/i });
-    await editTargetButton.click();
-    const input = page.getByRole('spinbutton', { name: /Temporal Target/i });
-    await input.fill('999');
-    await input.press('Escape');
+      await expect(editTargetButton).toBeVisible();
 
-    // Should be back in view mode
-    await expect(editTargetButton).toBeVisible();
-
-    // Target value unchanged in API
-    const afterRes = await request.get('/api/weekly-tracker');
-    const afterData = await afterRes.json();
-    if (afterRes.status() === 200 && afterData.success) {
+      // Briefly wait to give any errant blur-triggered save a chance to land, then assert no change
+      await page.waitForTimeout(500);
+      const afterRes = await request.get('/api/weekly-tracker');
+      const afterData = await afterRes.json();
       expect(afterData.currentWeekSummary.temporalTarget).toBe(targetBefore);
-    }
+    });
   });
 
   test('monthly review compact layout: hours worked and temporal hours persist independently', async ({ page, request }) => {
