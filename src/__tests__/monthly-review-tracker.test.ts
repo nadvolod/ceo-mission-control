@@ -12,8 +12,8 @@
 jest.mock('../lib/storage', () => {
   let store: Record<string, any> = {};
   return {
-    loadJSON: jest.fn(async (key: string, defaultValue: any) => store[key] ?? defaultValue),
-    saveJSON: jest.fn(async (key: string, data: any) => { store[key] = data; }),
+    loadJSON: jest.fn(async (_ownerId: string, key: string, defaultValue: any) => store[key] ?? defaultValue),
+    saveJSON: jest.fn(async (_ownerId: string, key: string, data: any) => { store[key] = data; }),
     appendAuditLog: jest.fn(async () => {}),
     _reset: () => { store = {}; },
   };
@@ -24,6 +24,7 @@ const storage = require('../lib/storage');
 
 import { MonthlyReviewTracker } from '@/lib/monthly-review-tracker';
 import type { MonthlyReview } from '@/lib/types';
+import { UNIT_TEST_OWNER_ID } from './utils/owner-id';
 
 function makeValidReview(overrides: Partial<MonthlyReview> = {}): Omit<MonthlyReview, 'id' | 'createdAt' | 'updatedAt'> {
   return {
@@ -64,14 +65,14 @@ describe('MonthlyReviewTracker', () => {
   });
 
   test('creates with empty data', async () => {
-    const tracker = await MonthlyReviewTracker.create();
+    const tracker = await MonthlyReviewTracker.create(UNIT_TEST_OWNER_ID);
     const data = tracker.getAllData();
     expect(data.reviews).toEqual([]);
     expect(data.lastUpdated).toBeDefined();
   });
 
   test('submits a new monthly review', async () => {
-    const tracker = await MonthlyReviewTracker.create();
+    const tracker = await MonthlyReviewTracker.create(UNIT_TEST_OWNER_ID);
     const input = makeValidReview();
     const review = await tracker.submitReview(input);
 
@@ -85,7 +86,7 @@ describe('MonthlyReviewTracker', () => {
   });
 
   test('upserts review for the same month', async () => {
-    const tracker = await MonthlyReviewTracker.create();
+    const tracker = await MonthlyReviewTracker.create(UNIT_TEST_OWNER_ID);
     await tracker.submitReview(makeValidReview());
     const updated = await tracker.submitReview(makeValidReview({ hoursWorked: 100 }));
 
@@ -94,7 +95,7 @@ describe('MonthlyReviewTracker', () => {
   });
 
   test('stores reviews for different months separately', async () => {
-    const tracker = await MonthlyReviewTracker.create();
+    const tracker = await MonthlyReviewTracker.create(UNIT_TEST_OWNER_ID);
     await tracker.submitReview(makeValidReview({ month: '2026-03', date: '2026-03-31' }));
     await tracker.submitReview(makeValidReview({ month: '2026-04', date: '2026-04-12' }));
 
@@ -102,7 +103,7 @@ describe('MonthlyReviewTracker', () => {
   });
 
   test('gets review by month', async () => {
-    const tracker = await MonthlyReviewTracker.create();
+    const tracker = await MonthlyReviewTracker.create(UNIT_TEST_OWNER_ID);
     await tracker.submitReview(makeValidReview({ month: '2026-03', date: '2026-03-31' }));
     await tracker.submitReview(makeValidReview({ month: '2026-04', date: '2026-04-12' }));
 
@@ -115,7 +116,7 @@ describe('MonthlyReviewTracker', () => {
   });
 
   test('getRecentReviews returns most-recent-first', async () => {
-    const tracker = await MonthlyReviewTracker.create();
+    const tracker = await MonthlyReviewTracker.create(UNIT_TEST_OWNER_ID);
     await tracker.submitReview(makeValidReview({ month: '2026-01', date: '2026-01-31' }));
     await tracker.submitReview(makeValidReview({ month: '2026-02', date: '2026-02-28' }));
     await tracker.submitReview(makeValidReview({ month: '2026-03', date: '2026-03-31' }));
@@ -127,7 +128,7 @@ describe('MonthlyReviewTracker', () => {
   });
 
   test('getRatingsTrend returns ratings over time', async () => {
-    const tracker = await MonthlyReviewTracker.create();
+    const tracker = await MonthlyReviewTracker.create(UNIT_TEST_OWNER_ID);
     await tracker.submitReview(makeValidReview({ month: '2026-01', date: '2026-01-31', ratings: { discipline: 5, focus: 6, executive: 4, math: 5, nutrition: 3, fitness: 4, sleep: 3 } }));
     await tracker.submitReview(makeValidReview({ month: '2026-02', date: '2026-02-28', ratings: { discipline: 7, focus: 8, executive: 6, math: 7, nutrition: 5, fitness: 6, sleep: 4 } }));
 
@@ -140,35 +141,35 @@ describe('MonthlyReviewTracker', () => {
   });
 
   test('validates hoursWorked is non-negative', async () => {
-    const tracker = await MonthlyReviewTracker.create();
+    const tracker = await MonthlyReviewTracker.create(UNIT_TEST_OWNER_ID);
     await expect(
       tracker.submitReview(makeValidReview({ hoursWorked: -10 }))
     ).rejects.toThrow('hoursWorked must be a non-negative number');
   });
 
   test('validates ratings are between 1 and 10', async () => {
-    const tracker = await MonthlyReviewTracker.create();
+    const tracker = await MonthlyReviewTracker.create(UNIT_TEST_OWNER_ID);
     await expect(
       tracker.submitReview(makeValidReview({ ratings: { discipline: 11, focus: 8, executive: 6, math: 7, nutrition: 5, fitness: 6, sleep: 4 } }))
     ).rejects.toThrow('discipline rating must be between 1 and 10');
   });
 
   test('validates month format', async () => {
-    const tracker = await MonthlyReviewTracker.create();
+    const tracker = await MonthlyReviewTracker.create(UNIT_TEST_OWNER_ID);
     await expect(
       tracker.submitReview(makeValidReview({ month: '2026-13' }))
     ).rejects.toThrow('month must be a valid YYYY-MM string');
   });
 
   test('validates decisionSource enum', async () => {
-    const tracker = await MonthlyReviewTracker.create();
+    const tracker = await MonthlyReviewTracker.create(UNIT_TEST_OWNER_ID);
     await expect(
       tracker.submitReview(makeValidReview({ decisionSource: 'chaos' as any }))
     ).rejects.toThrow('decisionSource must be one of: discipline, emotion, mixed');
   });
 
   test('deletes a review by month', async () => {
-    const tracker = await MonthlyReviewTracker.create();
+    const tracker = await MonthlyReviewTracker.create(UNIT_TEST_OWNER_ID);
     await tracker.submitReview(makeValidReview({ month: '2026-03', date: '2026-03-31' }));
     await tracker.submitReview(makeValidReview({ month: '2026-04', date: '2026-04-12' }));
 
@@ -181,10 +182,10 @@ describe('MonthlyReviewTracker', () => {
   });
 
   test('persists data across instances', async () => {
-    const tracker1 = await MonthlyReviewTracker.create();
+    const tracker1 = await MonthlyReviewTracker.create(UNIT_TEST_OWNER_ID);
     await tracker1.submitReview(makeValidReview());
 
-    const tracker2 = await MonthlyReviewTracker.create();
+    const tracker2 = await MonthlyReviewTracker.create(UNIT_TEST_OWNER_ID);
     expect(tracker2.getAllData().reviews).toHaveLength(1);
     expect(tracker2.getReviewByMonth('2026-04')!.hoursWorked).toBe(92.5);
   });

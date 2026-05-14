@@ -14,12 +14,16 @@ function weekDay(offset: number): string {
 jest.mock('@/lib/storage', () => {
   let store: Record<string, any> = {};
   return {
-    loadJSON: jest.fn(async (key: string, defaultValue: any) => store[key] ?? defaultValue),
-    saveJSON: jest.fn(async (key: string, data: any) => { store[key] = data; }),
+    loadJSON: jest.fn(async (_ownerId: string, key: string, defaultValue: any) => store[key] ?? defaultValue),
+    saveJSON: jest.fn(async (_ownerId: string, key: string, data: any) => { store[key] = data; }),
     appendAuditLog: jest.fn(async () => {}),
     _reset: () => { store = {}; },
   };
 });
+
+jest.mock('@/lib/users', () => ({
+  getAdminUserId: jest.fn(async () => '00000000-0000-0000-0000-000000000001'),
+}));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const storage = require('@/lib/storage');

@@ -9,16 +9,20 @@ jest.mock('@/lib/storage', () => {
   let jsonStore: Record<string, any> = {};
   let textStore: Record<string, string> = {};
   return {
-    loadJSON: jest.fn(async (key: string, defaultValue: any) => jsonStore[key] ?? defaultValue),
-    saveJSON: jest.fn(async (key: string, data: any) => { jsonStore[key] = data; }),
-    loadText: jest.fn(async (key: string, defaultValue: string = '') => textStore[key] ?? defaultValue),
-    saveText: jest.fn(async (key: string, content: string) => { textStore[key] = content; }),
+    loadJSON: jest.fn(async (_ownerId: string, key: string, defaultValue: any) => jsonStore[key] ?? defaultValue),
+    saveJSON: jest.fn(async (_ownerId: string, key: string, data: any) => { jsonStore[key] = data; }),
+    loadText: jest.fn(async (_ownerId: string, key: string, defaultValue: string = '') => textStore[key] ?? defaultValue),
+    saveText: jest.fn(async (_ownerId: string, key: string, content: string) => { textStore[key] = content; }),
     appendAuditLog: jest.fn(async () => {}),
     _reset: () => { jsonStore = {}; textStore = {}; },
     _setJSON: (key: string, data: any) => { jsonStore[key] = data; },
     _setText: (key: string, content: string) => { textStore[key] = content; },
   };
 });
+
+jest.mock('@/lib/users', () => ({
+  getAdminUserId: jest.fn(async () => '00000000-0000-0000-0000-000000000001'),
+}));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const storage = require('@/lib/storage');

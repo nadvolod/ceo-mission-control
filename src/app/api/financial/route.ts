@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FinancialTracker } from '@/lib/financial-tracker';
 import { checkAuth } from '@/lib/auth';
+import { getAdminUserId } from '@/lib/users';
 
 export async function GET() {
   try {
-    const financialTracker = await FinancialTracker.create();
+    const ownerId = await getAdminUserId();
+    const financialTracker = await FinancialTracker.create(ownerId);
     const todaysMetrics = financialTracker.getTodaysMetrics();
     const weeklyTotals = financialTracker.getWeeklyTotals();
     const monthlyTotals = financialTracker.getMonthlyTotals();
@@ -31,7 +33,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
-    const financialTracker = await FinancialTracker.create();
+    const ownerId = await getAdminUserId();
+    const financialTracker = await FinancialTracker.create(ownerId);
     const body = await request.json();
     const { action, ...data } = body;
 

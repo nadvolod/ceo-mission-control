@@ -14,17 +14,17 @@ interface TokenCache {
 // Token management
 // ---------------------------------------------------------------------------
 
-async function saveTokens(client: GarminConnect): Promise<void> {
+async function saveTokens(ownerId: string, client: GarminConnect): Promise<void> {
   const tokens = client.exportToken();
-  await saveJSON(TOKEN_KEY, { ...tokens, savedAt: new Date().toISOString() });
+  await saveJSON(ownerId, TOKEN_KEY, { ...tokens, savedAt: new Date().toISOString() });
 }
 
-async function getClientWithCachedTokens(): Promise<GarminConnect | null> {
+async function getClientWithCachedTokens(ownerId: string): Promise<GarminConnect | null> {
   const email = process.env.GARMIN_EMAIL;
   const password = process.env.GARMIN_PASSWORD;
   if (!email || !password) return null;
 
-  const cached = await loadJSON<TokenCache | null>(TOKEN_KEY, null);
+  const cached = await loadJSON<TokenCache | null>(ownerId, TOKEN_KEY, null);
   if (!cached?.oauth1 || !cached?.oauth2) return null;
 
   const client = new GarminConnect({ username: email, password });
@@ -54,7 +54,7 @@ async function getClientWithCachedTokens(): Promise<GarminConnect | null> {
 // Track background login so MFA code submission can complete it
 let pendingLoginPromise: Promise<void> | null = null;
 
-export async function initiateGarminLogin(): Promise<{
+export async function initiateGarminLogin(ownerId: string): Promise<{
   success: boolean;
   mfaRequired?: boolean;
   sessionId?: string;
@@ -68,7 +68,7 @@ export async function initiateGarminLogin(): Promise<{
   }
 
   // Check if we already have valid tokens
-  const existing = await getClientWithCachedTokens();
+  const existing = await getClientWithCachedTokens(ownerId);
   if (existing) {
     return { success: true };
   }
@@ -85,7 +85,7 @@ export async function initiateGarminLogin(): Promise<{
   // Start login with sessionId — the library will block at waitForMFACode(sessionId)
   // This runs in the background; the MFA code submission unblocks it
   pendingLoginPromise = client.login(email, password, sessionId).then(async () => {
-    await saveTokens(client);
+    await saveTokens(ownerId, client);
     console.log('Garmin: MFA login completed successfully');
   }).catch((err) => {
     console.error('Garmin: MFA login failed:', err);
@@ -101,7 +101,7 @@ export async function initiateGarminLogin(): Promise<{
 /**
  * Step 2: Complete login by submitting the MFA code from email.
  */
-export async function completeMFALogin(sessionId: string, code: string): Promise<{
+export async function completeMFALogin(ownerId: string, sessionId: string, code: string): Promise<{
   success: boolean;
   error?: string;
 }> {
@@ -123,7 +123,7 @@ export async function completeMFALogin(sessionId: string, code: string): Promise
     pendingLoginPromise = null;
 
     // Verify tokens were saved and work
-    const client = await getClientWithCachedTokens();
+    const client = await getClientWithCachedTokens(ownerId);
     if (client) {
       return { success: true };
     }
@@ -260,11 +260,11 @@ async function fetchWeight(client: GarminConnect, dateStr: string): Promise<Part
 // Data sync (requires cached tokens from prior login)
 // ---------------------------------------------------------------------------
 
-export async function fetchGarminMetrics(days: number): Promise<{
+export async function fetchGarminMetrics(ownerId: string, days: number): Promise<{
   metrics: GarminDayMetrics[];
   error: string | null;
 }> {
-  const client = await getClientWithCachedTokens();
+  const client = await getClientWithCachedTokens(ownerId);
   if (!client) {
     return {
       metrics: [],
@@ -327,7 +327,7 @@ export async function fetchGarminMetrics(days: number): Promise<{
 
   // Save refreshed tokens
   try {
-    await saveTokens(client);
+    await saveTokens(ownerId, client);
   } catch {
     // Token save failure is non-fatal
   }

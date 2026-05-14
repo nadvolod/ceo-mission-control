@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadJSON, saveJSON } from '@/lib/storage';
+import { getAdminUserId } from '@/lib/users';
+
+// Waitlist is a shared/global resource — stored under the admin owner.
+// In a real multi-tenant app this would be its own table; keeping it here
+// avoids spreading writes across a non-existent "system" user.
 
 interface WaitlistEntry {
   id: string;
@@ -23,7 +28,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     }
 
-    const entries = await loadJSON<WaitlistEntry[]>('waitlist-entries.json', []);
+    const ownerId = await getAdminUserId();
+    const entries = await loadJSON<WaitlistEntry[]>(ownerId, 'waitlist-entries.json', []);
 
     if (entries.some(e => e.email.toLowerCase() === email.toLowerCase())) {
       return NextResponse.json({ error: 'Already on the waitlist' }, { status: 409 });
@@ -40,7 +46,7 @@ export async function POST(request: NextRequest) {
     };
 
     entries.push(entry);
-    await saveJSON('waitlist-entries.json', entries);
+    await saveJSON(ownerId, 'waitlist-entries.json', entries);
 
     console.log(`[Waitlist] New signup: ${entry.email} (${entry.company || 'no company'})`);
 
@@ -57,7 +63,8 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    const entries = await loadJSON<WaitlistEntry[]>('waitlist-entries.json', []);
+    const ownerId = await getAdminUserId();
+    const entries = await loadJSON<WaitlistEntry[]>(ownerId, 'waitlist-entries.json', []);
     return NextResponse.json({ count: entries.length });
   } catch (error) {
     console.error('[Waitlist] Error:', error);

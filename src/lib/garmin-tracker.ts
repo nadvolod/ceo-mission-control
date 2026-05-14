@@ -15,22 +15,25 @@ function defaultData(): GarminHealthData {
 
 export class GarminTracker {
   private data: GarminHealthData = defaultData();
+  private readonly ownerId: string;
 
-  private constructor() {}
+  private constructor(ownerId: string) {
+    this.ownerId = ownerId;
+  }
 
-  static async create(): Promise<GarminTracker> {
-    const tracker = new GarminTracker();
+  static async create(ownerId: string): Promise<GarminTracker> {
+    const tracker = new GarminTracker(ownerId);
     await tracker.loadData();
     return tracker;
   }
 
   private async loadData(): Promise<void> {
-    const stored = await loadJSON(STORAGE_KEY, defaultData());
+    const stored = await loadJSON<GarminHealthData>(this.ownerId, STORAGE_KEY, defaultData());
     this.data = { ...defaultData(), ...stored };
   }
 
   private async saveData(): Promise<void> {
-    await saveJSON(STORAGE_KEY, this.data);
+    await saveJSON(this.ownerId, STORAGE_KEY, this.data);
   }
 
   async syncMetrics(metrics: GarminDayMetrics[]): Promise<{ synced: number }> {
@@ -50,6 +53,7 @@ export class GarminTracker {
     await this.saveData();
 
     await appendAuditLog(
+      this.ownerId,
       format(new Date(), 'yyyy-MM-dd'),
       'garmin-sync',
       `Synced ${synced} day(s) of Garmin data`

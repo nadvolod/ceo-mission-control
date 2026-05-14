@@ -1,5 +1,6 @@
 import { RevenueProjectionService } from './revenue-projection';
 import type { RevenueAdjustment, MonthProjection } from './types';
+import { UNIT_TEST_OWNER_ID } from '@/__tests__/utils/owner-id';
 
 // Mock storage to avoid DB dependency in unit tests
 jest.mock('./storage', () => ({
@@ -18,7 +19,7 @@ describe('RevenueProjectionService', () => {
   let service: RevenueProjectionService;
 
   beforeEach(async () => {
-    service = await RevenueProjectionService.create();
+    service = await RevenueProjectionService.create(UNIT_TEST_OWNER_ID);
   });
 
   describe('computeProjections', () => {

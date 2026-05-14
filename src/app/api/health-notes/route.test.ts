@@ -11,6 +11,10 @@ jest.mock('@/lib/storage', () => ({
   appendAuditLog: jest.fn(),
 }));
 
+jest.mock('@/lib/users', () => ({
+  getAdminUserId: jest.fn(async () => '00000000-0000-0000-0000-000000000001'),
+}));
+
 jest.mock('@/lib/auth', () => ({
   checkAuth: jest.fn((req: NextRequest) => {
     return req.headers.get('x-sync-api-key') === 'test-key';

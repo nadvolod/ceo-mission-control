@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { RevenueProjectionService } from '@/lib/revenue-projection';
 import { checkAuth } from '@/lib/auth';
 import { loadJSON } from '@/lib/storage';
+import { getAdminUserId } from '@/lib/users';
 import type { AdjustmentType } from '@/lib/types';
 
 const VALID_TYPES = new Set<AdjustmentType>(['revenue_gain', 'revenue_loss', 'expense_increase', 'expense_decrease']);
@@ -20,7 +21,8 @@ function validateBaseAmount(amount: unknown): number | null {
 
 export async function GET() {
   try {
-    const service = await RevenueProjectionService.create();
+    const ownerId = await getAdminUserId();
+    const service = await RevenueProjectionService.create(ownerId);
     const data = service.getData();
 
     // Get Monarch base values for projection computation
@@ -32,7 +34,7 @@ export async function GET() {
       previousMonthIncome?: number;
       previousMonthExpenses?: number;
       previousMonthLabel?: string;
-    } | null>('monarch-financial-data.json', null);
+    } | null>(ownerId, 'monarch-financial-data.json', null);
 
     // Prefer previous full month data; fall back to current month, then 0
     const monarchIncome = monarchCache?.previousMonthIncome ?? monarchCache?.monthlyIncome ?? 0;
@@ -79,7 +81,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
-    const service = await RevenueProjectionService.create();
+    const ownerId = await getAdminUserId();
+    const service = await RevenueProjectionService.create(ownerId);
     const body = await request.json();
     const { action, ...data } = body;
 

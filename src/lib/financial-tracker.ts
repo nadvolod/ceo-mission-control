@@ -29,23 +29,26 @@ export class FinancialTracker {
     dailyMetrics: {},
     lastUpdated: new Date().toISOString()
   };
+  private readonly ownerId: string;
 
-  private constructor() {}
+  private constructor(ownerId: string) {
+    this.ownerId = ownerId;
+  }
 
-  static async create(): Promise<FinancialTracker> {
-    const tracker = new FinancialTracker();
+  static async create(ownerId: string): Promise<FinancialTracker> {
+    const tracker = new FinancialTracker(ownerId);
     await tracker.loadData();
     return tracker;
   }
 
   private async loadData(): Promise<void> {
     const defaultData: FinancialData = { dailyMetrics: {}, lastUpdated: new Date().toISOString() };
-    this.data = await loadJSON('financial-metrics.json', defaultData);
+    this.data = await loadJSON(this.ownerId, 'financial-metrics.json', defaultData);
   }
 
   private async saveData(): Promise<void> {
     this.data.lastUpdated = new Date().toISOString();
-    await saveJSON('financial-metrics.json', this.data);
+    await saveJSON(this.ownerId, 'financial-metrics.json', this.data);
   }
 
   async addEntry(category: 'moved' | 'generated' | 'cut', amount: number, description: string, date?: string): Promise<FinancialEntry> {
