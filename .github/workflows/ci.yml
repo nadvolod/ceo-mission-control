@@ -4,7 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    # No branches filter — CI runs on every PR regardless of base, so a
+    # stacked PR (e.g. PR 2 of the multi-user series, based on PR 1)
+    # gets the same green-required gate as one targeting main directly.
 
 concurrency:
   group: ci-${{ github.ref }}
