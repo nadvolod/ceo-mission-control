@@ -19,9 +19,9 @@ function validateBaseAmount(amount: unknown): number | null {
   return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const ownerId = await requireEffectiveUserId();
+    const ownerId = await requireEffectiveUserId(request);
     const service = await RevenueProjectionService.create(ownerId);
     const data = service.getData();
 
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
-    const ownerId = await requireEffectiveUserId();
+    const ownerId = await requireEffectiveUserId(request);
     const service = await RevenueProjectionService.create(ownerId);
     const body = await request.json();
     const { action, ...data } = body;

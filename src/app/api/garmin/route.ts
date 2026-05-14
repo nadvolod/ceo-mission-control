@@ -9,9 +9,9 @@ import { requireEffectiveUserId } from '@/lib/session';
 
 export const maxDuration = 60;
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const ownerId = await requireEffectiveUserId();
+    const ownerId = await requireEffectiveUserId(request);
     const garmin = await GarminTracker.create(ownerId);
     const notes = await HealthNotesTracker.create(ownerId);
 
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action, ...data } = body;
-    const ownerId = await requireEffectiveUserId();
+    const ownerId = await requireEffectiveUserId(request);
 
     switch (action) {
       case 'sync': {

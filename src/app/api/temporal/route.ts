@@ -52,9 +52,9 @@ async function updateDailyScorecard(ownerId: string, date: string, newTotal: num
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const ownerId = await requireEffectiveUserId();
+    const ownerId = await requireEffectiveUserId(request);
     const data = await loadTemporalData(ownerId);
 
     return NextResponse.json({
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const ownerId = await requireEffectiveUserId();
+      const ownerId = await requireEffectiveUserId(request);
       const data = await loadTemporalData(ownerId);
       const now = new Date();
       const today = now.toISOString().split('T')[0];

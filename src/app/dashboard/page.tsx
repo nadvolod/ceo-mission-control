@@ -12,6 +12,7 @@ import { DashboardTabs } from '@/components/DashboardTabs';
 import type { TabId } from '@/components/DashboardTabs';
 import { enrichScorecard } from '@/lib/derive-focus';
 import { useDashboardData } from '@/hooks/useDashboardData';
+import { AdminHandoffButtons } from '@/components/AdminHandoffButtons';
 
 export default function HomePage() {
   const {
@@ -91,6 +92,7 @@ export default function HomePage() {
                   <div className="text-xs text-gray-500">Focus Hours</div>
                 </div>
               </div>
+              <AdminHandoffButtons />
               <button
                 onClick={loadAllData}
                 className="flex-shrink-0 px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"

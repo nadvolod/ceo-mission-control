@@ -36,7 +36,7 @@ describe('/api/weekly-tracker', () => {
 
   describe('GET', () => {
     it('should return correct structure with empty data', async () => {
-      const response = await GET();
+      const response = await GET(new NextRequest('http://localhost/'));
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -69,7 +69,7 @@ describe('/api/weekly-tracker', () => {
       };
       storage.loadJSON.mockResolvedValueOnce(existingData);
 
-      const response = await GET();
+      const response = await GET(new NextRequest('http://localhost/'));
       const data = await response.json();
 
       expect(data.todaysEntry).not.toBeNull();
@@ -183,7 +183,7 @@ describe('/api/weekly-tracker', () => {
       expect(data.review.temporalTarget).toBe(8);
 
       // Verify it appears in GET response
-      const getResponse = await GET();
+      const getResponse = await GET(new NextRequest('http://localhost/'));
       const getData = await getResponse.json();
       expect(getData.currentWeekSummary.temporalTarget).toBe(8);
     });
@@ -269,7 +269,7 @@ describe('/api/weekly-tracker', () => {
       });
       await POST(req2);
 
-      const getResponse = await GET();
+      const getResponse = await GET(new NextRequest('http://localhost/'));
       const data = await getResponse.json();
 
       // Both entries should be present in the week summary

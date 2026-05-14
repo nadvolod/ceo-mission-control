@@ -11,9 +11,9 @@ const STORE_KEY = 'synced-tasks.json';
  * GET /api/sync-tasks
  * Returns current synced tasks from Neon (for dashboard consumption).
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const ownerId = await requireEffectiveUserId();
+    const ownerId = await requireEffectiveUserId(request);
     const data = await loadJSON<{ tasks: SyncedTask[] } | null>(ownerId, STORE_KEY, null);
     const tasks = data?.tasks ?? [];
     return NextResponse.json({ tasks, count: tasks.length });
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action } = body;
-    const ownerId = await requireEffectiveUserId();
+    const ownerId = await requireEffectiveUserId(request);
 
     switch (action) {
       case 'push': {

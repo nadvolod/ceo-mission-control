@@ -28,10 +28,10 @@ function syncedToAiTask(task: SyncedTask, index: number): AiTask {
   };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     // Try synced tasks from Neon first
-    const ownerId = await requireEffectiveUserId();
+    const ownerId = await requireEffectiveUserId(request);
     const syncedData = await loadJSON<{ tasks: SyncedTask[] } | null>(ownerId, 'synced-tasks.json', null);
     if (syncedData?.tasks && syncedData.tasks.length > 0) {
       const tasks = syncedData.tasks.map(syncedToAiTask);

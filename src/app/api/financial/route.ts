@@ -4,9 +4,9 @@ import { checkAuth } from '@/lib/auth';
 import { requireEffectiveUserId } from '@/lib/session';
 import { startOfWeek, format, subDays } from 'date-fns';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const ownerId = await requireEffectiveUserId();
+    const ownerId = await requireEffectiveUserId(request);
     const financialTracker = await FinancialTracker.create(ownerId);
     const todaysMetrics = financialTracker.getTodaysMetrics();
     const weeklyTotals = financialTracker.getWeeklyTotals();
@@ -46,7 +46,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
-    const ownerId = await requireEffectiveUserId();
+    const ownerId = await requireEffectiveUserId(request);
     const financialTracker = await FinancialTracker.create(ownerId);
     const body = await request.json();
     const { action, ...data } = body;

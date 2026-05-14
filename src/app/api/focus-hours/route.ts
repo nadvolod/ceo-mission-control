@@ -26,9 +26,9 @@ async function logToMemory(ownerId: string, session: FocusSession): Promise<void
   }
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const ownerId = await requireEffectiveUserId();
+    const ownerId = await requireEffectiveUserId(request);
     const tracker = await FocusTracker.create(ownerId);
 
     const now = new Date();
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action, ...data } = body;
-    const ownerId = await requireEffectiveUserId();
+    const ownerId = await requireEffectiveUserId(request);
     const tracker = await FocusTracker.create(ownerId);
 
     switch (action) {

@@ -85,21 +85,64 @@ export async function requireAdmin(): Promise<CmcSession | NextResponse> {
 }
 
 /**
+ * Detects whether this request originated from an `/as/<role>/...` page.
+ * Browsers preserve `Referer` on same-origin requests by default, so an
+ * `/api/weekly-tracker` call fired from `/as/demo/dashboard` carries the
+ * page path in `Referer`. That's what lets the existing API routes serve
+ * demo data without the client adding any custom header.
+ *
+ * Reads both the request URL itself (covers SSR fetches inside `/as/...`
+ * Server Components) and the Referer header (covers client-side fetches
+ * to /api/*).
+ */
+function detectImpersonationRole(request?: NextRequest | Request): 'demo' | 'test' | null {
+  if (!request) return null;
+  const candidates: string[] = [];
+  try {
+    candidates.push(new URL((request as Request).url).pathname);
+  } catch {
+    // Some Request implementations don't expose an absolute URL; fall
+    // back to Referer only.
+  }
+  const referer = request.headers.get('referer');
+  if (referer) {
+    try {
+      candidates.push(new URL(referer).pathname);
+    } catch {
+      // ignore malformed Referer
+    }
+  }
+  for (const path of candidates) {
+    const m = path.match(/^\/as\/(demo|test)(?:\/|$)/);
+    if (m) return m[1] as 'demo' | 'test';
+  }
+  return null;
+}
+
+/**
  * Resolves which user's data this request should read/write.
  *
- * Today (PR 2): always returns `adminId` for an admin session, or `userId`
- * for a plain user session. PR 3 will extend this to honor URL prefixes
- * like `/as/demo/...` so the admin can view-as another user without
- * swapping cookies (which would corrupt background auto-saves in the
- * original tab).
+ * - Plain user session: their own id.
+ * - Admin session, request from /as/<role>/...: the impersonated user id,
+ *   but only if the session actually carries that slot. Without that
+ *   check, anyone could craft a Referer to peek at someone else's data.
+ *   Middleware also enforces this at the URL level.
+ * - Otherwise: admin's id.
  *
  * Returns null when the request has no session — callers should treat
  * that as 401.
  */
-export async function getEffectiveUserId(_request?: NextRequest | Request): Promise<string | null> {
+export async function getEffectiveUserId(request?: NextRequest | Request): Promise<string | null> {
   const s = await getOptionalSession();
   if (!s) return null;
-  if (s.adminId) return s.adminId;
+
+  if (s.adminId) {
+    const role = detectImpersonationRole(request);
+    if (role && s.impersonating?.[role]) {
+      return s.impersonating[role]!;
+    }
+    return s.adminId;
+  }
   if (s.userId) return s.userId;
   return null;
 }

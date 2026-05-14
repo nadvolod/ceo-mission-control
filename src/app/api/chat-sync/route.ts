@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('Processing chat sync for message:', message);
-    const ownerId = await requireEffectiveUserId();
+    const ownerId = await requireEffectiveUserId(request);
     const manager = await getChatSyncManager(ownerId);
     const result = await manager.syncChatUpdate(message);
 

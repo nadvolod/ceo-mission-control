@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { files, json } = body;
-    const ownerId = await requireEffectiveUserId();
+    const ownerId = await requireEffectiveUserId(request);
 
     const results: string[] = [];
 
