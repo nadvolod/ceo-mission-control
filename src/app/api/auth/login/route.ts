@@ -1,3 +1,4 @@
+import bcrypt from 'bcryptjs';
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyPassword } from '@/lib/users';
 import { setAdminSession, setUserSession } from '@/lib/session';
@@ -6,6 +7,11 @@ import { appendAuditLog } from '@/lib/storage';
 
 const MAX_PASSWORD_LEN = 256;
 const LOGIN_RATE_LIMIT = { windowMs: 60_000, max: 5 };
+
+// Pre-computed hash used to spend roughly the same CPU on unknown-email
+// logins as on known-email failed logins. Without this, response time
+// alone enumerates valid accounts even when the error body is generic.
+const DUMMY_BCRYPT_HASH = bcrypt.hashSync('not-a-real-password', 12);
 
 function clientKey(request: NextRequest): string {
   // Prefer the platform-supplied IP header; fall back to a constant so the
@@ -43,8 +49,11 @@ export async function POST(request: NextRequest) {
 
   const user = await verifyPassword(email, password);
   if (!user) {
-    // Log the failure under no specific owner (we don't know who they
-    // wanted to be). Keep the email out of the log to avoid PII leaks.
+    // Spend bcrypt CPU even on unknown emails so response time can't
+    // enumerate valid accounts (verifyPassword short-circuits when the
+    // email isn't found). The comparison's outcome is intentionally
+    // discarded; the constant-time guarantee is what we want.
+    await bcrypt.compare(password, DUMMY_BCRYPT_HASH);
     return NextResponse.json({ error: 'Incorrect email or password.' }, { status: 401 });
   }
 

@@ -47,6 +47,10 @@ test.describe('Auth flows (unauthenticated)', () => {
 
 test.describe('Auth flows (authenticated as test user)', () => {
   // Uses the storageState from auth.setup.ts via the chromium project config.
+  // SERIAL mode because two tests below share the same test user's rows — the
+  // empty-state assertion must observe the post-globalSetup state before the
+  // round-trip test writes to it.
+  test.describe.configure({ mode: 'serial' });
 
   test('dashboard loads for the test user', async ({ page }) => {
     const response = await page.goto('/dashboard');

@@ -33,9 +33,27 @@ function sessionOpts(): SessionOptions {
   };
 }
 
+// Non-browser clients (e.g. mcp/task-sync-server.ts) authenticate with the
+// SYNC_API_KEY header. We let those bypass the session check so route-level
+// checkAuth() can validate them.
+function hasApiKey(request: NextRequest): boolean {
+  const key = process.env.SYNC_API_KEY;
+  if (!key) return false;
+  const headerKey =
+    request.headers.get('x-sync-api-key') ||
+    request.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+  return headerKey === key;
+}
+
 export async function middleware(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, search } = request.nextUrl;
   if (isPublic(pathname)) {
+    return NextResponse.next();
+  }
+
+  // API routes can authenticate with SYNC_API_KEY for programmatic access.
+  // Hand off to route-level checkAuth() if the header matches.
+  if (pathname.startsWith('/api/') && hasApiKey(request)) {
     return NextResponse.next();
   }
 
@@ -52,7 +70,11 @@ export async function middleware(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
     const loginUrl = new URL('/login', request.url);
-    if (pathname !== '/dashboard') loginUrl.searchParams.set('next', pathname);
+    // Preserve the full path + query so the user lands back where they
+    // requested (e.g. /dashboard?tab=tasks).
+    if (pathname !== '/dashboard' || search) {
+      loginUrl.searchParams.set('next', pathname + (search || ''));
+    }
     return NextResponse.redirect(loginUrl);
   }
 

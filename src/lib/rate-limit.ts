@@ -10,6 +10,9 @@ interface Bucket {
 }
 
 const buckets = new Map<string, Bucket>();
+// Opportunistic cleanup so a stream of unique keys (e.g. ever-changing
+// client IPs) can't grow the map unboundedly across the process lifetime.
+const MAX_BUCKETS = 10_000;
 
 interface RateLimitOptions {
   windowMs: number;
@@ -22,8 +25,16 @@ export interface RateLimitResult {
   retryAfterSec: number;
 }
 
+function pruneExpired(now: number): void {
+  if (buckets.size < MAX_BUCKETS) return;
+  for (const [k, b] of buckets) {
+    if (b.resetAt <= now) buckets.delete(k);
+  }
+}
+
 export function rateLimit(key: string, opts: RateLimitOptions): RateLimitResult {
   const now = Date.now();
+  pruneExpired(now);
   const existing = buckets.get(key);
   if (!existing || existing.resetAt <= now) {
     buckets.set(key, { count: 1, resetAt: now + opts.windowMs });

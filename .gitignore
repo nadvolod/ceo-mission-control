@@ -9,6 +9,7 @@
 # testing
 /coverage
 /test-results
+/tests/.auth/
 
 # runtime workspace data (filesystem storage fallback)
 /data/workspace
