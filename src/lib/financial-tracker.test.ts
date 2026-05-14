@@ -144,12 +144,15 @@ describe('FinancialTracker.addEntry (input validation)', () => {
     expect(data.dailyMetrics[DATE]).toBeUndefined();
   });
 
-  it('rejects invalid date keys to prevent unsafe object mutation', async () => {
+  it.each(['__proto__', '2024-13-45'])(
+    'rejects invalid date key "%s"',
+    async (badDate) => {
     const tracker = await FinancialTracker.create();
-    await expect(tracker.addEntry('cut', 10, 'bad date', '__proto__')).rejects.toThrow(
+    await expect(tracker.addEntry('cut', 10, 'bad date', badDate)).rejects.toThrow(
       /invalid date/i
     );
-  });
+    }
+  );
 
   it('trims a valid description before storing it on the entry', async () => {
     const tracker = await FinancialTracker.create();
