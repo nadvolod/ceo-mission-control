@@ -80,9 +80,9 @@ export async function POST(request: NextRequest) {
       case 'submitReview': {
         const { revenue, slipAnalysis, systemAdjustment, nextWeekTargets, bottleneck, temporalTarget, weekStartDate, weekEndDate } = data;
 
-        if (typeof revenue !== 'number' || !isFinite(revenue) || revenue < 0) {
+        if (revenue !== undefined && (typeof revenue !== 'number' || !isFinite(revenue) || revenue < 0)) {
           return NextResponse.json(
-            { success: false, error: 'revenue must be a non-negative number' },
+            { success: false, error: 'revenue must be a non-negative number when provided' },
             { status: 400 }
           );
         }
