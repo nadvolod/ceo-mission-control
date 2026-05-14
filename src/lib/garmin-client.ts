@@ -51,8 +51,10 @@ async function getClientWithCachedTokens(ownerId: string): Promise<GarminConnect
  * The caller must then call `completeMFALogin(sessionId, code)` with the
  * code sent to the user's email.
  */
-// Track background login so MFA code submission can complete it
-let pendingLoginPromise: Promise<void> | null = null;
+// Keyed by sessionId so concurrent MFA logins (e.g. admin and a separate
+// signed-in user) don't overwrite each other and finalize the wrong Garmin
+// session against the wrong owner_id.
+const pendingLogins = new Map<string, Promise<void>>();
 
 export async function initiateGarminLogin(ownerId: string): Promise<{
   success: boolean;
@@ -82,14 +84,18 @@ export async function initiateGarminLogin(ownerId: string): Promise<{
     mfa: { type: 'file', dir: '/tmp' },
   });
 
-  // Start login with sessionId — the library will block at waitForMFACode(sessionId)
-  // This runs in the background; the MFA code submission unblocks it
-  pendingLoginPromise = client.login(email, password, sessionId).then(async () => {
+  // Start login with sessionId — the library will block at waitForMFACode(sessionId).
+  // The pending promise is stored under sessionId so completeMFALogin can find
+  // the right one when multiple users are mid-flow simultaneously.
+  const pending = client.login(email, password, sessionId).then(async () => {
     await saveTokens(ownerId, client);
     console.log('Garmin: MFA login completed successfully');
   }).catch((err) => {
     console.error('Garmin: MFA login failed:', err);
+  }).finally(() => {
+    pendingLogins.delete(sessionId);
   });
+  pendingLogins.set(sessionId, pending);
 
   // Give the login a moment to reach the MFA waiting point
   await new Promise(resolve => setTimeout(resolve, 3000));
@@ -111,16 +117,17 @@ export async function completeMFALogin(ownerId: string, sessionId: string, code:
     const submitted = await mfaManager.submitMFACode(sessionId, code);
     console.log('Garmin: MFA code submitted, result:', submitted);
 
-    // Wait for the background login promise to complete
-    if (pendingLoginPromise) {
-      await Promise.race([
-        pendingLoginPromise,
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Login timed out after MFA submission')), 20000)),
-      ]);
+    // Wait for THIS session's login to complete, not whatever happened to be
+    // pending globally. If the sessionId is unknown, that means it expired or
+    // was never initiated — tell the caller to start over.
+    const pending = pendingLogins.get(sessionId);
+    if (!pending) {
+      return { success: false, error: 'Login session expired. Try connecting again.' };
     }
-
-    // Clean up
-    pendingLoginPromise = null;
+    await Promise.race([
+      pending,
+      new Promise((_, reject) => setTimeout(() => reject(new Error('Login timed out after MFA submission')), 20000)),
+    ]);
 
     // Verify tokens were saved and work
     const client = await getClientWithCachedTokens(ownerId);
@@ -131,7 +138,7 @@ export async function completeMFALogin(ownerId: string, sessionId: string, code:
     return { success: false, error: 'MFA accepted but login did not complete. Try connecting again.' };
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    pendingLoginPromise = null;
+    pendingLogins.delete(sessionId);
     return { success: false, error: `MFA verification failed: ${message}` };
   }
 }

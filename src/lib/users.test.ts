@@ -7,7 +7,8 @@ jest.mock('./db', () => {
   let usersRows: any[] = [];
   const tagged = (strings: TemplateStringsArray, ...values: any[]) => {
     const tpl = strings.join('|');
-    if (tpl.includes('SELECT id, email, password_hash, role, display_name, created_at')) {
+    // verifyPassword still SELECTs password_hash; the other lookups now skip it.
+    if (tpl.includes('SELECT') && tpl.includes('FROM users')) {
       if (tpl.includes('email = ')) {
         const email = values[0] as string;
         return Promise.resolve(usersRows.filter((u) => u.email === email));
@@ -24,7 +25,11 @@ jest.mock('./db', () => {
     if (tpl.includes('UPDATE users SET password_hash')) {
       const [hash, userId] = values as [string, string];
       const u = usersRows.find((u) => u.id === userId);
-      if (u) u.password_hash = hash;
+      if (u) {
+        u.password_hash = hash;
+        // setPassword now uses RETURNING id to detect missing rows.
+        return Promise.resolve([{ id: u.id }]);
+      }
       return Promise.resolve([]);
     }
     return Promise.resolve([]);
@@ -122,6 +127,10 @@ describe('users', () => {
       expect(u.password_hash).not.toBe(ADMIN_HASH);
       // and the new hash should validate the new password
       expect(bcrypt.compareSync('new-strong-password', u.password_hash)).toBe(true);
+    });
+    it('throws when the user id is unknown (no silent success)', async () => {
+      await expect(setPassword('22222222-2222-2222-2222-222222222222', 'a-valid-password'))
+        .rejects.toThrow(/no user with id/);
     });
   });
 });

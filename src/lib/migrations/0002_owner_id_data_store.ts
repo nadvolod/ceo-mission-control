@@ -16,7 +16,9 @@ export const migration: Migration = {
       await sql`ALTER TABLE data_store ADD COLUMN owner_id UUID REFERENCES users(id)`;
     }
 
-    const admin = await sql`SELECT id FROM users WHERE email = ${'nadvolod@gmail.com'}`;
+    // Look up admin by role, not by hardcoded email — forks/test deployments
+    // may seed a different admin identity via ADMIN_EMAIL.
+    const admin = await sql`SELECT id FROM users WHERE role = ${'admin'} ORDER BY created_at ASC LIMIT 1`;
     if (admin.length === 0) {
       throw new Error('[migration 0002] admin user missing — 0001 must run first');
     }

@@ -16,7 +16,7 @@ export const migration: Migration = {
       await sql`ALTER TABLE text_store ADD COLUMN owner_id UUID REFERENCES users(id)`;
     }
 
-    const admin = await sql`SELECT id FROM users WHERE email = ${'nadvolod@gmail.com'}`;
+    const admin = await sql`SELECT id FROM users WHERE role = ${'admin'} ORDER BY created_at ASC LIMIT 1`;
     if (admin.length === 0) {
       throw new Error('[migration 0003] admin user missing — 0001 must run first');
     }

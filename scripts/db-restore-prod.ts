@@ -37,50 +37,59 @@ async function main() {
   console.log(`Restoring from ${file} captured ${backup.meta.capturedAt}`);
   console.log('Counts to restore:', backup.meta.counts);
 
-  // Wipe current state (most aggressive; assumes you have already inspected)
-  console.log('Wiping current rows...');
-  await sql`DELETE FROM audit_log`;
-  await sql`DELETE FROM data_store`;
-  await sql`DELETE FROM text_store`;
-  try { await sql`DELETE FROM schema_migrations`; } catch { /* missing */ }
-  try { await sql`DELETE FROM users`; } catch { /* missing */ }
+  // All-or-nothing: wipe + reseed must be a single transaction. A failure
+  // partway through used to leave prod with the existing rows already
+  // DELETEd but new rows not yet INSERTed — irrecoverable without another
+  // backup. Neon HTTP `sql.transaction([...])` runs the array atomically
+  // in a single round-trip.
+  const queries = [];
 
-  // Reseed users first (FKs depend on them)
+  // Wipe (FKs require child rows go first)
+  queries.push(sql`DELETE FROM audit_log`);
+  queries.push(sql`DELETE FROM data_store`);
+  queries.push(sql`DELETE FROM text_store`);
+  queries.push(sql`DELETE FROM schema_migrations`);
+  queries.push(sql`DELETE FROM users`);
+
+  // Reseed users first (FK targets)
   for (const u of backup.users) {
-    await sql`INSERT INTO users (id, email, password_hash, role, display_name, created_at)
-              VALUES (${u.id}, ${u.email}, ${u.password_hash}, ${u.role}, ${u.display_name}, ${u.created_at})`;
+    queries.push(sql`INSERT INTO users (id, email, password_hash, role, display_name, created_at)
+                     VALUES (${u.id}, ${u.email}, ${u.password_hash}, ${u.role}, ${u.display_name}, ${u.created_at})`);
   }
   for (const m of backup.schema_migrations) {
-    await sql`INSERT INTO schema_migrations (version, description, applied_at)
-              VALUES (${m.version}, ${m.description ?? ''}, ${m.applied_at ?? new Date().toISOString()})`;
+    queries.push(sql`INSERT INTO schema_migrations (version, description, applied_at)
+                     VALUES (${m.version}, ${m.description ?? ''}, ${m.applied_at ?? new Date().toISOString()})`);
   }
   for (const r of backup.data_store) {
     if (r.owner_id) {
-      await sql`INSERT INTO data_store (owner_id, key, data, updated_at)
-                VALUES (${r.owner_id}, ${r.key}, ${JSON.stringify(r.data)}, ${r.updated_at ?? new Date().toISOString()})`;
+      queries.push(sql`INSERT INTO data_store (owner_id, key, data, updated_at)
+                       VALUES (${r.owner_id}, ${r.key}, ${JSON.stringify(r.data)}, ${r.updated_at ?? new Date().toISOString()})`);
     } else {
-      await sql`INSERT INTO data_store (key, data, updated_at)
-                VALUES (${r.key}, ${JSON.stringify(r.data)}, ${r.updated_at ?? new Date().toISOString()})`;
+      queries.push(sql`INSERT INTO data_store (key, data, updated_at)
+                       VALUES (${r.key}, ${JSON.stringify(r.data)}, ${r.updated_at ?? new Date().toISOString()})`);
     }
   }
   for (const r of backup.text_store) {
     if (r.owner_id) {
-      await sql`INSERT INTO text_store (owner_id, key, content, updated_at)
-                VALUES (${r.owner_id}, ${r.key}, ${r.content}, ${r.updated_at ?? new Date().toISOString()})`;
+      queries.push(sql`INSERT INTO text_store (owner_id, key, content, updated_at)
+                       VALUES (${r.owner_id}, ${r.key}, ${r.content}, ${r.updated_at ?? new Date().toISOString()})`);
     } else {
-      await sql`INSERT INTO text_store (key, content, updated_at)
-                VALUES (${r.key}, ${r.content}, ${r.updated_at ?? new Date().toISOString()})`;
+      queries.push(sql`INSERT INTO text_store (key, content, updated_at)
+                       VALUES (${r.key}, ${r.content}, ${r.updated_at ?? new Date().toISOString()})`);
     }
   }
   for (const r of backup.audit_log) {
     if (r.owner_id) {
-      await sql`INSERT INTO audit_log (owner_id, date, entry_type, content, created_at)
-                VALUES (${r.owner_id}, ${r.date}, ${r.entry_type}, ${r.content}, ${r.created_at ?? new Date().toISOString()})`;
+      queries.push(sql`INSERT INTO audit_log (owner_id, date, entry_type, content, created_at)
+                       VALUES (${r.owner_id}, ${r.date}, ${r.entry_type}, ${r.content}, ${r.created_at ?? new Date().toISOString()})`);
     } else {
-      await sql`INSERT INTO audit_log (date, entry_type, content, created_at)
-                VALUES (${r.date}, ${r.entry_type}, ${r.content}, ${r.created_at ?? new Date().toISOString()})`;
+      queries.push(sql`INSERT INTO audit_log (date, entry_type, content, created_at)
+                       VALUES (${r.date}, ${r.entry_type}, ${r.content}, ${r.created_at ?? new Date().toISOString()})`);
     }
   }
+
+  console.log(`Executing ${queries.length} statements in a single transaction...`);
+  await sql.transaction(queries);
   console.log('Restore complete.');
 }
 

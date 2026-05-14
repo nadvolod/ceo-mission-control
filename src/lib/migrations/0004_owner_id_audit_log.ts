@@ -18,7 +18,7 @@ export const migration: Migration = {
       await sql`ALTER TABLE audit_log ADD COLUMN owner_id UUID REFERENCES users(id)`;
     }
 
-    const admin = await sql`SELECT id FROM users WHERE email = ${'nadvolod@gmail.com'}`;
+    const admin = await sql`SELECT id FROM users WHERE role = ${'admin'} ORDER BY created_at ASC LIMIT 1`;
     if (admin.length === 0) {
       throw new Error('[migration 0004] admin user missing — 0001 must run first');
     }

@@ -14,16 +14,19 @@ export interface User {
   createdAt: string;
 }
 
-interface UserRow {
+interface PublicUserRow {
   id: string;
   email: string;
-  password_hash: string;
   role: UserRole;
   display_name: string | null;
   created_at: string;
 }
 
-function toUser(row: UserRow): User {
+interface UserWithHashRow extends PublicUserRow {
+  password_hash: string;
+}
+
+function toUser(row: PublicUserRow): User {
   return {
     id: row.id,
     email: row.email,
@@ -39,24 +42,27 @@ function requireDb() {
   return db;
 }
 
+// Non-auth lookups intentionally skip password_hash so callers cannot
+// accidentally log or expose it. Only verifyPassword fetches it.
+
 export async function getUserByEmail(email: string): Promise<User | null> {
   const db = requireDb();
-  const rows = (await db`SELECT id, email, password_hash, role, display_name, created_at
-                         FROM users WHERE email = ${email}`) as UserRow[];
+  const rows = (await db`SELECT id, email, role, display_name, created_at
+                         FROM users WHERE email = ${email}`) as PublicUserRow[];
   return rows[0] ? toUser(rows[0]) : null;
 }
 
 export async function getUserById(id: string): Promise<User | null> {
   const db = requireDb();
-  const rows = (await db`SELECT id, email, password_hash, role, display_name, created_at
-                         FROM users WHERE id = ${id}`) as UserRow[];
+  const rows = (await db`SELECT id, email, role, display_name, created_at
+                         FROM users WHERE id = ${id}`) as PublicUserRow[];
   return rows[0] ? toUser(rows[0]) : null;
 }
 
 export async function getUserByRole(role: UserRole): Promise<User | null> {
   const db = requireDb();
-  const rows = (await db`SELECT id, email, password_hash, role, display_name, created_at
-                         FROM users WHERE role = ${role} ORDER BY created_at ASC LIMIT 1`) as UserRow[];
+  const rows = (await db`SELECT id, email, role, display_name, created_at
+                         FROM users WHERE role = ${role} ORDER BY created_at ASC LIMIT 1`) as PublicUserRow[];
   return rows[0] ? toUser(rows[0]) : null;
 }
 
@@ -66,7 +72,7 @@ export async function verifyPassword(email: string, password: string): Promise<U
   }
   const db = requireDb();
   const rows = (await db`SELECT id, email, password_hash, role, display_name, created_at
-                         FROM users WHERE email = ${email}`) as UserRow[];
+                         FROM users WHERE email = ${email}`) as UserWithHashRow[];
   if (rows.length === 0) return null;
   const ok = await bcrypt.compare(password, rows[0].password_hash);
   return ok ? toUser(rows[0]) : null;
@@ -78,7 +84,13 @@ export async function setPassword(userId: string, password: string): Promise<voi
   }
   const db = requireDb();
   const hash = await bcrypt.hash(password, BCRYPT_COST);
-  await db`UPDATE users SET password_hash = ${hash} WHERE id = ${userId}`;
+  // RETURNING + length check — silently succeeding for an unknown id would
+  // let a password-reset flow report success while leaving the account
+  // unchanged.
+  const rows = (await db`UPDATE users SET password_hash = ${hash} WHERE id = ${userId} RETURNING id`) as Array<{ id: string }>;
+  if (rows.length === 0) {
+    throw new Error(`setPassword: no user with id ${userId}`);
+  }
 }
 
 /**

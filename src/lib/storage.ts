@@ -25,13 +25,12 @@ function requireDb() {
 export async function loadJSON<T>(ownerId: string, key: string, defaultValue: T): Promise<T> {
   assertOwnerId(ownerId, 'loadJSON', key);
   const db = requireDb();
-  try {
-    const rows = await db`SELECT data FROM data_store WHERE owner_id = ${ownerId} AND key = ${key}`;
-    if (rows.length > 0) {
-      return rows[0].data as T;
-    }
-  } catch (error) {
-    console.error(`storage.loadJSON error for owner=${ownerId} key=${key}:`, error);
+  // Errors propagate. Returning defaultValue on DB failure would mask
+  // connectivity/schema problems and let the next save() overwrite real
+  // data with empty defaults — silent data loss.
+  const rows = await db`SELECT data FROM data_store WHERE owner_id = ${ownerId} AND key = ${key}`;
+  if (rows.length > 0) {
+    return rows[0].data as T;
   }
   return defaultValue;
 }
@@ -43,7 +42,6 @@ export async function saveJSON(ownerId: string, key: string, data: unknown): Pro
   await db`INSERT INTO data_store (owner_id, key, data, updated_at)
            VALUES (${ownerId}, ${key}, ${payload}, NOW())
            ON CONFLICT (owner_id, key) DO UPDATE SET data = ${payload}, updated_at = NOW()`;
-  console.log(`[storage] saveJSON owner=${ownerId} key=${key}`);
 }
 
 // --- Text content (per-user) ---
@@ -51,13 +49,10 @@ export async function saveJSON(ownerId: string, key: string, data: unknown): Pro
 export async function loadText(ownerId: string, key: string, defaultContent: string = ''): Promise<string> {
   assertOwnerId(ownerId, 'loadText', key);
   const db = requireDb();
-  try {
-    const rows = await db`SELECT content FROM text_store WHERE owner_id = ${ownerId} AND key = ${key}`;
-    if (rows.length > 0) {
-      return rows[0].content as string;
-    }
-  } catch (error) {
-    console.error(`storage.loadText error for owner=${ownerId} key=${key}:`, error);
+  // Errors propagate (see loadJSON).
+  const rows = await db`SELECT content FROM text_store WHERE owner_id = ${ownerId} AND key = ${key}`;
+  if (rows.length > 0) {
+    return rows[0].content as string;
   }
   return defaultContent;
 }
@@ -68,7 +63,6 @@ export async function saveText(ownerId: string, key: string, content: string): P
   await db`INSERT INTO text_store (owner_id, key, content, updated_at)
            VALUES (${ownerId}, ${key}, ${content}, NOW())
            ON CONFLICT (owner_id, key) DO UPDATE SET content = ${content}, updated_at = NOW()`;
-  console.log(`[storage] saveText owner=${ownerId} key=${key}`);
 }
 
 // --- Audit log (per-user) ---
