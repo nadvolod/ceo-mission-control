@@ -12,18 +12,20 @@
  */
 
 import bcrypt from 'bcryptjs';
-import { neon } from '@neondatabase/serverless';
+import { neon, type NeonQueryFunction } from '@neondatabase/serverless';
 
 const BCRYPT_COST = 12;
 
-async function reseedOne(sql: ReturnType<typeof neon>, email: string, envVar: string) {
+type Sql = NeonQueryFunction<false, false>;
+
+async function reseedOne(sql: Sql, email: string, envVar: string) {
   const raw = process.env[envVar];
   if (!raw || raw.length < 8) {
     console.log(`[reseed] ${envVar} unset or <8 chars — skipping ${email}`);
     return;
   }
   const hash = await bcrypt.hash(raw, BCRYPT_COST);
-  const result = await sql`UPDATE users SET password_hash = ${hash} WHERE email = ${email} RETURNING id`;
+  const result = (await sql`UPDATE users SET password_hash = ${hash} WHERE email = ${email} RETURNING id`) as Array<{ id: string }>;
   if (result.length === 0) {
     console.warn(`[reseed] ${email} not found — run db:migrate first`);
     return;
@@ -36,7 +38,7 @@ async function main() {
     console.error('DATABASE_URL is required');
     process.exit(2);
   }
-  const sql = neon(process.env.DATABASE_URL);
+  const sql: Sql = neon(process.env.DATABASE_URL);
 
   await reseedOne(sql, 'nadvolod@gmail.com', 'ADMIN_INITIAL_PASSWORD');
   await reseedOne(sql, 'demo@ceo-mc.local', 'DEMO_USER_PASSWORD');
