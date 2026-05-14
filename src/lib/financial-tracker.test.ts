@@ -5,8 +5,8 @@
 jest.mock('./storage', () => {
   let store: Record<string, any> = {};
   return {
-    loadJSON: jest.fn(async (key: string, defaultValue: any) => store[key] ?? defaultValue),
-    saveJSON: jest.fn(async (key: string, data: any) => { store[key] = data; }),
+    loadJSON: jest.fn(async (_ownerId: string, key: string, defaultValue: any) => store[key] ?? defaultValue),
+    saveJSON: jest.fn(async (_ownerId: string, key: string, data: any) => { store[key] = data; }),
     appendAuditLog: jest.fn(async () => {}),
     _reset: () => { store = {}; },
   };
@@ -17,6 +17,7 @@ const storage = require('./storage');
 
 import { addDays, format, startOfWeek } from 'date-fns';
 import { FinancialTracker } from './financial-tracker';
+import { UNIT_TEST_OWNER_ID } from '@/__tests__/utils/owner-id';
 
 const DATE = '2026-05-11';
 
@@ -27,7 +28,7 @@ describe('FinancialTracker.recalculateTotals (cent-based accumulation)', () => {
   });
 
   it('sums 49.99 + 0.01 + 100 to exactly 150 for the cut category (and netImpact: 150)', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     await tracker.addEntry('cut', 49.99, 'a', DATE);
     await tracker.addEntry('cut', 0.01, 'b', DATE);
     await tracker.addEntry('cut', 100, 'c', DATE);
@@ -41,7 +42,7 @@ describe('FinancialTracker.recalculateTotals (cent-based accumulation)', () => {
   });
 
   it('sums 0.1 + 0.2 to exactly 0.3 for the generated category', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     await tracker.addEntry('generated', 0.1, 'a', DATE);
     await tracker.addEntry('generated', 0.2, 'b', DATE);
 
@@ -52,7 +53,7 @@ describe('FinancialTracker.recalculateTotals (cent-based accumulation)', () => {
   });
 
   it('sums large amounts 1_500_000 + 750_000.50 for moved to exactly 2_250_000.5', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     await tracker.addEntry('moved', 1_500_000, 'a', DATE);
     await tracker.addEntry('moved', 750_000.5, 'b', DATE);
 
@@ -63,14 +64,14 @@ describe('FinancialTracker.recalculateTotals (cent-based accumulation)', () => {
   });
 
   it('empty day returns { moved: 0, generated: 0, cut: 0, netImpact: 0 }', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     // No entries — getTodaysMetrics returns the default totals shape.
     const today = tracker.getTodaysMetrics();
     expect(today.totals).toEqual({ moved: 0, generated: 0, cut: 0, netImpact: 0 });
   });
 
   it('three categories on the same day produce netImpact = moved + generated + cut exactly', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     await tracker.addEntry('moved', 0.1, 'm1', DATE);
     await tracker.addEntry('moved', 0.2, 'm2', DATE);
     await tracker.addEntry('generated', 0.1, 'g1', DATE);
@@ -96,56 +97,56 @@ describe('FinancialTracker.addEntry (input validation)', () => {
   });
 
   it('rejects amount = 0', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     await expect(tracker.addEntry('cut', 0, 'zero', DATE)).rejects.toThrow(
       /amount must be greater than 0/i
     );
   });
 
   it('rejects negative amount', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     await expect(tracker.addEntry('generated', -10, 'neg', DATE)).rejects.toThrow(
       /amount must be greater than 0/i
     );
   });
 
   it('rejects NaN amount', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     await expect(tracker.addEntry('moved', Number.NaN, 'nan', DATE)).rejects.toThrow(
       /amount must be greater than 0/i
     );
   });
 
   it('rejects Infinity amount', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     await expect(
       tracker.addEntry('moved', Number.POSITIVE_INFINITY, 'inf', DATE)
     ).rejects.toThrow(/amount must be greater than 0/i);
   });
 
   it('rejects whitespace-only description', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     await expect(tracker.addEntry('cut', 10, '   ', DATE)).rejects.toThrow(
       /description.*required/i
     );
   });
 
   it('rejects empty description', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     await expect(tracker.addEntry('cut', 10, '', DATE)).rejects.toThrow(
       /description.*required/i
     );
   });
 
   it('does not create a dailyMetrics entry for the day when validation fails', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     await expect(tracker.addEntry('cut', 0, 'zero', DATE)).rejects.toThrow();
     const data = tracker.getAllData();
     expect(data.dailyMetrics[DATE]).toBeUndefined();
   });
 
   it('trims a valid description before storing it on the entry', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     const entry = await tracker.addEntry('generated', 5, '  hello world  ', DATE);
     expect(entry.description).toBe('hello world');
     const data = tracker.getAllData();
@@ -160,7 +161,7 @@ describe('FinancialTracker.getDailyMetricsForWeek', () => {
   });
 
   it('returns 7 zero-filled days for an empty week starting 2026-05-11', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     const result = tracker.getDailyMetricsForWeek('2026-05-11');
 
     expect(result).toHaveLength(7);
@@ -181,7 +182,7 @@ describe('FinancialTracker.getDailyMetricsForWeek', () => {
   });
 
   it('returns 7 days for a sparse week with entries only on Wednesday at index 2', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     await tracker.addEntry('generated', 100, 'wed revenue', '2026-05-13');
 
     const result = tracker.getDailyMetricsForWeek('2026-05-11');
@@ -201,7 +202,7 @@ describe('FinancialTracker.getDailyMetricsForWeek', () => {
   });
 
   it('excludes the previous Sunday (2026-05-10) and includes the upcoming Sunday (2026-05-17)', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     await tracker.addEntry('moved', 500, 'prev sunday', '2026-05-10');
     await tracker.addEntry('cut', 75, 'sunday cut', '2026-05-17');
 
@@ -229,7 +230,7 @@ describe('FinancialTracker.getDailyMetricsForWeek', () => {
   });
 
   it('handles a month boundary: week starting 2026-04-27 spans April 27 through May 3', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     await tracker.addEntry('generated', 200, 'apr 30 entry', '2026-04-30');
     await tracker.addEntry('moved', 1000, 'may 3 entry', '2026-05-03');
 
@@ -265,7 +266,7 @@ describe('FinancialTracker.getDailyMetricsForRange', () => {
   });
 
   it('returns 5 zero-filled days for an empty range 2026-05-01..2026-05-05', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     const result = tracker.getDailyMetricsForRange('2026-05-01', '2026-05-05');
 
     expect(result).toHaveLength(5);
@@ -283,7 +284,7 @@ describe('FinancialTracker.getDailyMetricsForRange', () => {
   });
 
   it('reflects boundary entries on start and end days at indices 0 and 4', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     await tracker.addEntry('moved', 500, 'start day entry', '2026-05-01');
     await tracker.addEntry('cut', 75, 'end day entry', '2026-05-05');
 
@@ -308,7 +309,7 @@ describe('FinancialTracker.getDailyMetricsForRange', () => {
   });
 
   it('handles month crossing: 2026-04-29..2026-05-02 returns the exact 4 dates', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     const result = tracker.getDailyMetricsForRange('2026-04-29', '2026-05-02');
 
     expect(result).toHaveLength(4);
@@ -321,7 +322,7 @@ describe('FinancialTracker.getDailyMetricsForRange', () => {
   });
 
   it('returns a length-1 array for a single-day range (start === end)', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     await tracker.addEntry('generated', 42, 'solo day', '2026-05-11');
 
     const result = tracker.getDailyMetricsForRange('2026-05-11', '2026-05-11');
@@ -342,7 +343,7 @@ describe('FinancialTracker.getPreviousWeekTotals', () => {
   });
 
   it('returns zero totals when no entries exist anywhere', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     expect(tracker.getPreviousWeekTotals()).toEqual({
       moved: 0,
       generated: 0,
@@ -352,7 +353,7 @@ describe('FinancialTracker.getPreviousWeekTotals', () => {
   });
 
   it('sums only entries from the previous Mon-Sun week (ignores this week and other days)', async () => {
-    const tracker = await FinancialTracker.create();
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
 
     const thisWeekMonday = startOfWeek(new Date(), { weekStartsOn: 1 });
     const prevWeekMonday = addDays(thisWeekMonday, -7);

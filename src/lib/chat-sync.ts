@@ -7,16 +7,18 @@ import type { AiTask } from './types';
 export class ChatSyncManager {
   private financialTracker: FinancialTracker;
   private focusTracker: FocusTracker;
+  private readonly ownerId: string;
 
-  private constructor(financialTracker: FinancialTracker, focusTracker: FocusTracker) {
+  private constructor(ownerId: string, financialTracker: FinancialTracker, focusTracker: FocusTracker) {
+    this.ownerId = ownerId;
     this.financialTracker = financialTracker;
     this.focusTracker = focusTracker;
   }
 
-  static async create(): Promise<ChatSyncManager> {
-    const financialTracker = await FinancialTracker.create();
-    const focusTracker = await FocusTracker.create();
-    return new ChatSyncManager(financialTracker, focusTracker);
+  static async create(ownerId: string): Promise<ChatSyncManager> {
+    const financialTracker = await FinancialTracker.create(ownerId);
+    const focusTracker = await FocusTracker.create(ownerId);
+    return new ChatSyncManager(ownerId, financialTracker, focusTracker);
   }
 
   async syncChatUpdate(message: string): Promise<{ financial?: any; focusHours?: any; tasks?: any; scorecard?: any }> {
@@ -104,7 +106,7 @@ export class ChatSyncManager {
 
     for (const { field, value } of updates) {
       try {
-        await updateScorecardField(field, value);
+        await updateScorecardField(this.ownerId, field, value);
         updated.push(field);
         console.log(`Scorecard updated: ${field}`);
       } catch (err) {

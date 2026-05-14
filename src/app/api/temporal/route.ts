@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadJSON, saveJSON, loadText, saveText, appendAuditLog } from '@/lib/storage';
+import { getAdminUserId } from '@/lib/users';
 
 interface TemporalSession {
   id: string;
@@ -15,20 +16,20 @@ interface TemporalData {
   dailyTotals: Record<string, number>;
 }
 
-async function loadTemporalData(): Promise<TemporalData> {
-  return await loadJSON('temporal-tracking.json', {
+async function loadTemporalData(ownerId: string): Promise<TemporalData> {
+  return await loadJSON(ownerId, 'temporal-tracking.json', {
     sessions: [],
     dailyTotals: {}
   });
 }
 
-async function saveTemporalData(data: TemporalData): Promise<void> {
-  await saveJSON('temporal-tracking.json', data);
+async function saveTemporalData(ownerId: string, data: TemporalData): Promise<void> {
+  await saveJSON(ownerId, 'temporal-tracking.json', data);
 }
 
-async function updateDailyScorecard(date: string, newTotal: number): Promise<void> {
+async function updateDailyScorecard(ownerId: string, date: string, newTotal: number): Promise<void> {
   try {
-    let content = await loadText('DAILY_SCORECARD.md', '');
+    let content = await loadText(ownerId, 'DAILY_SCORECARD.md', '');
 
     // Update the "Actual:" line in the temporal hours section
     const actualRegex = /(-[ \t]*Actual:[ \t]*)([\d.]*)/;
@@ -45,7 +46,7 @@ async function updateDailyScorecard(date: string, newTotal: number): Promise<voi
       }
     }
 
-    await saveText('DAILY_SCORECARD.md', content);
+    await saveText(ownerId, 'DAILY_SCORECARD.md', content);
   } catch (error) {
     console.error('Error updating daily scorecard:', error);
   }
@@ -53,7 +54,8 @@ async function updateDailyScorecard(date: string, newTotal: number): Promise<voi
 
 export async function GET() {
   try {
-    const data = await loadTemporalData();
+    const ownerId = await getAdminUserId();
+    const data = await loadTemporalData(ownerId);
 
     return NextResponse.json({
       success: true,
@@ -82,7 +84,8 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const data = await loadTemporalData();
+      const ownerId = await getAdminUserId();
+      const data = await loadTemporalData(ownerId);
       const now = new Date();
       const today = now.toISOString().split('T')[0];
 
@@ -105,10 +108,10 @@ export async function POST(request: NextRequest) {
       data.dailyTotals[today] = newTotal;
 
       // Save temporal data
-      await saveTemporalData(data);
+      await saveTemporalData(ownerId, data);
 
       // Update daily scorecard
-      await updateDailyScorecard(today, newTotal);
+      await updateDailyScorecard(ownerId, today, newTotal);
 
       // Also log to memory file
       try {
@@ -120,7 +123,7 @@ export async function POST(request: NextRequest) {
 
         const logEntry = `\n## Temporal Session Completed (${timestamp})\n- **Duration**: ${session.duration} hours\n- **Description**: ${session.description}\n- **Daily total**: ${newTotal} hours\n\n`;
 
-        await appendAuditLog(today, 'temporal', logEntry);
+        await appendAuditLog(ownerId, today, 'temporal', logEntry);
       } catch (error) {
         console.error('Error updating memory file:', error);
       }

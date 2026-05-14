@@ -15,22 +15,25 @@ function defaultData(): MonthlyReviewData {
 
 export class MonthlyReviewTracker {
   private data: MonthlyReviewData = defaultData();
+  private readonly ownerId: string;
 
-  private constructor() {}
+  private constructor(ownerId: string) {
+    this.ownerId = ownerId;
+  }
 
-  static async create(): Promise<MonthlyReviewTracker> {
-    const tracker = new MonthlyReviewTracker();
+  static async create(ownerId: string): Promise<MonthlyReviewTracker> {
+    const tracker = new MonthlyReviewTracker(ownerId);
     await tracker.loadData();
     return tracker;
   }
 
   private async loadData(): Promise<void> {
-    this.data = await loadJSON(STORAGE_KEY, defaultData());
+    this.data = await loadJSON(this.ownerId, STORAGE_KEY, defaultData());
   }
 
   private async saveData(): Promise<void> {
     this.data.lastUpdated = new Date().toISOString();
-    await saveJSON(STORAGE_KEY, this.data);
+    await saveJSON(this.ownerId, STORAGE_KEY, this.data);
   }
 
   async submitReview(
@@ -88,6 +91,7 @@ export class MonthlyReviewTracker {
     await this.saveData();
 
     await appendAuditLog(
+      this.ownerId,
       input.date,
       'monthly-review',
       `Monthly review submitted for ${input.month}: ${input.hoursWorked}h worked, ` +
@@ -107,6 +111,7 @@ export class MonthlyReviewTracker {
     await this.saveData();
 
     await appendAuditLog(
+      this.ownerId,
       new Date().toISOString().split('T')[0],
       'monthly-review',
       `Monthly review deleted for ${month}`

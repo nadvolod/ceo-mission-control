@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFinancialSnapshot, getCachedSnapshot } from '@/lib/monarch-service';
+import { getAdminUserId } from '@/lib/users';
 
 export async function GET() {
   if (!process.env.MONARCH_TOKEN) {
@@ -10,14 +11,16 @@ export async function GET() {
   }
 
   try {
-    const snapshot = await getFinancialSnapshot();
+    const ownerId = await getAdminUserId();
+    const snapshot = await getFinancialSnapshot(ownerId);
     return NextResponse.json(snapshot);
   } catch (error) {
     console.error('Error fetching Monarch data:', error);
 
     // Try to serve stale cache on error
     try {
-      const stale = await getCachedSnapshot();
+      const ownerId = await getAdminUserId();
+      const stale = await getCachedSnapshot(ownerId);
       if (stale) {
         return NextResponse.json({ ...stale, stale: true });
       }
@@ -46,7 +49,8 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'refresh': {
-        const snapshot = await getFinancialSnapshot(true);
+        const ownerId = await getAdminUserId();
+        const snapshot = await getFinancialSnapshot(ownerId, true);
         return NextResponse.json(snapshot);
       }
 

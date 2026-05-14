@@ -10,17 +10,20 @@ function defaultData(): WeeklyTrackerData {
 
 export class WeeklyTracker {
   private data: WeeklyTrackerData = defaultData();
+  private readonly ownerId: string;
 
-  private constructor() {}
+  private constructor(ownerId: string) {
+    this.ownerId = ownerId;
+  }
 
-  static async create(): Promise<WeeklyTracker> {
-    const tracker = new WeeklyTracker();
+  static async create(ownerId: string): Promise<WeeklyTracker> {
+    const tracker = new WeeklyTracker(ownerId);
     await tracker.loadData();
     return tracker;
   }
 
   private async loadData(): Promise<void> {
-    this.data = await loadJSON(STORAGE_KEY, defaultData());
+    this.data = await loadJSON(this.ownerId, STORAGE_KEY, defaultData());
     // Backfill temporalTarget for reviews created before this field existed
     for (const review of this.data.weeklyReviews) {
       if (typeof review.temporalTarget !== 'number') {
@@ -31,7 +34,7 @@ export class WeeklyTracker {
 
   private async saveData(): Promise<void> {
     this.data.lastUpdated = new Date().toISOString();
-    await saveJSON(STORAGE_KEY, this.data);
+    await saveJSON(this.ownerId, STORAGE_KEY, this.data);
   }
 
   async logDay(
@@ -66,6 +69,7 @@ export class WeeklyTracker {
 
     const flags = WeeklyTracker.getDayFlags(entry);
     await appendAuditLog(
+      this.ownerId,
       entryDate,
       'weekly-tracker',
       `Logged day: ${deepWorkHours}h deep work, ${pipelineActions} pipeline, trained=${trained}` +
@@ -121,6 +125,7 @@ export class WeeklyTracker {
     await this.saveData();
 
     await appendAuditLog(
+      this.ownerId,
       weekStart,
       'weekly-tracker',
       `Weekly review submitted: $${revenue} revenue, bottleneck: ${review.bottleneck || 'none'}`
@@ -265,7 +270,7 @@ export class WeeklyTracker {
     entry.timestamp = new Date().toISOString();
     await this.saveData();
 
-    await appendAuditLog(date, 'weekly-tracker', `Auto-training from Garmin: ${activeMinutes} active min (threshold: ${threshold}) → trained=${autoTrained}`);
+    await appendAuditLog(this.ownerId, date, 'weekly-tracker', `Auto-training from Garmin: ${activeMinutes} active min (threshold: ${threshold}) → trained=${autoTrained}`);
     return autoTrained;
   }
 

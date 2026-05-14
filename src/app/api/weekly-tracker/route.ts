@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WeeklyTracker } from '@/lib/weekly-tracker';
 import { checkAuth } from '@/lib/auth';
+import { getAdminUserId } from '@/lib/users';
 
 export async function GET() {
   try {
-    const tracker = await WeeklyTracker.create();
+    const ownerId = await getAdminUserId();
+    const tracker = await WeeklyTracker.create(ownerId);
 
     return NextResponse.json({
       success: true,
@@ -32,7 +34,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action, ...data } = body;
-    const tracker = await WeeklyTracker.create();
+    const ownerId = await getAdminUserId();
+    const tracker = await WeeklyTracker.create(ownerId);
 
     switch (action) {
       case 'logDay': {

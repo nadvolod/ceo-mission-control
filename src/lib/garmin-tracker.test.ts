@@ -4,6 +4,7 @@
 import { GarminTracker } from './garmin-tracker';
 import * as storage from './storage';
 import type { GarminDayMetrics, GarminHealthData } from './types';
+import { UNIT_TEST_OWNER_ID } from '@/__tests__/utils/owner-id';
 
 jest.mock('./storage', () => ({
   loadJSON: jest.fn(),
@@ -52,8 +53,8 @@ describe('GarminTracker', () => {
 
   describe('create', () => {
     it('loads data from storage on creation', async () => {
-      await GarminTracker.create();
-      expect(mockLoadJSON).toHaveBeenCalledWith('garmin-health.json', expect.any(Object));
+      await GarminTracker.create(UNIT_TEST_OWNER_ID);
+      expect(mockLoadJSON).toHaveBeenCalledWith(UNIT_TEST_OWNER_ID, 'garmin-health.json', expect.any(Object));
     });
   });
 
@@ -67,11 +68,12 @@ describe('GarminTracker', () => {
         syncError: null,
       });
 
-      const tracker = await GarminTracker.create();
+      const tracker = await GarminTracker.create(UNIT_TEST_OWNER_ID);
       const newMetrics = [makeMetrics({ date: '2026-04-13' })];
       await tracker.syncMetrics(newMetrics);
 
       expect(mockSaveJSON).toHaveBeenCalledWith(
+        UNIT_TEST_OWNER_ID,
         'garmin-health.json',
         expect.objectContaining({
           metrics: expect.objectContaining({
@@ -90,18 +92,18 @@ describe('GarminTracker', () => {
         syncError: null,
       });
 
-      const tracker = await GarminTracker.create();
+      const tracker = await GarminTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.syncMetrics([makeMetrics({ sleepScore: 85 })]);
 
-      const savedData = (mockSaveJSON.mock.calls[0][1] as GarminHealthData);
+      const savedData = (mockSaveJSON.mock.calls[0][2] as GarminHealthData);
       expect(savedData.metrics['2026-04-13'].sleepScore).toBe(85);
     });
 
     it('updates lastSyncedAt timestamp', async () => {
-      const tracker = await GarminTracker.create();
+      const tracker = await GarminTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.syncMetrics([makeMetrics()]);
 
-      const savedData = (mockSaveJSON.mock.calls[0][1] as GarminHealthData);
+      const savedData = (mockSaveJSON.mock.calls[0][2] as GarminHealthData);
       expect(savedData.lastSyncedAt).toBeTruthy();
       expect(savedData.syncStatus).toBe('idle');
     });
@@ -122,7 +124,7 @@ describe('GarminTracker', () => {
         syncError: null,
       });
 
-      const tracker = await GarminTracker.create();
+      const tracker = await GarminTracker.create(UNIT_TEST_OWNER_ID);
       const result = tracker.getMetricsForRange('2026-04-11', '2026-04-12');
 
       expect(result).toHaveLength(2);
@@ -131,7 +133,7 @@ describe('GarminTracker', () => {
     });
 
     it('returns empty array for range with no data', async () => {
-      const tracker = await GarminTracker.create();
+      const tracker = await GarminTracker.create(UNIT_TEST_OWNER_ID);
       const result = tracker.getMetricsForRange('2026-04-01', '2026-04-05');
       expect(result).toEqual([]);
     });
@@ -149,7 +151,7 @@ describe('GarminTracker', () => {
         syncError: null,
       });
 
-      const tracker = await GarminTracker.create();
+      const tracker = await GarminTracker.create(UNIT_TEST_OWNER_ID);
       const latest = tracker.getLatestMetrics();
 
       expect(latest?.date).toBe('2026-04-13');
@@ -157,7 +159,7 @@ describe('GarminTracker', () => {
     });
 
     it('returns null when no data', async () => {
-      const tracker = await GarminTracker.create();
+      const tracker = await GarminTracker.create(UNIT_TEST_OWNER_ID);
       expect(tracker.getLatestMetrics()).toBeNull();
     });
   });
@@ -179,7 +181,7 @@ describe('GarminTracker', () => {
         syncError: null,
       });
 
-      const tracker = await GarminTracker.create();
+      const tracker = await GarminTracker.create(UNIT_TEST_OWNER_ID);
       const avg = tracker.getAverages(7);
 
       // Average depends on "today" — the 7-day window is relative to current date.
@@ -199,7 +201,7 @@ describe('GarminTracker', () => {
         syncError: null,
       });
 
-      const tracker = await GarminTracker.create();
+      const tracker = await GarminTracker.create(UNIT_TEST_OWNER_ID);
 
       // Get first copy and mutate it
       const firstCopy = tracker.getAllData();

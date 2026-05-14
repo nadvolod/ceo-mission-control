@@ -49,23 +49,26 @@ export class FocusTracker {
     dailyMetrics: {},
     lastUpdated: new Date().toISOString()
   };
+  private readonly ownerId: string;
 
-  private constructor() {}
+  private constructor(ownerId: string) {
+    this.ownerId = ownerId;
+  }
 
-  static async create(): Promise<FocusTracker> {
-    const tracker = new FocusTracker();
+  static async create(ownerId: string): Promise<FocusTracker> {
+    const tracker = new FocusTracker(ownerId);
     await tracker.loadData();
     return tracker;
   }
 
   private async loadData(): Promise<void> {
     const defaultData: FocusData = { dailyMetrics: {}, lastUpdated: new Date().toISOString() };
-    this.data = await loadJSON('focus-tracking.json', defaultData);
+    this.data = await loadJSON(this.ownerId, 'focus-tracking.json', defaultData);
   }
 
   private async saveData(): Promise<void> {
     this.data.lastUpdated = new Date().toISOString();
-    await saveJSON('focus-tracking.json', this.data);
+    await saveJSON(this.ownerId, 'focus-tracking.json', this.data);
   }
 
   async addSession(
