@@ -24,9 +24,11 @@ describe('storage DB writes', () => {
 
   it('saveJSON updates first, then inserts when no rows were updated', async () => {
     const sqlCalls: string[] = [];
-    const db = jest.fn(async (strings: TemplateStringsArray) => {
+    const queryValues: unknown[][] = [];
+    const db = jest.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
       const sql = strings.join(' ');
       sqlCalls.push(sql);
+      queryValues.push(values);
       if (sql.includes('UPDATE data_store')) return [];
       return [];
     });
@@ -38,6 +40,14 @@ describe('storage DB writes', () => {
     expect(sqlCalls.some(sql => sql.includes('UPDATE data_store'))).toBe(true);
     expect(sqlCalls.some(sql => sql.includes('INSERT INTO data_store'))).toBe(true);
     expect(sqlCalls.some(sql => sql.includes('ON CONFLICT'))).toBe(false);
+    expect(queryValues).toContainEqual([
+      '{"hello":"world"}',
+      'financial-metrics.json',
+    ]);
+    expect(queryValues).toContainEqual([
+      'financial-metrics.json',
+      '{"hello":"world"}',
+    ]);
   });
 
   it('saveJSON does not insert when update already matched rows', async () => {
@@ -58,9 +68,11 @@ describe('storage DB writes', () => {
 
   it('saveText updates first, then inserts when no rows were updated', async () => {
     const sqlCalls: string[] = [];
-    const db = jest.fn(async (strings: TemplateStringsArray) => {
+    const queryValues: unknown[][] = [];
+    const db = jest.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
       const sql = strings.join(' ');
       sqlCalls.push(sql);
+      queryValues.push(values);
       if (sql.includes('UPDATE text_store')) return [];
       return [];
     });
@@ -71,5 +83,13 @@ describe('storage DB writes', () => {
     expect(sqlCalls.some(sql => sql.includes('UPDATE text_store'))).toBe(true);
     expect(sqlCalls.some(sql => sql.includes('INSERT INTO text_store'))).toBe(true);
     expect(sqlCalls.some(sql => sql.includes('ON CONFLICT'))).toBe(false);
+    expect(queryValues).toContainEqual([
+      '# Updated',
+      'INITIATIVES.md',
+    ]);
+    expect(queryValues).toContainEqual([
+      'INITIATIVES.md',
+      '# Updated',
+    ]);
   });
 });
