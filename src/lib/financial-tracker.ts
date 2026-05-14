@@ -161,11 +161,13 @@ export class FinancialTracker {
     if (!totals || typeof totals !== 'object') {
       withDefaults.totals = { moved: 0, generated: 0, cut: 0, netImpact: 0 };
     } else {
+      const toFiniteNumber = (value: unknown): number =>
+        typeof value === 'number' && Number.isFinite(value) ? value : 0;
       withDefaults.totals = {
-        moved: Number.isFinite(totals.moved) ? totals.moved : 0,
-        generated: Number.isFinite(totals.generated) ? totals.generated : 0,
-        cut: Number.isFinite(totals.cut) ? totals.cut : 0,
-        netImpact: Number.isFinite(totals.netImpact) ? totals.netImpact : 0,
+        moved: toFiniteNumber(totals.moved),
+        generated: toFiniteNumber(totals.generated),
+        cut: toFiniteNumber(totals.cut),
+        netImpact: toFiniteNumber(totals.netImpact),
       };
     }
     withDefaults.date = withDefaults.date || date;

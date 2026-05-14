@@ -47,9 +47,15 @@ export async function saveJSON(filename: string, data: unknown): Promise<void> {
   if (hasDb()) {
     await ensureDbReady();
     const db = getDb()!;
-    await db`INSERT INTO data_store (key, data, updated_at)
-             VALUES (${filename}, ${JSON.stringify(data)}, NOW())
-             ON CONFLICT (key) DO UPDATE SET data = ${JSON.stringify(data)}, updated_at = NOW()`;
+    const payload = JSON.stringify(data);
+    const updated = await db`UPDATE data_store
+                             SET data = ${payload}, updated_at = NOW()
+                             WHERE key = ${filename}
+                             RETURNING key`;
+    if (updated.length === 0) {
+      await db`INSERT INTO data_store (key, data, updated_at)
+               VALUES (${filename}, ${payload}, NOW())`;
+    }
     return;
   }
 
@@ -91,9 +97,14 @@ export async function saveText(filename: string, content: string): Promise<void>
   if (hasDb()) {
     await ensureDbReady();
     const db = getDb()!;
-    await db`INSERT INTO text_store (key, content, updated_at)
-             VALUES (${filename}, ${content}, NOW())
-             ON CONFLICT (key) DO UPDATE SET content = ${content}, updated_at = NOW()`;
+    const updated = await db`UPDATE text_store
+                             SET content = ${content}, updated_at = NOW()
+                             WHERE key = ${filename}
+                             RETURNING key`;
+    if (updated.length === 0) {
+      await db`INSERT INTO text_store (key, content, updated_at)
+               VALUES (${filename}, ${content}, NOW())`;
+    }
     return;
   }
 
