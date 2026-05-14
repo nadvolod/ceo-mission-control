@@ -1,14 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFinancialSnapshot, getCachedSnapshot } from '@/lib/monarch-service';
-import { requireEffectiveUserId } from '@/lib/session';
+import { requireEffectiveUserId, isRealAdminRequest } from '@/lib/session';
 
-export async function GET(request: NextRequest) {
+// Monarch uses a single global MONARCH_TOKEN. A demo or test user with an
+// empty cache could otherwise trigger a fresh fetch and store admin's real
+// financial accounts under their own owner_id. Until per-user Monarch
+// credentials exist, gate this route to the real admin (not impersonated).
+async function guard(request: NextRequest): Promise<NextResponse | null> {
   if (!process.env.MONARCH_TOKEN) {
     return NextResponse.json(
       { error: 'Monarch Money not configured. Set MONARCH_TOKEN environment variable.' },
-      { status: 503 }
+      { status: 503 },
     );
   }
+  if (!(await isRealAdminRequest(request))) {
+    return NextResponse.json(
+      { error: 'Monarch data is admin-only until per-user credentials are supported.' },
+      { status: 403 },
+    );
+  }
+  return null;
+}
+
+export async function GET(request: NextRequest) {
+  const blocked = await guard(request);
+  if (blocked) return blocked;
 
   try {
     const ownerId = await requireEffectiveUserId(request);
@@ -36,12 +52,8 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!process.env.MONARCH_TOKEN) {
-    return NextResponse.json(
-      { error: 'Monarch Money not configured. Set MONARCH_TOKEN environment variable.' },
-      { status: 503 }
-    );
-  }
+  const blocked = await guard(request);
+  if (blocked) return blocked;
 
   try {
     const body = await request.json();

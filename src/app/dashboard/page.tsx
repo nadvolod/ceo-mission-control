@@ -22,6 +22,7 @@ export default function HomePage() {
     handleMonarchRefresh,
     handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleSubmitWeeklyReview,
     monthlyReviewData, handleSubmitMonthlyReview, handleDeleteMonthlyReview,
+    handleDeleteDay, handleDeleteWeeklyReview,
   } = useDashboardData();
 
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
@@ -158,6 +159,8 @@ export default function HomePage() {
                   }
                   dailyFinancialTrend={financialData?.dailyFinancialTrend ?? []}
                   onAddFinancialEntry={handleAddFinancialEntry}
+                  onDeleteDay={handleDeleteDay}
+                  onDeleteReview={handleDeleteWeeklyReview}
                 />
               </div>
             )}

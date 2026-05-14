@@ -5,7 +5,14 @@ import { WeeklyTracker } from '@/lib/weekly-tracker';
 import { checkAuth } from '@/lib/auth';
 import { loadJSON } from '@/lib/storage';
 import { fetchGarminMetrics, initiateGarminLogin, completeMFALogin } from '@/lib/garmin-client';
-import { requireEffectiveUserId } from '@/lib/session';
+import { requireEffectiveUserId, isRealAdminRequest } from '@/lib/session';
+
+// Garmin uses single global GARMIN_EMAIL/PASSWORD credentials. Any
+// authenticated user could otherwise trigger a login or fetch and cache
+// the admin's Garmin data under their own owner_id. Gate the credential-
+// touching actions to the real admin (not impersonated) until per-user
+// Garmin support exists.
+const ADMIN_ONLY_ACTIONS = new Set(['garmin-login', 'garmin-mfa', 'fetch-garmin']);
 
 export const maxDuration = 60;
 
@@ -47,6 +54,12 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action, ...data } = body;
+    if (ADMIN_ONLY_ACTIONS.has(action) && !(await isRealAdminRequest(request))) {
+      return NextResponse.json(
+        { error: `Action "${action}" is admin-only until per-user Garmin credentials are supported.` },
+        { status: 403 },
+      );
+    }
     const ownerId = await requireEffectiveUserId(request);
 
     switch (action) {

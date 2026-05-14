@@ -78,6 +78,20 @@ export class HealthNotesTracker {
     return fullNote;
   }
 
+  /** Delete the note for a specific YYYY-MM-DD. Returns true if it existed. */
+  async deleteNote(date: string): Promise<boolean> {
+    if (!this.data.notes[date]) return false;
+    delete this.data.notes[date];
+    await this.saveData();
+    await appendAuditLog(
+      this.ownerId,
+      date,
+      'health-notes',
+      `Note deleted for ${date}`,
+    );
+    return true;
+  }
+
   getNoteForDate(date: string): DailyHealthNote | null {
     return this.data.notes[date] || null;
   }

@@ -67,6 +67,8 @@ export interface DashboardHandlers {
   }) => Promise<void>;
   handleSubmitMonthlyReview: (review: Omit<MonthlyReview, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   handleDeleteMonthlyReview: (month: string) => Promise<void>;
+  handleDeleteDay: (date: string) => Promise<void>;
+  handleDeleteWeeklyReview: (id: string) => Promise<void>;
 }
 
 export function useDashboardData(): DashboardData & DashboardHandlers {
@@ -410,6 +412,32 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
     }
   }, [loadAllData]);
 
+  const handleDeleteDay = useCallback(async (date: string) => {
+    const response = await fetch('/api/weekly-tracker', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'deleteDay', date }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to delete day');
+    }
+    await loadAllData();
+  }, [loadAllData]);
+
+  const handleDeleteWeeklyReview = useCallback(async (id: string) => {
+    const response = await fetch('/api/weekly-tracker', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'deleteReview', id }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to delete review');
+    }
+    await loadAllData();
+  }, [loadAllData]);
+
   return {
     aiTasks, taskStats, initiatives, scorecard, financialData, focusData,
     monarchData, monarchError, monarchLoading, projectionData, weeklyTrackerData,
@@ -418,5 +446,6 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
     handleMonarchRefresh, handleAddProjectionAdjustment, handleRemoveProjectionAdjustment,
     handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleSubmitWeeklyReview,
     handleSubmitMonthlyReview, handleDeleteMonthlyReview,
+    handleDeleteDay, handleDeleteWeeklyReview,
   };
 }
