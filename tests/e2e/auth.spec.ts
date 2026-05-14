@@ -21,7 +21,9 @@ test.describe('Auth flows (unauthenticated)', () => {
     await page.getByRole('button', { name: /sign in/i }).click();
 
     // Generic error message — never leaks whether the email exists
-    await expect(page.getByRole('alert')).toHaveText(/Incorrect email or password/i);
+    // Next.js renders a hidden <div role="alert" id="__next-route-announcer__"> on
+     // every page, so we must filter by text to disambiguate.
+    await expect(page.getByRole('alert').filter({ hasText: /Incorrect/i })).toBeVisible();
     await expect(page).toHaveURL(/\/login/);
   });
 
@@ -32,7 +34,9 @@ test.describe('Auth flows (unauthenticated)', () => {
     await page.getByRole('button', { name: /sign in/i }).click();
 
     // Identical message — defense against email-enumeration.
-    await expect(page.getByRole('alert')).toHaveText(/Incorrect email or password/i);
+    // Next.js renders a hidden <div role="alert" id="__next-route-announcer__"> on
+     // every page, so we must filter by text to disambiguate.
+    await expect(page.getByRole('alert').filter({ hasText: /Incorrect/i })).toBeVisible();
   });
 
   test('API routes return 401 when called without a session', async ({ request }) => {
