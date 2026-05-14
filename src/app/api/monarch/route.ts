@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getFinancialSnapshot, getCachedSnapshot } from '@/lib/monarch-service';
 import { requireEffectiveUserId } from '@/lib/session';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   if (!process.env.MONARCH_TOKEN) {
     return NextResponse.json(
       { error: 'Monarch Money not configured. Set MONARCH_TOKEN environment variable.' },
@@ -11,7 +11,7 @@ export async function GET() {
   }
 
   try {
-    const ownerId = await requireEffectiveUserId();
+    const ownerId = await requireEffectiveUserId(request);
     const snapshot = await getFinancialSnapshot(ownerId);
     return NextResponse.json(snapshot);
   } catch (error) {
@@ -19,7 +19,7 @@ export async function GET() {
 
     // Try to serve stale cache on error
     try {
-      const ownerId = await requireEffectiveUserId();
+      const ownerId = await requireEffectiveUserId(request);
       const stale = await getCachedSnapshot(ownerId);
       if (stale) {
         return NextResponse.json({ ...stale, stale: true });
@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'refresh': {
-        const ownerId = await requireEffectiveUserId();
+        const ownerId = await requireEffectiveUserId(request);
         const snapshot = await getFinancialSnapshot(ownerId, true);
         return NextResponse.json(snapshot);
       }

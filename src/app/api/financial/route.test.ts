@@ -1,6 +1,7 @@
 /**
  * @jest-environment node
  */
+import { NextRequest } from 'next/server';
 import { GET } from './route';
 
 jest.mock('@/lib/storage', () => {
@@ -33,7 +34,7 @@ describe('/api/financial GET', () => {
   });
 
   it('returns the extended payload shape with weekly/30-day financial data', async () => {
-    const response = await GET();
+    const response = await GET(new NextRequest('http://localhost/'));
     expect(response.status).toBe(200);
 
     const body = await response.json();

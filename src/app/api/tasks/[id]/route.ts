@@ -37,7 +37,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       const marker = `[task:${taskId}]`;
       (async () => {
         try {
-          const ownerId = await requireEffectiveUserId();
+          const ownerId = await requireEffectiveUserId(request);
           const tracker = await FinancialTracker.create(ownerId);
           const todaysEntries = tracker.getTodaysMetrics().entries;
           const alreadyLogged = todaysEntries.some((e) => e.description.includes(marker));

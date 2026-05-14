@@ -13,7 +13,8 @@
     "test:e2e:playwright": "playwright test",
     "db:migrate": "tsx scripts/db-migrate.ts",
     "db:hash-rows": "tsx scripts/db-hash-rows.ts",
-    "db:reseed-users": "tsx scripts/db-reseed-users.ts"
+    "db:reseed-users": "tsx scripts/db-reseed-users.ts",
+    "seed:demo": "tsx scripts/seed-demo-data.ts"
   },
   "dependencies": {
     "@gooin/garmin-connect": "^1.7.6",

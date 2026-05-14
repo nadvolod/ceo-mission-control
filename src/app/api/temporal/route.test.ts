@@ -37,7 +37,7 @@ describe('/api/temporal', () => {
 
   describe('GET /api/temporal', () => {
     it('should return empty sessions when no data exists', async () => {
-      const response = await GET();
+      const response = await GET(new NextRequest('http://localhost/'));
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -61,7 +61,7 @@ describe('/api/temporal', () => {
         dailyTotals: { [TODAY]: 2 }
       });
 
-      const response = await GET();
+      const response = await GET(new NextRequest('http://localhost/'));
       const data = await response.json();
 
       expect(response.status).toBe(200);

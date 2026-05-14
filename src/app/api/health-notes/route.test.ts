@@ -50,7 +50,7 @@ describe('/api/health-notes', () => {
 
   describe('GET', () => {
     it('returns notes and templates', async () => {
-      const response = await GET();
+      const response = await GET(new NextRequest('http://localhost/'));
       const data = await response.json();
 
       expect(response.status).toBe(200);

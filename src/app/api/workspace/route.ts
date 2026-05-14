@@ -3,9 +3,9 @@ import { readInitiatives, readDailyScorecard, updateScorecardField } from '@/lib
 import { checkAuth } from '@/lib/auth';
 import { requireEffectiveUserId } from '@/lib/session';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const ownerId = await requireEffectiveUserId();
+    const ownerId = await requireEffectiveUserId(request);
     const initiatives = await readInitiatives(ownerId);
     const scorecard = await readDailyScorecard(ownerId);
 
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
   try {
     const { action, ...data } = await request.json();
 
-    const ownerId = await requireEffectiveUserId();
+    const ownerId = await requireEffectiveUserId(request);
 
     switch (action) {
       case 'refresh': {

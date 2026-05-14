@@ -34,7 +34,7 @@ describe('/api/focus-hours', () => {
 
   describe('GET', () => {
     it('should return all dashboard data when no data exists', async () => {
-      const response = await GET();
+      const response = await GET(new NextRequest('http://localhost/'));
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -66,7 +66,7 @@ describe('/api/focus-hours', () => {
       };
       storage.loadJSON.mockResolvedValueOnce(existingData);
 
-      const response = await GET();
+      const response = await GET(new NextRequest('http://localhost/'));
       const data = await response.json();
       expect(data.todaysMetrics.totalHours).toBe(3);
     });
