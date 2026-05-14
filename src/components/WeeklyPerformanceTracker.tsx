@@ -146,6 +146,12 @@ export function WeeklyPerformanceTracker({
   const [reviewTemporalTarget, setReviewTemporalTarget] = useState(existingReview?.temporalTarget?.toString() ?? '5');
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
 
+  // Inline Temporal Target edit state
+  const [isEditingTarget, setIsEditingTarget] = useState(false);
+  const [targetDraft, setTargetDraft] = useState<string>('');
+  const [isSavingTarget, setIsSavingTarget] = useState(false);
+  const [targetError, setTargetError] = useState<string | null>(null);
+
   // Sync review form when existing review data changes (e.g. after submit)
   useEffect(() => {
     if (existingReview) {
@@ -185,6 +191,49 @@ export function WeeklyPerformanceTracker({
       console.error('Error logging good day:', error);
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const beginEditTarget = () => {
+    setTargetDraft(currentWeekSummary.temporalTarget.toString());
+    setTargetError(null);
+    setIsEditingTarget(true);
+  };
+
+  const cancelEditTarget = () => {
+    setIsEditingTarget(false);
+    setTargetError(null);
+    setTargetDraft('');
+  };
+
+  const saveTarget = async () => {
+    if (isSavingTarget) return;
+    const next = parseFloat(targetDraft);
+    if (isNaN(next) || next < 0) {
+      setTargetError('Enter a non-negative number');
+      return;
+    }
+    if (next === currentWeekSummary.temporalTarget) {
+      cancelEditTarget();
+      return;
+    }
+    setIsSavingTarget(true);
+    setTargetError(null);
+    try {
+      await onSubmitReview({
+        slipAnalysis: existingReview?.slipAnalysis ?? '',
+        systemAdjustment: existingReview?.systemAdjustment ?? '',
+        nextWeekTargets: existingReview?.nextWeekTargets ?? '',
+        bottleneck: existingReview?.bottleneck ?? '',
+        temporalTarget: next,
+      });
+      setIsEditingTarget(false);
+      setTargetDraft('');
+    } catch (error) {
+      console.error('Error saving Temporal Target:', error);
+      setTargetError('Save failed — try again');
+    } finally {
+      setIsSavingTarget(false);
     }
   };
 
@@ -344,21 +393,64 @@ export function WeeklyPerformanceTracker({
             <div className="text-xs text-gray-500">Trained</div>
           </div>
           <div className="text-center p-3 bg-indigo-50 rounded-lg">
-            <div className="text-2xl font-bold text-indigo-600">
-              {temporalActual}/{currentWeekSummary.temporalTarget}
-              <span className="text-sm font-normal">h</span>
-            </div>
-            <div className="text-xs text-gray-500">Temporal Target</div>
-            <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1.5">
-              <div
-                className={`h-1.5 rounded-full transition-all duration-300 ${
-                  currentWeekSummary.temporalTarget > 0 && temporalActual >= currentWeekSummary.temporalTarget
-                    ? 'bg-green-500'
-                    : 'bg-indigo-500'
-                }`}
-                style={{ width: `${Math.min(100, currentWeekSummary.temporalTarget > 0 ? (temporalActual / currentWeekSummary.temporalTarget) * 100 : 0)}%` }}
-              />
-            </div>
+            {isEditingTarget ? (
+              <div className="flex flex-col items-center gap-1">
+                <div className="flex items-center justify-center gap-1 text-2xl font-bold text-indigo-600">
+                  <span>{temporalActual}/</span>
+                  <input
+                    autoFocus
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    aria-label="Temporal Target (hours/week)"
+                    value={targetDraft}
+                    disabled={isSavingTarget}
+                    onChange={(e) => setTargetDraft(e.target.value)}
+                    onFocus={(e) => e.currentTarget.select()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        void saveTarget();
+                      } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        cancelEditTarget();
+                      }
+                    }}
+                    onBlur={() => { void saveTarget(); }}
+                    className="w-16 text-center text-2xl font-bold text-indigo-600 bg-white border border-indigo-300 rounded px-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <span className="text-sm font-normal">h</span>
+                </div>
+                <div className="text-xs text-gray-500">Temporal Target</div>
+                {targetError && (
+                  <div className="text-xs text-red-600" role="alert">{targetError}</div>
+                )}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={beginEditTarget}
+                aria-label="Edit Temporal Target"
+                className="w-full text-center focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded"
+                title="Click to edit Temporal Target"
+              >
+                <div className="text-2xl font-bold text-indigo-600">
+                  {temporalActual}/{currentWeekSummary.temporalTarget}
+                  <span className="text-sm font-normal">h</span>
+                </div>
+                <div className="text-xs text-gray-500">Temporal Target</div>
+                <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1.5">
+                  <div
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      currentWeekSummary.temporalTarget > 0 && temporalActual >= currentWeekSummary.temporalTarget
+                        ? 'bg-green-500'
+                        : 'bg-indigo-500'
+                    }`}
+                    style={{ width: `${Math.min(100, currentWeekSummary.temporalTarget > 0 ? (temporalActual / currentWeekSummary.temporalTarget) * 100 : 0)}%` }}
+                  />
+                </div>
+              </button>
+            )}
           </div>
           <div className="text-center p-3 bg-emerald-50 rounded-lg">
             <div
@@ -1009,20 +1101,8 @@ export function WeeklyPerformanceTracker({
                 {hasCurrentWeekReview ? 'Update Weekly Review' : 'Weekly Review'}
               </h4>
               <form onSubmit={handleReviewSubmit} className="space-y-3">
-                <div>
-                  <label htmlFor="wt-temporal-target" className="block text-sm font-medium text-gray-700 mb-1">
-                    Temporal Target (hours/week)
-                  </label>
-                  <input
-                    id="wt-temporal-target"
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    value={reviewTemporalTarget}
-                    onChange={(e) => setReviewTemporalTarget(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900"
-                    placeholder="e.g., 5"
-                  />
+                <div className="text-xs text-gray-500 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+                  Tip: click the Temporal Target card above to change your weekly target.
                 </div>
                 <div>
                   <label htmlFor="wt-slip" className="block text-sm font-medium text-gray-700 mb-1">

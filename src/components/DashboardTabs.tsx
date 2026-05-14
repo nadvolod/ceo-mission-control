@@ -2,13 +2,13 @@
 
 import { BarChart3, CheckCircle2, ClipboardList } from 'lucide-react';
 
-export const TAB_IDS = ['dashboard', 'tasks', 'monthly-review'] as const;
+export const TAB_IDS = ['dashboard', 'monthly-review', 'tasks'] as const;
 export type TabId = (typeof TAB_IDS)[number];
 
 const TABS: Array<{ id: TabId; label: string; icon: React.ReactNode }> = [
   { id: 'dashboard', label: 'Dashboard', icon: <BarChart3 className="h-4 w-4" /> },
-  { id: 'tasks', label: 'Tasks', icon: <CheckCircle2 className="h-4 w-4" /> },
   { id: 'monthly-review', label: 'Monthly Review', icon: <ClipboardList className="h-4 w-4" /> },
+  { id: 'tasks', label: 'Tasks', icon: <CheckCircle2 className="h-4 w-4" /> },
 ];
 
 interface DashboardTabsProps {

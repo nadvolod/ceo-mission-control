@@ -64,4 +64,19 @@ describe('DashboardTabs', () => {
     expect(TAB_IDS).toContain('tasks');
     expect(TAB_IDS).toContain('monthly-review');
   });
+
+  it('renders tabs in order: Dashboard, Monthly Review, Tasks', () => {
+    render(<DashboardTabs activeTab="dashboard" onTabChange={mockOnTabChange} />);
+
+    const buttons = screen.getAllByRole('button');
+    expect(buttons.map(b => b.textContent?.trim())).toEqual([
+      'Dashboard',
+      'Monthly Review',
+      'Tasks',
+    ]);
+  });
+
+  it('TAB_IDS array order is dashboard, monthly-review, tasks', () => {
+    expect(Array.from(TAB_IDS)).toEqual(['dashboard', 'monthly-review', 'tasks']);
+  });
 });

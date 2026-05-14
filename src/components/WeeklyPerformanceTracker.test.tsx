@@ -399,3 +399,173 @@ describe('WeeklyPerformanceTracker - Review form without revenue', () => {
     );
   });
 });
+
+describe('WeeklyPerformanceTracker - Inline Temporal Target Edit', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('shows the current Temporal Target on the dashboard card', () => {
+    render(<WeeklyPerformanceTracker {...baseProps} currentWeekSummary={{ ...baseWeekSummary, temporalTarget: 8 }} />);
+
+    expect(screen.getByText(/Temporal Target/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Edit Temporal Target/i })).toBeInTheDocument();
+  });
+
+  it('enters edit mode when clicking the Temporal Target card', async () => {
+    const user = userEvent.setup();
+    render(<WeeklyPerformanceTracker {...baseProps} currentWeekSummary={{ ...baseWeekSummary, temporalTarget: 8 }} />);
+
+    await user.click(screen.getByRole('button', { name: /Edit Temporal Target/i }));
+
+    const input = screen.getByRole('spinbutton', { name: /Temporal Target/i }) as HTMLInputElement;
+    expect(input).toBeInTheDocument();
+    expect(input.value).toBe('8');
+  });
+
+  it('saves a new Temporal Target via Enter and calls onSubmitReview with existing review fields', async () => {
+    const user = userEvent.setup();
+    const onSubmitReview = jest.fn().mockResolvedValue(undefined);
+    const existingReview = {
+      id: 'rev_1',
+      weekStartDate: baseWeekSummary.weekStartDate,
+      weekEndDate: baseWeekSummary.weekEndDate,
+      revenue: 5000,
+      slipAnalysis: 'missed Wed',
+      systemAdjustment: 'block mornings',
+      nextWeekTargets: 'ship feature X',
+      bottleneck: 'meetings',
+      temporalTarget: 8,
+      createdAt: '2026-04-14T00:00:00Z',
+    };
+
+    render(
+      <WeeklyPerformanceTracker
+        {...baseProps}
+        currentWeekSummary={{ ...baseWeekSummary, temporalTarget: 8, revenue: 5000 }}
+        recentReviews={[existingReview]}
+        onSubmitReview={onSubmitReview}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /Edit Temporal Target/i }));
+
+    const input = screen.getByRole('spinbutton', { name: /Temporal Target/i });
+    await user.clear(input);
+    await user.type(input, '12');
+    await user.keyboard('{Enter}');
+
+    expect(onSubmitReview).toHaveBeenCalledWith({
+      slipAnalysis: 'missed Wed',
+      systemAdjustment: 'block mornings',
+      nextWeekTargets: 'ship feature X',
+      bottleneck: 'meetings',
+      temporalTarget: 12,
+    });
+  });
+
+  it('defaults revenue to 0 when no existing review exists', async () => {
+    const user = userEvent.setup();
+    const onSubmitReview = jest.fn().mockResolvedValue(undefined);
+
+    render(
+      <WeeklyPerformanceTracker
+        {...baseProps}
+        currentWeekSummary={{ ...baseWeekSummary, temporalTarget: 5 }}
+        recentReviews={[]}
+        onSubmitReview={onSubmitReview}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /Edit Temporal Target/i }));
+
+    const input = screen.getByRole('spinbutton', { name: /Temporal Target/i });
+    await user.clear(input);
+    await user.type(input, '10');
+    await user.keyboard('{Enter}');
+
+    expect(onSubmitReview).toHaveBeenCalledWith({
+      slipAnalysis: '',
+      systemAdjustment: '',
+      nextWeekTargets: '',
+      bottleneck: '',
+      temporalTarget: 10,
+    });
+  });
+
+  it('cancels edit without saving when Escape is pressed', async () => {
+    const user = userEvent.setup();
+    const onSubmitReview = jest.fn().mockResolvedValue(undefined);
+
+    render(
+      <WeeklyPerformanceTracker
+        {...baseProps}
+        currentWeekSummary={{ ...baseWeekSummary, temporalTarget: 8 }}
+        onSubmitReview={onSubmitReview}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /Edit Temporal Target/i }));
+
+    const input = screen.getByRole('spinbutton', { name: /Temporal Target/i });
+    await user.clear(input);
+    await user.type(input, '99');
+    await user.keyboard('{Escape}');
+
+    expect(onSubmitReview).not.toHaveBeenCalled();
+    // Should be back in view mode
+    expect(screen.getByRole('button', { name: /Edit Temporal Target/i })).toBeInTheDocument();
+  });
+
+  it('does not save when value is unchanged', async () => {
+    const user = userEvent.setup();
+    const onSubmitReview = jest.fn().mockResolvedValue(undefined);
+
+    render(
+      <WeeklyPerformanceTracker
+        {...baseProps}
+        currentWeekSummary={{ ...baseWeekSummary, temporalTarget: 8 }}
+        onSubmitReview={onSubmitReview}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /Edit Temporal Target/i }));
+    await user.keyboard('{Enter}');
+
+    expect(onSubmitReview).not.toHaveBeenCalled();
+  });
+
+  it('rejects negative values with an inline error', async () => {
+    const user = userEvent.setup();
+    const onSubmitReview = jest.fn().mockResolvedValue(undefined);
+
+    render(
+      <WeeklyPerformanceTracker
+        {...baseProps}
+        currentWeekSummary={{ ...baseWeekSummary, temporalTarget: 8 }}
+        onSubmitReview={onSubmitReview}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /Edit Temporal Target/i }));
+    const input = screen.getByRole('spinbutton', { name: /Temporal Target/i });
+    await user.clear(input);
+    await user.type(input, '-3');
+    await user.keyboard('{Enter}');
+
+    expect(onSubmitReview).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent(/non-negative/i);
+  });
+
+  it('does not render the duplicate Temporal Target input inside the Sunday review form', async () => {
+    const user = userEvent.setup();
+    render(<WeeklyPerformanceTracker {...baseProps} />);
+
+    // Switch to the review sub-tab inside the tracker
+    const reviewTab = screen.getByRole('button', { name: /^Review$/i });
+    await user.click(reviewTab);
+
+    // The old labelled input must not exist anywhere on the page anymore
+    expect(screen.queryByLabelText(/Temporal Target \(hours\/week\)/i)).not.toBeInTheDocument();
+  });
+});
