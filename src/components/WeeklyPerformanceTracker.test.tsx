@@ -260,6 +260,7 @@ describe('WeeklyPerformanceTracker - Money Move quick-add', () => {
   it.each([
     ['moved', /\+ moved/i, 'Moved funds'],
     ['generated', /\+ generated/i, 'Generated revenue'],
+    ['cut', /\+ cut/i, 'Cut expenses'],
   ] as const)('submits %s category from quick-add', async (category, trigger, description) => {
     const user = userEvent.setup();
     const onAddFinancialEntry = jest.fn().mockResolvedValue(undefined);
