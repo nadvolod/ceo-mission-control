@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import {
   Flame, Plus, TrendingUp, TrendingDown, CheckCircle2, XCircle,
-  AlertTriangle, BarChart3, Activity, ClipboardList, Target
+  AlertTriangle, BarChart3, Activity, ClipboardList, Target, Trash2
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -59,6 +59,10 @@ interface WeeklyPerformanceTrackerProps {
     amount: number,
     description: string
   ) => Promise<void>;
+  /** Admin curation: remove a daily entry for the given date. Optional. */
+  onDeleteDay?: (date: string) => Promise<void>;
+  /** Admin curation: remove a weekly review by id. Optional. */
+  onDeleteReview?: (id: string) => Promise<void>;
 }
 
 type TabId = 'daily' | 'weekly' | 'trends' | 'review';
@@ -98,6 +102,8 @@ export function WeeklyPerformanceTracker({
   previousWeekFinancialTotals,
   dailyFinancialTrend,
   onAddFinancialEntry,
+  onDeleteDay,
+  onDeleteReview,
 }: WeeklyPerformanceTrackerProps) {
   const [activeTab, setActiveTab] = useState<TabId>('daily');
   const [isLogging, setIsLogging] = useState(false);
@@ -809,6 +815,27 @@ export function WeeklyPerformanceTracker({
                           <AlertTriangle className="h-3 w-3 text-red-500 mx-auto" />
                         </div>
                       )}
+                      {/* Curation: delete this day's entry. Only shows
+                          when an entry exists AND the parent supplied an
+                          onDeleteDay handler (admin contexts). */}
+                      {entry && onDeleteDay && (
+                        <button
+                          type="button"
+                          aria-label={`Delete entry for ${entry.date}`}
+                          title={`Delete entry for ${entry.date}`}
+                          onClick={async () => {
+                            if (!window.confirm(`Delete the weekly tracker entry for ${entry.date}? This cannot be undone.`)) return;
+                            try {
+                              await onDeleteDay(entry.date);
+                            } catch (err) {
+                              alert((err as Error).message || 'Failed to delete entry');
+                            }
+                          }}
+                          className="mt-1 text-gray-400 hover:text-rose-600 transition-colors"
+                        >
+                          <Trash2 className="h-3 w-3 mx-auto" />
+                        </button>
+                      )}
                       {(() => {
                         const fin = weekFinancialByDay[i];
                         const net = fin?.totals.netImpact ?? 0;
@@ -1176,9 +1203,29 @@ export function WeeklyPerformanceTracker({
                         <span className="text-sm font-medium text-gray-900">
                           Week of {formatDate(review.weekStartDate)}
                         </span>
-                        <span className="text-sm font-bold text-green-600">
-                          ${(review.revenue ?? 0).toLocaleString()}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-green-600">
+                            ${(review.revenue ?? 0).toLocaleString()}
+                          </span>
+                          {onDeleteReview && (
+                            <button
+                              type="button"
+                              aria-label={`Delete review for week of ${review.weekStartDate}`}
+                              title={`Delete review for week of ${review.weekStartDate}`}
+                              onClick={async () => {
+                                if (!window.confirm(`Delete the weekly review for week of ${review.weekStartDate}? This cannot be undone.`)) return;
+                                try {
+                                  await onDeleteReview(review.id);
+                                } catch (err) {
+                                  alert((err as Error).message || 'Failed to delete review');
+                                }
+                              }}
+                              className="text-gray-400 hover:text-rose-600 transition-colors"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                       {review.slipAnalysis && (
                         <div className="text-xs text-gray-600 mb-1">

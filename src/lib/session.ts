@@ -165,6 +165,20 @@ export async function requireEffectiveUserId(request?: NextRequest | Request): P
   return id;
 }
 
+/**
+ * Returns true only when the request is the real admin acting as themselves
+ * — NOT when an admin is viewing /as/demo or /as/test, and NOT for plain
+ * users. Used to gate routes that hit globally-shared external credentials
+ * (Monarch token, Garmin login) where a non-admin or impersonated session
+ * could otherwise cache the admin's data under the wrong owner_id.
+ */
+export async function isRealAdminRequest(request?: NextRequest | Request): Promise<boolean> {
+  const s = await getOptionalSession();
+  if (!s?.adminId) return false;
+  const role = detectImpersonationRole(request);
+  return role === null;
+}
+
 /** Internal helper used by login/logout routes. */
 export async function setAdminSession(adminId: string): Promise<void> {
   const s = await getSession();

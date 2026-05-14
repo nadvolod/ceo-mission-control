@@ -121,6 +121,34 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      case 'deleteDay': {
+        const { date } = data;
+        if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          return NextResponse.json(
+            { success: false, error: 'date must be a valid YYYY-MM-DD string' },
+            { status: 400 }
+          );
+        }
+        const deleted = await tracker.deleteDailyEntry(date);
+        return NextResponse.json({
+          success: true,
+          deleted,
+          currentWeekSummary: tracker.getCurrentWeekSummary(),
+        });
+      }
+
+      case 'deleteReview': {
+        const { id } = data;
+        if (typeof id !== 'string' || !id) {
+          return NextResponse.json(
+            { success: false, error: 'id is required' },
+            { status: 400 }
+          );
+        }
+        const deleted = await tracker.deleteWeeklyReview(id);
+        return NextResponse.json({ success: true, deleted });
+      }
+
       case 'applyGarminTraining': {
         const { date, activeMinutes, threshold } = data;
 

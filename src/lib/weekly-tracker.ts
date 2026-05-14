@@ -136,6 +136,40 @@ export class WeeklyTracker {
     return fullReview;
   }
 
+  /** Delete the daily entry for a specific YYYY-MM-DD. Returns true if it existed. */
+  async deleteDailyEntry(date: string): Promise<boolean> {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new Error('date must be a valid YYYY-MM-DD string');
+    }
+    if (!this.data.dailyEntries[date]) return false;
+    delete this.data.dailyEntries[date];
+    await this.saveData();
+    await appendAuditLog(
+      this.ownerId,
+      date,
+      'weekly-tracker',
+      `Daily entry deleted for ${date}`,
+    );
+    return true;
+  }
+
+  /** Delete a weekly review by id. Returns true if it existed. */
+  async deleteWeeklyReview(id: string): Promise<boolean> {
+    const matched = this.data.weeklyReviews.find((r) => r.id === id);
+    if (!matched) return false;
+    this.data.weeklyReviews = this.data.weeklyReviews.filter((r) => r.id !== id);
+    await this.saveData();
+    // Audit-log under the week the review covered, not today — preserves
+    // forensic locality when reviewing the trail months later.
+    await appendAuditLog(
+      this.ownerId,
+      matched.weekStartDate,
+      'weekly-tracker',
+      `Weekly review deleted: ${id} (week of ${matched.weekStartDate})`,
+    );
+    return true;
+  }
+
   getTodaysEntry(): PerformanceDayEntry | null {
     const today = format(new Date(), 'yyyy-MM-dd');
     return this.data.dailyEntries[today] || null;

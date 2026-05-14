@@ -144,6 +144,18 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      case 'deleteNote': {
+        const { date } = data;
+        if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          return NextResponse.json(
+            { success: false, error: 'date must be a valid YYYY-MM-DD string' },
+            { status: 400 }
+          );
+        }
+        const deleted = await tracker.deleteNote(date);
+        return NextResponse.json({ success: true, deleted });
+      }
+
       default:
         return NextResponse.json(
           { success: false, error: `Unknown action: ${action}` },
