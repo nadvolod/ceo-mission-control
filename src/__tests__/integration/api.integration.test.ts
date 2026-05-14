@@ -17,7 +17,13 @@ import { GET as weeklyTrackerGet, POST as weeklyTrackerPost } from '@/app/api/we
 // Do NOT mock storage — these tests use the real DB
 const REQUIRED_ENV = 'DATABASE_URL';
 const DEFAULT_OWNER_ID = '00000000-0000-0000-0000-000000000000';
-let seededDefaultOwner = false;
+const DEFAULT_OWNER_EMAIL = 'integration-test@example.com';
+const POSTGRES_FK_VIOLATION_CODE = '23503';
+let createdDefaultOwnerInThisRun = false;
+
+function isForeignKeyViolation(error: unknown): boolean {
+  return (error as { code?: string })?.code === POSTGRES_FK_VIOLATION_CODE;
+}
 
 beforeAll(() => {
   if (!process.env[REQUIRED_ENV]) {
@@ -35,19 +41,33 @@ beforeAll(async () => {
   if (!db) return;
   const inserted = await db`
     INSERT INTO users (id, email)
-    VALUES (${DEFAULT_OWNER_ID}, 'integration-test@example.com')
+    VALUES (${DEFAULT_OWNER_ID}, ${DEFAULT_OWNER_EMAIL})
     ON CONFLICT (id) DO NOTHING
     RETURNING id
   `;
-  seededDefaultOwner = inserted.length > 0;
+  // Only clean up when this test run actually created the row.
+  createdDefaultOwnerInThisRun = inserted.length > 0;
+  if (!createdDefaultOwnerInThisRun) {
+    const existing = await db`SELECT id FROM users WHERE id = ${DEFAULT_OWNER_ID}`;
+    if (existing.length === 0) {
+      throw new Error(`Integration tests require users.id=${DEFAULT_OWNER_ID} to exist for owner_id FK writes.`);
+    }
+  }
 });
 
 afterAll(async () => {
-  if (!seededDefaultOwner) return;
+  if (!createdDefaultOwnerInThisRun) return;
   await ensureDbReady();
   const db = getDb();
   if (!db) return;
-  await db`DELETE FROM users WHERE id = ${DEFAULT_OWNER_ID}`;
+  try {
+    await db`DELETE FROM users WHERE id = ${DEFAULT_OWNER_ID}`;
+  } catch (error) {
+    if (!isForeignKeyViolation(error)) {
+      throw error;
+    }
+    // Ignore FK violations when child rows created in this run still reference this user.
+  }
 });
 
 // Auth headers for requests when SYNC_API_KEY is configured
