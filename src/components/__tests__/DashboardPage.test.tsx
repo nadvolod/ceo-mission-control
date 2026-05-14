@@ -103,9 +103,6 @@ jest.mock('@/hooks/useDashboardData', () => ({
 // Mock heavy child components as lightweight stubs (keeps tests fast & focused
 // on page composition, not component internals)
 // ---------------------------------------------------------------------------
-jest.mock('@/components/FinancialMetricsDashboard', () => ({
-  FinancialMetricsDashboard: () => <div data-testid="financial-impact">Financial Impact Tracking</div>,
-}));
 jest.mock('@/components/WeeklyPerformanceTracker', () => ({
   WeeklyPerformanceTracker: () => <div data-testid="weekly-performance">Weekly Performance Tracker</div>,
 }));
@@ -160,22 +157,22 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
 
   // --- Positive cases ---
 
-  it('renders Financial Impact Tracking as the first section', () => {
+  it('renders Weekly Performance Tracker as the first section', () => {
     render(<HomePage />);
-    const sections = screen.getAllByTestId(/financial-impact|weekly-performance|financial-command|health-intelligence|focus-optimization|mission-tracker|monthly-review|task-dashboard/);
-    expect(sections[0]).toHaveAttribute('data-testid', 'financial-impact');
+    const sections = screen.getAllByTestId(/weekly-performance|financial-command|health-intelligence|focus-optimization|mission-tracker|monthly-review|task-dashboard/);
+    expect(sections[0]).toHaveAttribute('data-testid', 'weekly-performance');
   });
 
-  it('renders Weekly Performance Tracker as the second section', () => {
+  it('renders Financial Command Center as the second section', () => {
     render(<HomePage />);
-    const sections = screen.getAllByTestId(/financial-impact|weekly-performance|financial-command|health-intelligence|focus-optimization|mission-tracker|monthly-review|task-dashboard/);
-    expect(sections[1]).toHaveAttribute('data-testid', 'weekly-performance');
+    const sections = screen.getAllByTestId(/weekly-performance|financial-command|health-intelligence|focus-optimization|mission-tracker|monthly-review|task-dashboard/);
+    expect(sections[1]).toHaveAttribute('data-testid', 'financial-command');
   });
 
-  it('renders Financial Command Center as the third section', () => {
+  it('does NOT render the removed FinancialMetricsDashboard (Financial Impact Tracking)', () => {
     render(<HomePage />);
-    const sections = screen.getAllByTestId(/financial-impact|weekly-performance|financial-command|health-intelligence|focus-optimization|mission-tracker|monthly-review|task-dashboard/);
-    expect(sections[2]).toHaveAttribute('data-testid', 'financial-command');
+    expect(screen.queryByTestId('financial-impact')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /Financial Impact Tracking/i })).not.toBeInTheDocument();
   });
 
   // --- Negative cases ---
@@ -194,9 +191,8 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
 
   // --- Edge cases ---
 
-  it('renders all 5 dashboard-tab sections on default view', () => {
+  it('renders all 4 dashboard-tab sections on default view', () => {
     render(<HomePage />);
-    expect(screen.getByTestId('financial-impact')).toBeInTheDocument();
     expect(screen.getByTestId('weekly-performance')).toBeInTheDocument();
     expect(screen.getByTestId('financial-command')).toBeInTheDocument();
     expect(screen.getByTestId('health-intelligence')).toBeInTheDocument();
@@ -207,14 +203,14 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
     mockUseDashboardData.mockReturnValue({ ...baseDashboardData, isLoading: true } as any);
     render(<HomePage />);
     expect(screen.getByText('Loading Mission Control...')).toBeInTheDocument();
-    expect(screen.queryByTestId('financial-impact')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('weekly-performance')).not.toBeInTheDocument();
   });
 
   it('shows error when scorecard is null', () => {
     mockUseDashboardData.mockReturnValue({ ...baseDashboardData, scorecard: null } as any);
     render(<HomePage />);
     expect(screen.getByText('Cannot Load Workspace Data')).toBeInTheDocument();
-    expect(screen.queryByTestId('financial-impact')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('weekly-performance')).not.toBeInTheDocument();
   });
 
   it('renders page header with CEO Mission Control title', () => {
@@ -235,9 +231,8 @@ describe('Dashboard Page - Phase 3: Tab-based layout', () => {
     expect(screen.getByTestId('dashboard-tabs')).toBeInTheDocument();
   });
 
-  it('default tab shows daily sections (Financial Impact, Weekly Perf, etc.)', () => {
+  it('default tab shows daily sections (Weekly Perf, Financial Command, etc.)', () => {
     render(<HomePage />);
-    expect(screen.getByTestId('financial-impact')).toBeInTheDocument();
     expect(screen.getByTestId('weekly-performance')).toBeInTheDocument();
     expect(screen.getByTestId('financial-command')).toBeInTheDocument();
     expect(screen.getByTestId('health-intelligence')).toBeInTheDocument();
@@ -258,8 +253,8 @@ describe('Dashboard Page - Phase 3: Tab-based layout', () => {
     await user.click(screen.getByText('Tasks'));
 
     expect(screen.getByTestId('task-dashboard')).toBeInTheDocument();
-    expect(screen.queryByTestId('financial-impact')).not.toBeInTheDocument();
     expect(screen.queryByTestId('weekly-performance')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('financial-command')).not.toBeInTheDocument();
   });
 
   it('Monthly Review tab shows MonthlyReviewTracker and MissionTracker', async () => {
@@ -270,7 +265,7 @@ describe('Dashboard Page - Phase 3: Tab-based layout', () => {
 
     expect(screen.getByTestId('monthly-review')).toBeInTheDocument();
     expect(screen.getByTestId('mission-tracker')).toBeInTheDocument();
-    expect(screen.queryByTestId('financial-impact')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('weekly-performance')).not.toBeInTheDocument();
     expect(screen.queryByTestId('task-dashboard')).not.toBeInTheDocument();
   });
 });

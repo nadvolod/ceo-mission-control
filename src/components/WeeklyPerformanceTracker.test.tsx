@@ -1,6 +1,7 @@
-import { render, screen, act, waitFor } from '@testing-library/react';
+import { render, screen, act, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { WeeklyPerformanceTracker } from './WeeklyPerformanceTracker';
+import type { DailyFinancialMetrics } from '@/lib/financial-tracker';
 
 // Mock recharts to avoid canvas/SVG rendering issues in tests
 jest.mock('recharts', () => ({
@@ -31,6 +32,13 @@ const baseWeekSummary = {
   temporalTarget: 5,
 };
 
+const emptyFin: DailyFinancialMetrics = {
+  date: '2026-05-11',
+  entries: [],
+  totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 },
+};
+const emptyTotals = { moved: 0, generated: 0, cut: 0, netImpact: 0 };
+
 const baseProps = {
   todaysEntry: null,
   currentWeekSummary: baseWeekSummary,
@@ -41,6 +49,18 @@ const baseProps = {
   onSubmitReview: jest.fn().mockResolvedValue(undefined),
   onAddFocusSession: jest.fn().mockResolvedValue(undefined),
   temporalActual: 0,
+  todaysFinancial: emptyFin,
+  weekFinancialByDay: Array.from({ length: 7 }, (_, i) => ({
+    ...emptyFin,
+    date: `2026-05-${String(11 + i).padStart(2, '0')}`,
+  })),
+  weekFinancialTotals: emptyTotals,
+  previousWeekFinancialTotals: emptyTotals,
+  dailyFinancialTrend: Array.from({ length: 30 }, (_, i) => ({
+    ...emptyFin,
+    date: `2026-04-${String(11 + i).padStart(2, '0')}`,
+  })),
+  onAddFinancialEntry: jest.fn().mockResolvedValue(undefined),
 };
 
 function makeFocusSession(overrides: Record<string, unknown> = {}) {
@@ -140,11 +160,11 @@ describe('WeeklyPerformanceTracker - Quick-Add Focus Buttons', () => {
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     render(<WeeklyPerformanceTracker {...baseProps} onAddFocusSession={slowAdd} />);
 
-    const buttons = screen.getAllByRole('button', { name: /^\+/ });
+    const buttons = screen.getAllByRole('button', { name: /^\+\d/ });
     await user.click(buttons[0]);
 
     // All quick-add buttons should be disabled while adding
-    const quickAddButtons = screen.getAllByRole('button', { name: /^\+/ });
+    const quickAddButtons = screen.getAllByRole('button', { name: /^\+\d/ });
     quickAddButtons.forEach(btn => {
       expect(btn).toBeDisabled();
     });
@@ -192,5 +212,360 @@ describe('WeeklyPerformanceTracker - Quick-Add Focus Buttons', () => {
     // Should show max 5 sessions
     const sessionItems = screen.getAllByText(/^Session \d+$/);
     expect(sessionItems.length).toBeLessThanOrEqual(5);
+  });
+});
+
+describe('WeeklyPerformanceTracker - Net Today card', () => {
+  it('renders Net Today card with currency value and category breakdown', () => {
+    render(
+      <WeeklyPerformanceTracker
+        {...baseProps}
+        todaysFinancial={{
+          date: '2026-05-11',
+          entries: [],
+          totals: { moved: 100, generated: 250, cut: 50, netImpact: 400 },
+        }}
+      />
+    );
+    expect(screen.getByTestId('net-today-value')).toHaveTextContent('$400');
+    expect(screen.getByTestId('net-today-breakdown')).toHaveTextContent('mv $100');
+    expect(screen.getByTestId('net-today-breakdown')).toHaveTextContent('gen $250');
+    expect(screen.getByTestId('net-today-breakdown')).toHaveTextContent('cut $50');
+  });
+});
+
+describe('WeeklyPerformanceTracker - Money Move quick-add', () => {
+  it('clicking + Cut opens the form with cut preselected and submits to onAddFinancialEntry', async () => {
+    const user = userEvent.setup();
+    const onAddFinancialEntry = jest.fn().mockResolvedValue(undefined);
+    render(<WeeklyPerformanceTracker {...baseProps} onAddFinancialEntry={onAddFinancialEntry} />);
+
+    await user.click(screen.getByRole('button', { name: /\+ cut/i }));
+    await user.type(screen.getByLabelText(/amount/i), '150');
+    await user.type(screen.getByLabelText(/description/i), 'storage');
+    await user.click(screen.getByRole('button', { name: /save move/i }));
+
+    expect(onAddFinancialEntry).toHaveBeenCalledWith('cut', 150, 'storage');
+  });
+
+  it('disables Save move when amount is 0/empty or description is empty', async () => {
+    const user = userEvent.setup();
+    render(<WeeklyPerformanceTracker {...baseProps} />);
+    await user.click(screen.getByRole('button', { name: /\+ generated/i }));
+    expect(screen.getByRole('button', { name: /save move/i })).toBeDisabled();
+    await user.type(screen.getByLabelText(/amount/i), '10');
+    expect(screen.getByRole('button', { name: /save move/i })).toBeDisabled();
+  });
+});
+
+describe('WeeklyPerformanceTracker - Per-day money line', () => {
+  it('renders a $ line per day reflecting that day\'s netImpact', () => {
+    const week = Array.from({ length: 7 }, (_, i) => ({
+      date: `2026-05-${String(11 + i).padStart(2, '0')}`,
+      entries: i === 2 ? [{ id: 'x', category: 'generated' as const, amount: 500, description: 'invoice', timestamp: '2026-05-13T10:00:00Z' }] : [],
+      totals: { moved: 0, generated: 0, cut: 0, netImpact: i === 2 ? 500 : 0 },
+    }));
+    render(<WeeklyPerformanceTracker {...baseProps} weekFinancialByDay={week} />);
+    const dayCells = screen.getAllByTestId(/^day-money-/);
+    expect(dayCells).toHaveLength(7);
+    expect(dayCells[2]).toHaveTextContent('$500');
+    expect(dayCells[2].className).toMatch(/text-emerald|text-green/);
+    expect(dayCells[0]).toHaveTextContent('—');
+  });
+
+  it('hovering a populated day money cell reveals its entries', async () => {
+    const user = userEvent.setup();
+    const week = Array.from({ length: 7 }, (_, i) => ({
+      date: `2026-05-${String(11 + i).padStart(2, '0')}`,
+      entries: i === 2 ? [{
+        id: 'wed', category: 'cut' as const, amount: 150,
+        description: 'storage units', timestamp: '2026-05-13T10:00:00Z',
+      }] : [],
+      totals: { moved: 0, generated: 0, cut: i === 2 ? 150 : 0, netImpact: i === 2 ? 150 : 0 },
+    }));
+    render(<WeeklyPerformanceTracker {...baseProps} weekFinancialByDay={week} />);
+    const wed = screen.getByTestId('day-money-2');
+    await user.hover(wed);
+    expect(screen.getByText('storage units')).toBeInTheDocument();
+  });
+});
+
+describe('WeeklyPerformanceTracker - Weekly Net Impact', () => {
+  it('weekly Net Impact card uses weekFinancialTotals, not review revenue', () => {
+    render(
+      <WeeklyPerformanceTracker
+        {...baseProps}
+        weekFinancialTotals={{ moved: 100, generated: 250, cut: 50, netImpact: 400 }}
+        previousWeekFinancialTotals={{ moved: 0, generated: 100, cut: 0, netImpact: 100 }}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^Weekly$/i }));
+    expect(screen.getByTestId('weekly-net-impact')).toHaveTextContent('$400');
+    expect(screen.getByTestId('weekly-net-impact-prev')).toHaveTextContent('$100');
+    expect(screen.getByTestId('weekly-moved')).toHaveTextContent('$100');
+    expect(screen.getByTestId('weekly-generated')).toHaveTextContent('$250');
+    expect(screen.getByTestId('weekly-cut')).toHaveTextContent('$50');
+  });
+});
+
+describe('WeeklyPerformanceTracker - Trends chart money series', () => {
+  it('Trends chart renders a money series when financial trend has data', () => {
+    const trend = Array.from({ length: 30 }, (_, i) => ({
+      date: `2026-04-${String(11 + i).padStart(2, '0')}`,
+      entries: [],
+      totals: { moved: 0, generated: 0, cut: 0, netImpact: i === 15 ? 500 : 0 },
+    }));
+    render(<WeeklyPerformanceTracker {...baseProps} dailyFinancialTrend={trend} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Trends$/i }));
+    expect(screen.getByTestId('trends-chart-money')).toBeInTheDocument();
+  });
+
+  it('Trends chart omits the money series when financial trend is all zeros', () => {
+    render(<WeeklyPerformanceTracker {...baseProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Trends$/i }));
+    expect(screen.queryByTestId('trends-chart-money')).not.toBeInTheDocument();
+  });
+});
+
+describe('WeeklyPerformanceTracker - Performance Summary', () => {
+  it('Avg net/day divides by days-in-range (30) and Best money day ties broken by earliest date', () => {
+    const trend = Array.from({ length: 30 }, (_, i) => ({
+      date: `2026-04-${String(11 + i).padStart(2, '0')}`,
+      entries: [],
+      totals: { moved: 0, generated: 0, cut: 0, netImpact: i === 5 ? 600 : i === 20 ? 600 : 0 },
+    }));
+    // Need at least one tracked day so Performance Summary is rendered.
+    const dailyTrend = Array.from({ length: 1 }, () => ({
+      date: '2026-05-11',
+      deepWorkHours: 1,
+      pipelineActions: 1,
+      trained: true,
+      timestamp: '',
+      isEmpty: false,
+    }));
+    render(
+      <WeeklyPerformanceTracker
+        {...baseProps}
+        dailyFinancialTrend={trend}
+        dailyTrend={dailyTrend}
+        currentWeekSummary={{ ...baseProps.currentWeekSummary, daysTracked: 1 }}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^Trends$/i }));
+    // 1200 / 30 = 40
+    expect(screen.getByTestId('avg-net-per-day')).toHaveTextContent('$40');
+    // Earlier date (Apr 16) wins the tie
+    expect(screen.getByTestId('best-money-day')).toHaveTextContent('Apr 16');
+    expect(screen.getByTestId('best-money-day')).toHaveTextContent('$600');
+  });
+
+  it('Best money day renders "—" when trend has no positive entries', () => {
+    const dailyTrend = Array.from({ length: 1 }, () => ({
+      date: '2026-05-11',
+      deepWorkHours: 1,
+      pipelineActions: 1,
+      trained: true,
+      timestamp: '',
+      isEmpty: false,
+    }));
+    render(
+      <WeeklyPerformanceTracker
+        {...baseProps}
+        dailyTrend={dailyTrend}
+        currentWeekSummary={{ ...baseProps.currentWeekSummary, daysTracked: 1 }}
+      />
+    );
+    fireEvent.click(screen.getByRole('button', { name: /^Trends$/i }));
+    expect(screen.getByTestId('best-money-day')).toHaveTextContent('—');
+  });
+});
+
+describe('WeeklyPerformanceTracker - Review form without revenue', () => {
+  it('does not render a Revenue input in the review form', () => {
+    render(<WeeklyPerformanceTracker {...baseProps} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Review$/i }));
+    expect(screen.queryByLabelText(/revenue this week/i)).not.toBeInTheDocument();
+  });
+
+  it('submits the review without a revenue field', async () => {
+    const user = userEvent.setup();
+    const onSubmitReview = jest.fn().mockResolvedValue(undefined);
+    render(<WeeklyPerformanceTracker {...baseProps} onSubmitReview={onSubmitReview} />);
+    fireEvent.click(screen.getByRole('button', { name: /^Review$/i }));
+    await user.type(screen.getByLabelText(/where did I slip/i), 'wed deep work missed');
+    await user.click(screen.getByRole('button', { name: /submit weekly review/i }));
+    expect(onSubmitReview).toHaveBeenCalledWith(
+      expect.not.objectContaining({ revenue: expect.anything() })
+    );
+  });
+});
+
+describe('WeeklyPerformanceTracker - Inline Temporal Target Edit', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('shows the current Temporal Target on the dashboard card', () => {
+    render(<WeeklyPerformanceTracker {...baseProps} currentWeekSummary={{ ...baseWeekSummary, temporalTarget: 8 }} />);
+
+    expect(screen.getByText(/Temporal Target/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Edit Temporal Target/i })).toBeInTheDocument();
+  });
+
+  it('enters edit mode when clicking the Temporal Target card', async () => {
+    const user = userEvent.setup();
+    render(<WeeklyPerformanceTracker {...baseProps} currentWeekSummary={{ ...baseWeekSummary, temporalTarget: 8 }} />);
+
+    await user.click(screen.getByRole('button', { name: /Edit Temporal Target/i }));
+
+    const input = screen.getByRole('spinbutton', { name: /Temporal Target/i }) as HTMLInputElement;
+    expect(input).toBeInTheDocument();
+    expect(input.value).toBe('8');
+  });
+
+  it('saves a new Temporal Target via Enter and calls onSubmitReview with existing review fields', async () => {
+    const user = userEvent.setup();
+    const onSubmitReview = jest.fn().mockResolvedValue(undefined);
+    const existingReview = {
+      id: 'rev_1',
+      weekStartDate: baseWeekSummary.weekStartDate,
+      weekEndDate: baseWeekSummary.weekEndDate,
+      revenue: 5000,
+      slipAnalysis: 'missed Wed',
+      systemAdjustment: 'block mornings',
+      nextWeekTargets: 'ship feature X',
+      bottleneck: 'meetings',
+      temporalTarget: 8,
+      createdAt: '2026-04-14T00:00:00Z',
+    };
+
+    render(
+      <WeeklyPerformanceTracker
+        {...baseProps}
+        currentWeekSummary={{ ...baseWeekSummary, temporalTarget: 8, revenue: 5000 }}
+        recentReviews={[existingReview]}
+        onSubmitReview={onSubmitReview}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /Edit Temporal Target/i }));
+
+    const input = screen.getByRole('spinbutton', { name: /Temporal Target/i });
+    await user.clear(input);
+    await user.type(input, '12');
+    await user.keyboard('{Enter}');
+
+    expect(onSubmitReview).toHaveBeenCalledWith({
+      slipAnalysis: 'missed Wed',
+      systemAdjustment: 'block mornings',
+      nextWeekTargets: 'ship feature X',
+      bottleneck: 'meetings',
+      temporalTarget: 12,
+    });
+  });
+
+  it('defaults revenue to 0 when no existing review exists', async () => {
+    const user = userEvent.setup();
+    const onSubmitReview = jest.fn().mockResolvedValue(undefined);
+
+    render(
+      <WeeklyPerformanceTracker
+        {...baseProps}
+        currentWeekSummary={{ ...baseWeekSummary, temporalTarget: 5 }}
+        recentReviews={[]}
+        onSubmitReview={onSubmitReview}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /Edit Temporal Target/i }));
+
+    const input = screen.getByRole('spinbutton', { name: /Temporal Target/i });
+    await user.clear(input);
+    await user.type(input, '10');
+    await user.keyboard('{Enter}');
+
+    expect(onSubmitReview).toHaveBeenCalledWith({
+      slipAnalysis: '',
+      systemAdjustment: '',
+      nextWeekTargets: '',
+      bottleneck: '',
+      temporalTarget: 10,
+    });
+  });
+
+  it('cancels edit without saving when Escape is pressed', async () => {
+    const user = userEvent.setup();
+    const onSubmitReview = jest.fn().mockResolvedValue(undefined);
+
+    render(
+      <WeeklyPerformanceTracker
+        {...baseProps}
+        currentWeekSummary={{ ...baseWeekSummary, temporalTarget: 8 }}
+        onSubmitReview={onSubmitReview}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /Edit Temporal Target/i }));
+
+    const input = screen.getByRole('spinbutton', { name: /Temporal Target/i });
+    await user.clear(input);
+    await user.type(input, '99');
+    await user.keyboard('{Escape}');
+
+    expect(onSubmitReview).not.toHaveBeenCalled();
+    // Should be back in view mode
+    expect(screen.getByRole('button', { name: /Edit Temporal Target/i })).toBeInTheDocument();
+  });
+
+  it('does not save when value is unchanged', async () => {
+    const user = userEvent.setup();
+    const onSubmitReview = jest.fn().mockResolvedValue(undefined);
+
+    render(
+      <WeeklyPerformanceTracker
+        {...baseProps}
+        currentWeekSummary={{ ...baseWeekSummary, temporalTarget: 8 }}
+        onSubmitReview={onSubmitReview}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /Edit Temporal Target/i }));
+    await user.keyboard('{Enter}');
+
+    expect(onSubmitReview).not.toHaveBeenCalled();
+  });
+
+  it('rejects negative values with an inline error', async () => {
+    const user = userEvent.setup();
+    const onSubmitReview = jest.fn().mockResolvedValue(undefined);
+
+    render(
+      <WeeklyPerformanceTracker
+        {...baseProps}
+        currentWeekSummary={{ ...baseWeekSummary, temporalTarget: 8 }}
+        onSubmitReview={onSubmitReview}
+      />
+    );
+
+    await user.click(screen.getByRole('button', { name: /Edit Temporal Target/i }));
+    const input = screen.getByRole('spinbutton', { name: /Temporal Target/i });
+    await user.clear(input);
+    await user.type(input, '-3');
+    await user.keyboard('{Enter}');
+
+    expect(onSubmitReview).not.toHaveBeenCalled();
+    expect(screen.getByRole('alert')).toHaveTextContent(/non-negative/i);
+  });
+
+  it('does not render the duplicate Temporal Target input inside the Sunday review form', async () => {
+    const user = userEvent.setup();
+    render(<WeeklyPerformanceTracker {...baseProps} />);
+
+    // Switch to the review sub-tab inside the tracker
+    const reviewTab = screen.getByRole('button', { name: /^Review$/i });
+    await user.click(reviewTab);
+
+    // The old labelled input must not exist anywhere on the page anymore
+    expect(screen.queryByLabelText(/Temporal Target \(hours\/week\)/i)).not.toBeInTheDocument();
   });
 });

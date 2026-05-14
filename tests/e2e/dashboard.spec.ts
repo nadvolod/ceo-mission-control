@@ -123,40 +123,17 @@ test.describe('Dashboard page rendering', () => {
     }
   });
 
-  test('financial impact tracking shows daily prompt or metrics', async ({ page }) => {
+  test('money move quick-add buttons render on the Weekly Performance Tracker', async ({ page }) => {
     await page.goto('/dashboard');
     await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
 
     const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
     if (hasFullDashboard) {
-      // Financial Impact Tracking section should be visible
-      await expect(page.getByText('Financial Impact Tracking')).toBeVisible();
-
-      // Should show either the daily prompt or the metrics
-      const hasDailyPrompt = await page.getByText('How much money was moved today?').isVisible().catch(() => false);
-      const hasMetrics = await page.getByText('Money Moved').isVisible().catch(() => false);
-      expect(hasDailyPrompt || hasMetrics, 'should show daily prompt or financial metrics').toBeTruthy();
-
-      // Log Entry button should be visible
-      await expect(page.getByRole('button', { name: 'Log Entry' })).toBeVisible();
-    }
-  });
-
-  test('dashboard default tab shows Financial Impact before Weekly Performance', async ({ page }) => {
-    await page.goto('/dashboard');
-    await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
-
-    const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
-    if (hasFullDashboard) {
-      const allText = await page.textContent('main');
-      if (allText) {
-        const financialImpactPos = allText.indexOf('Financial Impact Tracking');
-        const weeklyPos = allText.indexOf('Weekly Performance Tracker');
-
-        if (financialImpactPos !== -1 && weeklyPos !== -1) {
-          expect(financialImpactPos).toBeLessThan(weeklyPos);
-        }
-      }
+      await expect(page.getByRole('heading', { name: 'Weekly Performance Tracker' })).toBeVisible();
+      await expect(page.getByRole('button', { name: /^\+ Moved$/ })).toBeVisible();
+      await expect(page.getByRole('button', { name: /^\+ Generated$/ })).toBeVisible();
+      await expect(page.getByRole('button', { name: /^\+ Cut$/ })).toBeVisible();
+      await expect(page.getByTestId('net-today-value')).toBeVisible();
     }
   });
 
@@ -182,8 +159,8 @@ test.describe('Dashboard page rendering', () => {
       // Task dashboard should now be visible
       const allText = await page.textContent('main');
       expect(allText).toContain('Tasks');
-      // Financial Impact should NOT be visible on Tasks tab
-      await expect(page.getByText('Financial Impact Tracking')).toBeHidden();
+      // Weekly Performance Tracker should NOT be visible on Tasks tab
+      await expect(page.getByRole('heading', { name: 'Weekly Performance Tracker' })).toBeHidden();
     }
   });
 
@@ -195,8 +172,8 @@ test.describe('Dashboard page rendering', () => {
     if (hasFullDashboard) {
       await page.getByRole('button', { name: /Monthly Review/i }).click();
       await expect(page.getByText('Mission Command')).toBeVisible();
-      // Financial Impact should NOT be visible on Monthly Review tab
-      await expect(page.getByText('Financial Impact Tracking')).toBeHidden();
+      // Weekly Performance Tracker should NOT be visible on Monthly Review tab
+      await expect(page.getByRole('heading', { name: 'Weekly Performance Tracker' })).toBeHidden();
     }
   });
 
@@ -229,16 +206,6 @@ test.describe('Dashboard page rendering', () => {
       // Weekly Performance Tracker should be visible on default Dashboard tab
       await expect(page.getByText('Weekly Performance Tracker')).toBeVisible();
       await expect(page.getByRole('button', { name: 'Log Today' })).toBeVisible();
-
-      // Verify it appears after Financial Impact Tracking
-      const allText = await page.textContent('main');
-      if (allText) {
-        const financialPos = allText.indexOf('Financial Impact Tracking');
-        const trackerPos = allText.indexOf('Weekly Performance Tracker');
-        if (financialPos !== -1 && trackerPos !== -1) {
-          expect(financialPos).toBeLessThan(trackerPos);
-        }
-      }
     }
   });
 
@@ -350,6 +317,154 @@ test.describe('Dashboard page rendering', () => {
     expect(data.error).toContain('date');
   });
 
+  test.describe.serial('Inline Temporal Target editor (UI → API)', () => {
+    test('typing a new value and pressing Enter persists via API', async ({ page, request }) => {
+      const jsErrors: string[] = [];
+      page.on('pageerror', error => jsErrors.push(error.message));
+
+      await page.goto('/dashboard');
+      await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+      const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
+      if (!hasFullDashboard) {
+        test.skip();
+        return;
+      }
+
+      const editTargetButton = page.getByRole('button', { name: /Edit Temporal Target/i });
+      await expect(editTargetButton).toBeVisible({ timeout: 10_000 });
+
+      const beforeRes = await request.get('/api/weekly-tracker');
+      const beforeData = await beforeRes.json();
+      if (!beforeData.success) {
+        test.skip();
+        return;
+      }
+      const currentTarget: number = beforeData.currentWeekSummary?.temporalTarget ?? 5;
+      // Pick a value that's distinct from the current one (avoids the unchanged-no-op path)
+      const nextTarget = currentTarget === 13 ? 14 : 13;
+
+      await editTargetButton.click();
+      const input = page.getByRole('spinbutton', { name: /Temporal Target/i });
+      await expect(input).toBeVisible();
+      await input.fill(String(nextTarget));
+      await input.press('Enter');
+
+      // Poll the API until the new target value appears (decouples test from UI animation timing)
+      await expect.poll(async () => {
+        const res = await request.get('/api/weekly-tracker');
+        const data = await res.json();
+        return data?.currentWeekSummary?.temporalTarget;
+      }, { timeout: 20_000 }).toBe(nextTarget);
+
+      expect(jsErrors).toHaveLength(0);
+    });
+
+    test('Escape cancels without changing the API value', async ({ page, request }) => {
+      await page.goto('/dashboard');
+      await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+      const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
+      if (!hasFullDashboard) {
+        test.skip();
+        return;
+      }
+
+      const beforeRes = await request.get('/api/weekly-tracker');
+      const beforeData = await beforeRes.json();
+      if (!beforeData.success) {
+        test.skip();
+        return;
+      }
+      const targetBefore: number = beforeData.currentWeekSummary?.temporalTarget ?? 5;
+
+      const editTargetButton = page.getByRole('button', { name: /Edit Temporal Target/i });
+      await editTargetButton.click();
+      const input = page.getByRole('spinbutton', { name: /Temporal Target/i });
+      await input.fill('999');
+      await input.press('Escape');
+
+      await expect(editTargetButton).toBeVisible();
+
+      // Briefly wait to give any errant blur-triggered save a chance to land, then assert no change
+      await page.waitForTimeout(500);
+      const afterRes = await request.get('/api/weekly-tracker');
+      const afterData = await afterRes.json();
+      expect(afterData.currentWeekSummary.temporalTarget).toBe(targetBefore);
+    });
+  });
+
+  test('monthly review compact layout: hours worked and temporal hours persist independently', async ({ page, request }) => {
+    const TEST_MONTH = '2099-11';
+    const cleanup = () => request.post('/api/monthly-review', {
+      data: { action: 'deleteReview', month: TEST_MONTH },
+    }).catch(() => null);
+
+    await cleanup();
+
+    try {
+      await page.goto('/dashboard');
+      await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+      const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
+      if (!hasFullDashboard) {
+        test.skip();
+        return;
+      }
+
+      await page.getByRole('button', { name: /Monthly Review/i }).click();
+      await expect(page.getByRole('button', { name: /New Review/ })).toBeVisible();
+      await page.getByRole('button', { name: /New Review/ }).click();
+
+      await page.locator('#mr-month').fill(TEST_MONTH);
+
+      const hoursInput = page.locator('#mr-hours');
+      const temporalInput = page.locator('#mr-temporal');
+      await expect(hoursInput).toBeVisible();
+      await expect(temporalInput).toBeVisible();
+
+      const hoursBox = await hoursInput.boundingBox();
+      const temporalBox = await temporalInput.boundingBox();
+      expect(hoursBox?.width ?? 0).toBeLessThan(150);
+      expect(temporalBox?.width ?? 0).toBeLessThan(150);
+
+      await hoursInput.fill('97');
+      await temporalInput.fill('40');
+      await page.locator('#mr-alignment').fill('alignment text');
+      await page.locator('#mr-lesson').fill('lesson text');
+
+      const alignBox = await page.locator('#mr-alignment').boundingBox();
+      const lessonBox = await page.locator('#mr-lesson').boundingBox();
+      if (alignBox && lessonBox) {
+        expect(Math.abs(alignBox.y - lessonBox.y)).toBeLessThan(20);
+        expect(lessonBox.x).toBeGreaterThan(alignBox.x);
+      }
+
+      const submitRes = page.waitForResponse(
+        r => r.url().includes('/api/monthly-review') && r.request().method() === 'POST',
+        { timeout: 10_000 }
+      ).catch(() => null);
+      await page.getByRole('button', { name: /Save Review|Update Review/ }).click();
+      const response = await submitRes;
+
+      if (!response || response.status() === 401 || response.status() === 500) {
+        test.skip();
+        return;
+      }
+
+      const getRes = await request.get('/api/monthly-review');
+      const getData = await getRes.json();
+      const review = getData.recentReviews.find((r: any) => r.month === TEST_MONTH);
+      expect(review).toBeTruthy();
+      expect(review.hoursWorked).toBe(97);
+      expect(review.temporalHours).toBe(40);
+      expect(review.alignmentCheck).toBe('alignment text');
+      expect(review.monthLesson).toBe('lesson text');
+    } finally {
+      await cleanup();
+    }
+  });
+
   test('weekly review with temporalTarget persists and appears in GET', async ({ request }) => {
     const postRes = await request.post('/api/weekly-tracker', {
       data: { action: 'submitReview', revenue: 2000, temporalTarget: 8, slipAnalysis: 'test', systemAdjustment: '', nextWeekTargets: '', bottleneck: '' },
@@ -445,7 +560,7 @@ test.describe('Dashboard page rendering', () => {
         decisionSource: 'discipline',
         badHabits: 'Skipping tests',
         goodPatterns: 'TDD',
-        ratings: { discipline: 8, focus: 7, executive: 6, math: 5, nutrition: 7, fitness: 6, sleep: 7 },
+        ratings: { discipline: 8, focus: 7, nutrition: 7, fitness: 6, sleep: 7 },
         oneThingToFix: 'More test coverage',
         disciplinedVersionAction: 'Write tests first always',
       },
@@ -498,9 +613,10 @@ test.describe('Dashboard page rendering', () => {
 
       // Click History tab and verify it switches
       await historyTab.click();
-      // Should show either reviews or empty state
-      const hasReviews = await page.getByText(/\d{4}/).isVisible().catch(() => false);
-      const hasEmptyState = await page.getByText('No monthly reviews yet').isVisible().catch(() => false);
+      // Should show either reviews or empty state. Use .first() because multiple reviews
+      // (and other 4-digit numbers on the page) can match /\d{4}/ in strict mode.
+      const hasReviews = await page.getByText(/\d{4}/).first().isVisible().catch(() => false);
+      const hasEmptyState = await page.getByText('No monthly reviews yet').first().isVisible().catch(() => false);
       expect(hasReviews || hasEmptyState, 'History tab should show reviews or empty state').toBeTruthy();
     }
   });
@@ -787,6 +903,43 @@ test.describe('Garmin sync round-trip', () => {
 test.describe('editSupplement API', () => {
   const UNIQUE_SUPP = `E2E-Edit-Test-${Date.now()}`;
 
+  test.beforeAll(async ({ playwright }) => {
+    // Sweep any leftover E2E-prefixed supplements from previous failed test runs.
+    // Uses playwright.request (worker-scoped) since test-scoped `request` is not
+    // available in beforeAll hooks.
+    const baseURL = process.env.DASHBOARD_URL || 'https://ceo-mission-control-nine.vercel.app';
+    const ctx = await playwright.request.newContext({ baseURL });
+    try {
+      const res = await ctx.get('/api/health-notes');
+      if (!res.ok()) {
+        console.warn(`[editSupplement beforeAll] Could not fetch supplements for cleanup sweep (HTTP ${res.status()})`);
+        return;
+      }
+      const data = await res.json();
+      const staleTestSupplements: Array<{ name: string }> = (data.templates?.supplementTemplate ?? [])
+        .filter((s: { name: string }) => /^E2E-/.test(s.name));
+      for (const supp of staleTestSupplements) {
+        await ctx.post('/api/health-notes', {
+          data: { action: 'update-templates', operation: 'removeSupplement', name: supp.name },
+        });
+      }
+    } finally {
+      await ctx.dispose();
+    }
+  });
+
+  test.afterEach(async ({ request }) => {
+    // Guarantee cleanup even when tests fail or are skipped mid-way.
+    // removeSupplement is a no-op for names that don't exist, so this is safe to call
+    // unconditionally after every test in this describe block.
+    await request.post('/api/health-notes', {
+      data: { action: 'update-templates', operation: 'removeSupplement', name: UNIQUE_SUPP },
+    });
+    await request.post('/api/health-notes', {
+      data: { action: 'update-templates', operation: 'removeSupplement', name: `${UNIQUE_SUPP}-Edited` },
+    });
+  });
+
   test('add, edit, and remove a supplement end-to-end', async ({ request }) => {
     // 1. Add a test supplement
     const addRes = await request.post('/api/health-notes', {
@@ -890,6 +1043,21 @@ test.describe('editSupplement API', () => {
 });
 
 test.describe('Health Intelligence UI interactions', () => {
+  // Supplement names used across tests in this block — kept here to stay in sync with cleanup.
+  const UI_TEST_SUPPLEMENT = 'E2E-Edit-UI-Test';
+  const SAVE_TEST_SUPPLEMENT = 'E2E-Save-Test';
+  const SAVE_TEST_RENAMED = 'E2E-Save-Test-Renamed';
+
+  test.afterEach(async ({ request }) => {
+    // Guarantee cleanup of all supplement test data, even if tests fail or are skipped mid-way.
+    // removeSupplement is a no-op for names that don't exist, so this is safe unconditionally.
+    for (const name of [UI_TEST_SUPPLEMENT, SAVE_TEST_SUPPLEMENT, SAVE_TEST_RENAMED]) {
+      await request.post('/api/health-notes', {
+        data: { action: 'update-templates', operation: 'removeSupplement', name },
+      });
+    }
+  });
+
   test('charts tab shows empty state or rendered chart (not blank)', async ({ page, request }) => {
     const jsErrors: string[] = [];
     page.on('pageerror', error => jsErrors.push(error.message));
@@ -927,12 +1095,12 @@ test.describe('Health Intelligence UI interactions', () => {
 
     // Clean up any leftovers from prior runs
     await request.post('/api/health-notes', {
-      data: { action: 'update-templates', operation: 'removeSupplement', name: 'E2E-Edit-UI-Test' },
+      data: { action: 'update-templates', operation: 'removeSupplement', name: UI_TEST_SUPPLEMENT },
     });
 
     // Ensure exactly one test supplement exists
     const addRes = await request.post('/api/health-notes', {
-      data: { action: 'update-templates', operation: 'addSupplement', name: 'E2E-Edit-UI-Test', defaultDosageMg: 50 },
+      data: { action: 'update-templates', operation: 'addSupplement', name: UI_TEST_SUPPLEMENT, defaultDosageMg: 50 },
     });
     if (addRes.status() === 401) {
       test.skip();
@@ -947,7 +1115,7 @@ test.describe('Health Intelligence UI interactions', () => {
     await page.getByRole('button', { name: /Settings/i }).click();
 
     // Find the Edit button for our test supplement (exact match)
-    const editButton = page.getByRole('button', { name: 'Edit E2E-Edit-UI-Test', exact: true });
+    const editButton = page.getByRole('button', { name: `Edit ${UI_TEST_SUPPLEMENT}`, exact: true });
     await expect(editButton).toBeVisible();
     await editButton.click();
 
@@ -962,10 +1130,7 @@ test.describe('Health Intelligence UI interactions', () => {
     await expect(supplementSection.getByRole('button', { name: 'Save', exact: true })).toBeHidden();
     await expect(editButton).toBeVisible();
 
-    // Clean up
-    await request.post('/api/health-notes', {
-      data: { action: 'update-templates', operation: 'removeSupplement', name: 'E2E-Edit-UI-Test' },
-    });
+    // Clean up is handled by the afterEach hook
 
     expect(jsErrors).toHaveLength(0);
   });
@@ -973,15 +1138,15 @@ test.describe('Health Intelligence UI interactions', () => {
   test('Settings Edit button saves changes and persists via API', async ({ page, request }) => {
     // Clean up any leftovers from prior runs
     await request.post('/api/health-notes', {
-      data: { action: 'update-templates', operation: 'removeSupplement', name: 'E2E-Save-Test' },
+      data: { action: 'update-templates', operation: 'removeSupplement', name: SAVE_TEST_SUPPLEMENT },
     });
     await request.post('/api/health-notes', {
-      data: { action: 'update-templates', operation: 'removeSupplement', name: 'E2E-Save-Test-Renamed' },
+      data: { action: 'update-templates', operation: 'removeSupplement', name: SAVE_TEST_RENAMED },
     });
 
     // Add a supplement to edit
     const addRes = await request.post('/api/health-notes', {
-      data: { action: 'update-templates', operation: 'addSupplement', name: 'E2E-Save-Test', defaultDosageMg: 10 },
+      data: { action: 'update-templates', operation: 'addSupplement', name: SAVE_TEST_SUPPLEMENT, defaultDosageMg: 10 },
     });
     if (addRes.status() === 401) {
       test.skip();
@@ -995,8 +1160,8 @@ test.describe('Health Intelligence UI interactions', () => {
     await healthSection.scrollIntoViewIfNeeded();
     await page.getByRole('button', { name: /Settings/i }).click();
 
-    // Click Edit (exact match to avoid matching "E2E-Save-Test-Renamed")
-    const editButton = page.getByRole('button', { name: 'Edit E2E-Save-Test', exact: true });
+    // Click Edit (exact match to avoid matching the renamed version)
+    const editButton = page.getByRole('button', { name: `Edit ${SAVE_TEST_SUPPLEMENT}`, exact: true });
     await expect(editButton).toBeVisible();
     await editButton.click();
 
@@ -1007,7 +1172,7 @@ test.describe('Health Intelligence UI interactions', () => {
     // Modify the name input
     const nameInput = editRow.locator('input[type="text"]');
     await nameInput.clear();
-    await nameInput.fill('E2E-Save-Test-Renamed');
+    await nameInput.fill(SAVE_TEST_RENAMED);
 
     // Modify dosage
     const dosageInput = editRow.locator('input[type="number"]');
@@ -1024,19 +1189,16 @@ test.describe('Health Intelligence UI interactions', () => {
     const getRes = await request.get('/api/health-notes');
     const getData = await getRes.json();
     const renamed = getData.templates.supplementTemplate.find(
-      (s: { name: string }) => s.name === 'E2E-Save-Test-Renamed'
+      (s: { name: string }) => s.name === SAVE_TEST_RENAMED
     );
     expect(renamed, 'renamed supplement should exist in API response').toBeTruthy();
     expect(renamed.defaultDosageMg).toBe(99);
     // Old name should be gone
     expect(getData.templates.supplementTemplate.find(
-      (s: { name: string }) => s.name === 'E2E-Save-Test'
+      (s: { name: string }) => s.name === SAVE_TEST_SUPPLEMENT
     )).toBeFalsy();
 
-    // Clean up
-    await request.post('/api/health-notes', {
-      data: { action: 'update-templates', operation: 'removeSupplement', name: 'E2E-Save-Test-Renamed' },
-    });
+    // Clean up is handled by the afterEach hook
   });
 
   test('Settings tab has no JS errors during tab switching', async ({ page }) => {
@@ -1060,5 +1222,43 @@ test.describe('Health Intelligence UI interactions', () => {
     await page.waitForTimeout(300);
 
     expect(jsErrors).toHaveLength(0);
+  });
+});
+
+test.describe('Money move logging in Weekly Performance Tracker', () => {
+  test('logs a money move and reflects it in Net Today + day cell', async ({ page }) => {
+    await page.goto('/dashboard');
+    await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+    const hasFullDashboard = await page
+      .getByRole('heading', { name: 'Weekly Performance Tracker' })
+      .isVisible()
+      .catch(() => false);
+    test.skip(!hasFullDashboard, 'Weekly Performance Tracker not rendered (workspace data unavailable)');
+
+    // Capture Net Today's starting value so we can verify the delta after submit
+    const netTodayValue = page.getByTestId('net-today-value');
+    await expect(netTodayValue).toBeVisible();
+    const before = (await netTodayValue.textContent()) ?? '$0';
+
+    // Open the Cut quick-add form and submit a unique description so we can find it later
+    await page.getByRole('button', { name: /^\+ Cut$/ }).click();
+    const uniqueDescription = `e2e-storage-${Date.now()}`;
+    await page.getByLabel('amount').fill('150');
+    await page.getByLabel('description').fill(uniqueDescription);
+    await page.getByRole('button', { name: /Save move/i }).click();
+
+    // After submit, the form collapses (Save move button no longer visible) and Net Today updates
+    await expect(page.getByRole('button', { name: /Save move/i })).toBeHidden({ timeout: 10_000 });
+    await expect(netTodayValue).not.toHaveText(before, { timeout: 10_000 });
+
+    // The matching day's grid cell shows a $ value. Today's column index = (getDay() + 6) % 7.
+    const todayIdx = (new Date().getDay() + 6) % 7;
+    const dayMoney = page.getByTestId(`day-money-${todayIdx}`);
+    await expect(dayMoney).not.toHaveText('—');
+
+    // Hover reveals the popover with our unique description
+    await dayMoney.hover();
+    await expect(page.getByText(uniqueDescription)).toBeVisible({ timeout: 5_000 });
   });
 });

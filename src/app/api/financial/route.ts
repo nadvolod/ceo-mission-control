@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { FinancialTracker } from '@/lib/financial-tracker';
+import { FinancialTracker, FinancialValidationError } from '@/lib/financial-tracker';
 import { checkAuth } from '@/lib/auth';
 import { getAdminUserId } from '@/lib/users';
+import { startOfWeek, format, subDays } from 'date-fns';
 
 export async function GET() {
   try {
@@ -10,12 +11,24 @@ export async function GET() {
     const todaysMetrics = financialTracker.getTodaysMetrics();
     const weeklyTotals = financialTracker.getWeeklyTotals();
     const monthlyTotals = financialTracker.getMonthlyTotals();
+    const previousWeekTotals = financialTracker.getPreviousWeekTotals();
     const recentEntries = financialTracker.getRecentEntries(10);
+
+    const now = new Date();
+    const weekStart = format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    const weekFinancialByDay = financialTracker.getDailyMetricsForWeek(weekStart);
+
+    const rangeEnd = format(now, 'yyyy-MM-dd');
+    const rangeStart = format(subDays(now, 29), 'yyyy-MM-dd');
+    const dailyFinancialTrend = financialTracker.getDailyMetricsForRange(rangeStart, rangeEnd);
 
     return NextResponse.json({
       todaysMetrics,
       weeklyTotals,
       monthlyTotals,
+      previousWeekTotals,
+      weekFinancialByDay,
+      dailyFinancialTrend,
       recentEntries,
       timestamp: new Date().toISOString()
     });
@@ -41,8 +54,15 @@ export async function POST(request: NextRequest) {
     switch (action) {
       case 'addEntry': {
         const { category, amount, description, date } = data;
-        const entry = await financialTracker.addEntry(category, amount, description, date);
-        return NextResponse.json({ entry });
+        try {
+          const entry = await financialTracker.addEntry(category, amount, description, date);
+          return NextResponse.json({ entry });
+        } catch (err) {
+          if (err instanceof FinancialValidationError) {
+            return NextResponse.json({ error: err.message }, { status: 400 });
+          }
+          throw err;
+        }
       }
 
       case 'processMessage': {

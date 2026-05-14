@@ -15,8 +15,6 @@ import type { MonthlyReview, MonthlyReviewRatings } from '@/lib/types';
 const RATING_KEYS: Array<{ key: keyof MonthlyReviewRatings; label: string; color: string }> = [
   { key: 'discipline', label: 'Discipline', color: '#2563eb' },
   { key: 'focus', label: 'Focus', color: '#7c3aed' },
-  { key: 'executive', label: 'Executive', color: '#0891b2' },
-  { key: 'math', label: 'Math', color: '#059669' },
   { key: 'nutrition', label: 'Nutrition', color: '#d97706' },
   { key: 'fitness', label: 'Fitness', color: '#dc2626' },
   { key: 'sleep', label: 'Sleep', color: '#6366f1' },
@@ -41,7 +39,7 @@ const TABS: Array<{ id: TabId; label: string }> = [
 // ---------------------------------------------------------------------------
 
 function emptyRatings(): MonthlyReviewRatings {
-  return { discipline: 5, focus: 5, executive: 5, math: 5, nutrition: 5, fitness: 5, sleep: 5 };
+  return { discipline: 5, focus: 5, nutrition: 5, fitness: 5, sleep: 5 };
 }
 
 function avgRating(r: MonthlyReviewRatings): string {
@@ -278,7 +276,7 @@ export function MonthlyReviewTracker({
       <div className="p-6">
         {/* ── NEW REVIEW TAB ── */}
         {activeTab === 'new' && (
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6 max-w-5xl mx-auto">
             {editingReview && (
               <div className="bg-amber-50 border border-amber-200 rounded-lg px-4 py-2 text-sm text-amber-800">
                 Editing review for <strong>{formatMonthLabel(editingReview.month)}</strong>
@@ -304,19 +302,7 @@ export function MonthlyReviewTracker({
             <fieldset className="border border-gray-200 rounded-lg p-4">
               <legend className="text-sm font-semibold text-gray-700 px-2">Time</legend>
               <div className="space-y-3">
-                <div>
-                  <label htmlFor="mr-time-alloc" className="block text-xs text-gray-500 mb-1">
-                    Where did my time actually go?
-                  </label>
-                  <textarea
-                    id="mr-time-alloc"
-                    rows={2}
-                    value={timeAllocation}
-                    onChange={e => setTimeAllocation(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-wrap items-end gap-4">
                   <div>
                     <label htmlFor="mr-hours" className="block text-xs text-gray-500 mb-1">
                       Hours worked
@@ -328,7 +314,7 @@ export function MonthlyReviewTracker({
                       step={0.5}
                       value={hoursWorked}
                       onChange={e => setHoursWorked(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       required
                     />
                   </div>
@@ -343,10 +329,22 @@ export function MonthlyReviewTracker({
                       step={0.5}
                       value={temporalHours}
                       onChange={e => setTemporalHours(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                       required
                     />
                   </div>
+                </div>
+                <div>
+                  <label htmlFor="mr-time-alloc" className="block text-xs text-gray-500 mb-1">
+                    Where did my time actually go?
+                  </label>
+                  <textarea
+                    id="mr-time-alloc"
+                    rows={2}
+                    value={timeAllocation}
+                    onChange={e => setTimeAllocation(e.target.value)}
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
                 </div>
               </div>
             </fieldset>
@@ -354,7 +352,7 @@ export function MonthlyReviewTracker({
             {/* Energy section */}
             <fieldset className="border border-gray-200 rounded-lg p-4">
               <legend className="text-sm font-semibold text-gray-700 px-2">Energy</legend>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="mr-givers" className="block text-xs text-gray-500 mb-1">
                     What gave me energy?
@@ -400,7 +398,7 @@ export function MonthlyReviewTracker({
             {/* Money section */}
             <fieldset className="border border-gray-200 rounded-lg p-4">
               <legend className="text-sm font-semibold text-gray-700 px-2">Money</legend>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label htmlFor="mr-money" className="block text-xs text-gray-500 mb-1">
                     Where did my money go?
@@ -432,29 +430,31 @@ export function MonthlyReviewTracker({
             <fieldset className="border border-gray-200 rounded-lg p-4">
               <legend className="text-sm font-semibold text-gray-700 px-2">Discipline &amp; Alignment</legend>
               <div className="space-y-3">
-                <div>
-                  <label htmlFor="mr-alignment" className="block text-xs text-gray-500 mb-1">
-                    Did I align with long-term discipline or impulse?
-                  </label>
-                  <textarea
-                    id="mr-alignment"
-                    rows={2}
-                    value={alignmentCheck}
-                    onChange={e => setAlignmentCheck(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="mr-lesson" className="block text-xs text-gray-500 mb-1">
-                    What lesson does this month teach?
-                  </label>
-                  <textarea
-                    id="mr-lesson"
-                    rows={2}
-                    value={monthLesson}
-                    onChange={e => setMonthLesson(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="mr-alignment" className="block text-xs text-gray-500 mb-1">
+                      Did I align with long-term discipline or impulse?
+                    </label>
+                    <textarea
+                      id="mr-alignment"
+                      rows={2}
+                      value={alignmentCheck}
+                      onChange={e => setAlignmentCheck(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="mr-lesson" className="block text-xs text-gray-500 mb-1">
+                      What lesson does this month teach?
+                    </label>
+                    <textarea
+                      id="mr-lesson"
+                      rows={2}
+                      value={monthLesson}
+                      onChange={e => setMonthLesson(e.target.value)}
+                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    />
+                  </div>
                 </div>
 
                 {/* Decision source toggle */}
@@ -478,7 +478,7 @@ export function MonthlyReviewTracker({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="mr-bad" className="block text-xs text-gray-500 mb-1">
                       Bad habits that tried to return

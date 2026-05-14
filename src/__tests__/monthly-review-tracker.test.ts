@@ -46,8 +46,6 @@ function makeValidReview(overrides: Partial<MonthlyReview> = {}): Omit<MonthlyRe
     ratings: {
       discipline: 7,
       focus: 8,
-      executive: 6,
-      math: 7,
       nutrition: 5,
       fitness: 6,
       sleep: 4,
@@ -129,8 +127,8 @@ describe('MonthlyReviewTracker', () => {
 
   test('getRatingsTrend returns ratings over time', async () => {
     const tracker = await MonthlyReviewTracker.create(UNIT_TEST_OWNER_ID);
-    await tracker.submitReview(makeValidReview({ month: '2026-01', date: '2026-01-31', ratings: { discipline: 5, focus: 6, executive: 4, math: 5, nutrition: 3, fitness: 4, sleep: 3 } }));
-    await tracker.submitReview(makeValidReview({ month: '2026-02', date: '2026-02-28', ratings: { discipline: 7, focus: 8, executive: 6, math: 7, nutrition: 5, fitness: 6, sleep: 4 } }));
+    await tracker.submitReview(makeValidReview({ month: '2026-01', date: '2026-01-31', ratings: { discipline: 5, focus: 6, nutrition: 3, fitness: 4, sleep: 3 } }));
+    await tracker.submitReview(makeValidReview({ month: '2026-02', date: '2026-02-28', ratings: { discipline: 7, focus: 8, nutrition: 5, fitness: 6, sleep: 4 } }));
 
     const trend = tracker.getRatingsTrend();
     expect(trend).toHaveLength(2);
@@ -150,7 +148,7 @@ describe('MonthlyReviewTracker', () => {
   test('validates ratings are between 1 and 10', async () => {
     const tracker = await MonthlyReviewTracker.create(UNIT_TEST_OWNER_ID);
     await expect(
-      tracker.submitReview(makeValidReview({ ratings: { discipline: 11, focus: 8, executive: 6, math: 7, nutrition: 5, fitness: 6, sleep: 4 } }))
+      tracker.submitReview(makeValidReview({ ratings: { discipline: 11, focus: 8, nutrition: 5, fitness: 6, sleep: 4 } }))
     ).rejects.toThrow('discipline rating must be between 1 and 10');
   });
 

@@ -276,7 +276,7 @@ export interface WeeklyReview {
   id: string;
   weekStartDate: string;     // Monday YYYY-MM-DD
   weekEndDate: string;       // Sunday YYYY-MM-DD
-  revenue: number;           // $ weekly total
+  revenue?: number;          // $ weekly total (legacy; new submissions omit)
   slipAnalysis: string;      // "Where/why did I slip?"
   systemAdjustment: string;  // "What system do I adjust?"
   nextWeekTargets: string;
@@ -310,8 +310,6 @@ export interface WeeklyTrackerData {
 export interface MonthlyReviewRatings {
   discipline: number;       // 1-10
   focus: number;            // 1-10
-  executive: number;        // 1-10
-  math: number;             // 1-10
   nutrition: number;        // 1-10
   fitness: number;          // 1-10
   sleep: number;            // 1-10

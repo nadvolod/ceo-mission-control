@@ -4,7 +4,6 @@ import { useState } from 'react';
 import { TaskDashboard } from '@/components/TaskDashboard';
 import { FocusOptimization } from '@/components/FocusOptimization';
 import { MissionTracker } from '@/components/MissionTracker';
-import { FinancialMetricsDashboard } from '@/components/FinancialMetricsDashboard';
 import { FinancialCommandCenter } from '@/components/FinancialCommandCenter';
 import { WeeklyPerformanceTracker } from '@/components/WeeklyPerformanceTracker';
 import { MonthlyReviewTracker } from '@/components/MonthlyReviewTracker';
@@ -111,19 +110,6 @@ export default function HomePage() {
         {/* Dashboard Tab - Daily items */}
         {activeTab === 'dashboard' && (
           <>
-            {/* Financial Impact Tracking */}
-            {financialData && (
-              <div className="mb-8">
-                <FinancialMetricsDashboard
-                  todaysMetrics={financialData.todaysMetrics}
-                  weeklyTotals={financialData.weeklyTotals}
-                  monthlyTotals={financialData.monthlyTotals}
-                  recentEntries={financialData.recentEntries}
-                  onAddEntry={handleAddFinancialEntry}
-                />
-              </div>
-            )}
-
             {/* Weekly Performance Tracker */}
             {weeklyTrackerData && (
               <div className="mb-8">
@@ -134,11 +120,42 @@ export default function HomePage() {
                   dailyTrend={weeklyTrackerData.dailyTrend}
                   recentReviews={weeklyTrackerData.recentReviews}
                   onLogDay={handleLogDay}
-                  onSubmitReview={handleSubmitWeeklyReview}
+                  onSubmitReview={(review) =>
+                    handleSubmitWeeklyReview({
+                      slipAnalysis: review.slipAnalysis,
+                      systemAdjustment: review.systemAdjustment,
+                      nextWeekTargets: review.nextWeekTargets,
+                      bottleneck: review.bottleneck,
+                      temporalTarget: review.temporalTarget,
+                    })
+                  }
                   onAddFocusSession={handleAddFocusSession}
                   temporalActual={focusData?.weeklyTotals?.Temporal ?? scorecard.temporalActual ?? 0}
                   todaysFocusSessions={focusData?.recentSessions?.filter((s: { date: string }) => s.date === scorecard.date)}
                   todaysFocusTotal={focusData?.todaysMetrics?.totalHours ?? 0}
+                  todaysFinancial={
+                    financialData?.todaysMetrics ?? {
+                      date: '',
+                      entries: [],
+                      totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 },
+                    }
+                  }
+                  weekFinancialByDay={
+                    financialData?.weekFinancialByDay ??
+                    Array.from({ length: 7 }, () => ({
+                      date: '',
+                      entries: [],
+                      totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 },
+                    }))
+                  }
+                  weekFinancialTotals={
+                    financialData?.weeklyTotals ?? { moved: 0, generated: 0, cut: 0, netImpact: 0 }
+                  }
+                  previousWeekFinancialTotals={
+                    financialData?.previousWeekTotals ?? { moved: 0, generated: 0, cut: 0, netImpact: 0 }
+                  }
+                  dailyFinancialTrend={financialData?.dailyFinancialTrend ?? []}
+                  onAddFinancialEntry={handleAddFinancialEntry}
                 />
               </div>
             )}

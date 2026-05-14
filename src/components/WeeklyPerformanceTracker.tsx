@@ -10,6 +10,17 @@ import {
   LineChart, Line, ReferenceLine
 } from 'recharts';
 import type { PerformanceDayEntry, WeeklySummary, WeeklyReview, FocusCategory } from '@/lib/types';
+import type { DailyFinancialMetrics } from '@/lib/financial-tracker';
+import { MoneyMovePopover } from './MoneyMovePopover';
+
+type FinancialTotals = { moved: number; generated: number; cut: number; netImpact: number };
+
+function formatCurrency(value: number): string {
+  const abs = Math.abs(value);
+  const formatted = abs.toLocaleString('en-US', { maximumFractionDigits: 0 });
+  const sign = value < 0 ? '-' : '';
+  return `${sign}$${formatted}`;
+}
 
 const QUICK_ADD_BUTTONS: Array<{ hours: number; category: FocusCategory; color: string; borderColor: string }> = [
   { hours: 0.5, category: 'Temporal', color: 'text-blue-600', borderColor: 'border-blue-300 hover:bg-blue-50' },
@@ -28,7 +39,6 @@ interface WeeklyPerformanceTrackerProps {
   recentReviews: WeeklyReview[];
   onLogDay: (deepWorkHours: number, pipelineActions: number, trained: boolean) => Promise<void>;
   onSubmitReview: (review: {
-    revenue: number;
     slipAnalysis: string;
     systemAdjustment: string;
     nextWeekTargets: string;
@@ -39,6 +49,16 @@ interface WeeklyPerformanceTrackerProps {
   temporalActual?: number;
   todaysFocusSessions?: Array<{ category: string; hours: number; description: string; timestamp: string }>;
   todaysFocusTotal?: number;
+  todaysFinancial: DailyFinancialMetrics;
+  weekFinancialByDay: DailyFinancialMetrics[];
+  weekFinancialTotals: FinancialTotals;
+  previousWeekFinancialTotals: FinancialTotals;
+  dailyFinancialTrend: DailyFinancialMetrics[];
+  onAddFinancialEntry: (
+    category: 'moved' | 'generated' | 'cut',
+    amount: number,
+    description: string
+  ) => Promise<void>;
 }
 
 type TabId = 'daily' | 'weekly' | 'trends' | 'review';
@@ -72,6 +92,12 @@ export function WeeklyPerformanceTracker({
   temporalActual = 0,
   todaysFocusSessions = [],
   todaysFocusTotal = 0,
+  todaysFinancial,
+  weekFinancialByDay,
+  weekFinancialTotals,
+  previousWeekFinancialTotals,
+  dailyFinancialTrend,
+  onAddFinancialEntry,
 }: WeeklyPerformanceTrackerProps) {
   const [activeTab, setActiveTab] = useState<TabId>('daily');
   const [isLogging, setIsLogging] = useState(false);
@@ -79,6 +105,13 @@ export function WeeklyPerformanceTracker({
 
   const [isAddingFocus, setIsAddingFocus] = useState(false);
   const [lastAdded, setLastAdded] = useState<{ category: string; hours: number } | null>(null);
+
+  // Money Move quick-add state
+  const [moveCategory, setMoveCategory] = useState<'moved' | 'generated' | 'cut' | null>(null);
+  const [moveAmount, setMoveAmount] = useState('');
+  const [moveDescription, setMoveDescription] = useState('');
+  const [isAddingMove, setIsAddingMove] = useState(false);
+  const [moveError, setMoveError] = useState<string | null>(null);
 
   // Auto-clear success confirmation after 2 seconds
   useEffect(() => {
@@ -106,23 +139,25 @@ export function WeeklyPerformanceTracker({
   const existingReview = recentReviews.find(
     r => r.weekStartDate === currentWeekSummary.weekStartDate
   );
-  const [reviewRevenue, setReviewRevenue] = useState(existingReview?.revenue?.toString() ?? '');
   const [reviewSlip, setReviewSlip] = useState(existingReview?.slipAnalysis ?? '');
   const [reviewSystem, setReviewSystem] = useState(existingReview?.systemAdjustment ?? '');
   const [reviewTargets, setReviewTargets] = useState(existingReview?.nextWeekTargets ?? '');
   const [reviewBottleneck, setReviewBottleneck] = useState(existingReview?.bottleneck ?? '');
-  const [reviewTemporalTarget, setReviewTemporalTarget] = useState(existingReview?.temporalTarget?.toString() ?? '5');
   const [isSubmittingReview, setIsSubmittingReview] = useState(false);
+
+  // Inline Temporal Target edit state
+  const [isEditingTarget, setIsEditingTarget] = useState(false);
+  const [targetDraft, setTargetDraft] = useState<string>('');
+  const [isSavingTarget, setIsSavingTarget] = useState(false);
+  const [targetError, setTargetError] = useState<string | null>(null);
 
   // Sync review form when existing review data changes (e.g. after submit)
   useEffect(() => {
     if (existingReview) {
-      setReviewRevenue(existingReview.revenue?.toString() ?? '');
       setReviewSlip(existingReview.slipAnalysis ?? '');
       setReviewSystem(existingReview.systemAdjustment ?? '');
       setReviewTargets(existingReview.nextWeekTargets ?? '');
       setReviewBottleneck(existingReview.bottleneck ?? '');
-      setReviewTemporalTarget(existingReview.temporalTarget?.toString() ?? '5');
     }
   }, [existingReview?.id]);
 
@@ -157,23 +192,61 @@ export function WeeklyPerformanceTracker({
     }
   };
 
+  const beginEditTarget = () => {
+    setTargetDraft(currentWeekSummary.temporalTarget.toString());
+    setTargetError(null);
+    setIsEditingTarget(true);
+  };
+
+  const cancelEditTarget = () => {
+    setIsEditingTarget(false);
+    setTargetError(null);
+    setTargetDraft('');
+  };
+
+  const saveTarget = async () => {
+    if (isSavingTarget) return;
+    const next = parseFloat(targetDraft);
+    if (isNaN(next) || next < 0) {
+      setTargetError('Enter a non-negative number');
+      return;
+    }
+    if (next === currentWeekSummary.temporalTarget) {
+      cancelEditTarget();
+      return;
+    }
+    setIsSavingTarget(true);
+    setTargetError(null);
+    try {
+      await onSubmitReview({
+        slipAnalysis: existingReview?.slipAnalysis ?? '',
+        systemAdjustment: existingReview?.systemAdjustment ?? '',
+        nextWeekTargets: existingReview?.nextWeekTargets ?? '',
+        bottleneck: existingReview?.bottleneck ?? '',
+        temporalTarget: next,
+      });
+      setIsEditingTarget(false);
+      setTargetDraft('');
+    } catch (error) {
+      console.error('Error saving Temporal Target:', error);
+      setTargetError('Save failed — try again');
+    } finally {
+      setIsSavingTarget(false);
+    }
+  };
+
   const handleReviewSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    const rev = parseFloat(reviewRevenue);
-    if (isNaN(rev) || rev < 0) return;
 
     setIsSubmittingReview(true);
     try {
-      const tt = parseFloat(reviewTemporalTarget);
       await onSubmitReview({
-        revenue: rev,
         slipAnalysis: reviewSlip,
         systemAdjustment: reviewSystem,
         nextWeekTargets: reviewTargets,
         bottleneck: reviewBottleneck,
-        temporalTarget: isNaN(tt) || tt < 0 ? 5 : tt,
+        temporalTarget: existingReview?.temporalTarget ?? currentWeekSummary.temporalTarget ?? 5,
       });
-      setReviewRevenue('');
       setReviewSlip('');
       setReviewSystem('');
       setReviewTargets('');
@@ -208,6 +281,29 @@ export function WeeklyPerformanceTracker({
     date: d.date,
     deepWork: d.deepWorkHours,
   }));
+
+  // Performance Summary stats for money trend
+  const moneyTrend = dailyFinancialTrend;
+  const totalNet = moneyTrend.reduce((acc, d) => acc + d.totals.netImpact, 0);
+  const avgNetPerDay = moneyTrend.length > 0 ? totalNet / moneyTrend.length : 0;
+  const bestMoneyDay = moneyTrend.reduce<{ date: string; value: number } | null>((best, d) => {
+    if (d.totals.netImpact <= 0) return best;
+    if (!best || d.totals.netImpact > best.value) {
+      return { date: d.date, value: d.totals.netImpact };
+    }
+    return best;
+  }, null);
+
+  // Merge financial Net $/day into the 30-day trend chart
+  const moneyHasData = dailyFinancialTrend.some(d => d.totals.netImpact !== 0);
+  const financialByDate = new Map(dailyFinancialTrend.map(d => [d.date, d.totals.netImpact]));
+  const trendChartMerged = deepWorkTrendData.map(d => ({
+    date: d.date,
+    deepWork: d.deepWork,
+    netImpact: financialByDate.get(d.date) ?? 0,
+  }));
+  const hasDeepWorkData = deepWorkTrendData.some(d => d.deepWork > 0);
+  const showTrendChart = hasDeepWorkData || moneyHasData;
 
   // Weekly entries for the daily grid
   const weekEntries = currentWeekSummary.dailyEntries;
@@ -257,7 +353,7 @@ export function WeeklyPerformanceTracker({
         </div>
 
         {/* Today's Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
           <div className="text-center p-3 bg-blue-50 rounded-lg">
             <div className="text-2xl font-bold text-blue-600">
               {todaysEntry?.deepWorkHours ?? '--'}
@@ -294,20 +390,83 @@ export function WeeklyPerformanceTracker({
             <div className="text-xs text-gray-500">Trained</div>
           </div>
           <div className="text-center p-3 bg-indigo-50 rounded-lg">
-            <div className="text-2xl font-bold text-indigo-600">
-              {temporalActual}/{currentWeekSummary.temporalTarget}
-              <span className="text-sm font-normal">h</span>
+            {isEditingTarget ? (
+              <div className="flex flex-col items-center gap-1">
+                <div className="flex items-center justify-center gap-1 text-2xl font-bold text-indigo-600">
+                  <span>{temporalActual}/</span>
+                  <input
+                    autoFocus
+                    type="number"
+                    step="0.5"
+                    min="0"
+                    aria-label="Temporal Target (hours/week)"
+                    value={targetDraft}
+                    disabled={isSavingTarget}
+                    onChange={(e) => setTargetDraft(e.target.value)}
+                    onFocus={(e) => e.currentTarget.select()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        void saveTarget();
+                      } else if (e.key === 'Escape') {
+                        e.preventDefault();
+                        cancelEditTarget();
+                      }
+                    }}
+                    onBlur={() => {
+                      if (isEditingTarget) void saveTarget();
+                    }}
+                    className="w-16 text-center text-2xl font-bold text-indigo-600 bg-white border border-indigo-300 rounded px-1 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  />
+                  <span className="text-sm font-normal">h</span>
+                </div>
+                <div className="text-xs text-gray-500">Temporal Target</div>
+                {targetError && (
+                  <div className="text-xs text-red-600" role="alert">{targetError}</div>
+                )}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={beginEditTarget}
+                aria-label="Edit Temporal Target"
+                className="w-full text-center focus:outline-none focus:ring-2 focus:ring-indigo-500 rounded"
+                title="Click to edit Temporal Target"
+              >
+                <div className="text-2xl font-bold text-indigo-600">
+                  {temporalActual}/{currentWeekSummary.temporalTarget}
+                  <span className="text-sm font-normal">h</span>
+                </div>
+                <div className="text-xs text-gray-500">Temporal Target</div>
+                <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1.5">
+                  <div
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      currentWeekSummary.temporalTarget > 0 && temporalActual >= currentWeekSummary.temporalTarget
+                        ? 'bg-green-500'
+                        : 'bg-indigo-500'
+                    }`}
+                    style={{ width: `${Math.min(100, currentWeekSummary.temporalTarget > 0 ? (temporalActual / currentWeekSummary.temporalTarget) * 100 : 0)}%` }}
+                  />
+                </div>
+              </button>
+            )}
+          </div>
+          <div className="text-center p-3 bg-emerald-50 rounded-lg">
+            <div
+              data-testid="net-today-value"
+              className={`text-2xl font-bold ${
+                todaysFinancial.totals.netImpact > 0
+                  ? 'text-emerald-700'
+                  : todaysFinancial.totals.netImpact < 0
+                    ? 'text-red-600'
+                    : 'text-gray-500'
+              }`}
+            >
+              {formatCurrency(todaysFinancial.totals.netImpact)}
             </div>
-            <div className="text-xs text-gray-500">Temporal Target</div>
-            <div className="w-full bg-gray-200 rounded-full h-1.5 mt-1.5">
-              <div
-                className={`h-1.5 rounded-full transition-all duration-300 ${
-                  currentWeekSummary.temporalTarget > 0 && temporalActual >= currentWeekSummary.temporalTarget
-                    ? 'bg-green-500'
-                    : 'bg-indigo-500'
-                }`}
-                style={{ width: `${Math.min(100, currentWeekSummary.temporalTarget > 0 ? (temporalActual / currentWeekSummary.temporalTarget) * 100 : 0)}%` }}
-              />
+            <div className="text-xs text-gray-500">Net Today</div>
+            <div data-testid="net-today-breakdown" className="text-[10px] text-gray-500 mt-1">
+              mv {formatCurrency(todaysFinancial.totals.moved)} · gen {formatCurrency(todaysFinancial.totals.generated)} · cut {formatCurrency(todaysFinancial.totals.cut)}
             </div>
           </div>
           <div className={`text-center p-3 rounded-lg ${dayStatus.bgColor}`}>
@@ -345,6 +504,101 @@ export function WeeklyPerformanceTracker({
                 +{hours}h {category}
               </button>
             ))}
+          </div>
+        )}
+
+        {/* Money Move quick-add */}
+        {onAddFinancialEntry && (
+          <div className="mt-3 border-t border-gray-100 pt-3">
+            <div className="flex flex-wrap gap-2">
+              {(['moved', 'generated', 'cut'] as const).map(cat => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setMoveCategory(cat)}
+                  className="px-3 py-1.5 text-sm font-medium border border-emerald-300 text-emerald-700 rounded-full bg-white hover:bg-emerald-50"
+                >
+                  + {cat.charAt(0).toUpperCase() + cat.slice(1)}
+                </button>
+              ))}
+            </div>
+            {moveCategory && (
+              <form
+                className="mt-2 flex flex-wrap items-end gap-2 bg-gray-50 p-3 rounded-lg"
+                onSubmit={async e => {
+                  e.preventDefault();
+                  const amt = parseFloat(moveAmount);
+                  if (!Number.isFinite(amt) || amt <= 0 || !moveDescription.trim()) return;
+                  setIsAddingMove(true);
+                  setMoveError(null);
+                  try {
+                    await onAddFinancialEntry(moveCategory, amt, moveDescription.trim());
+                    setMoveAmount('');
+                    setMoveDescription('');
+                    setMoveCategory(null);
+                  } catch (err) {
+                    setMoveError(err instanceof Error ? err.message : 'Failed to save move');
+                  } finally {
+                    setIsAddingMove(false);
+                  }
+                }}
+              >
+                <label className="text-xs font-medium text-gray-600 flex flex-col">
+                  Category
+                  <select
+                    value={moveCategory}
+                    onChange={e => setMoveCategory(e.target.value as 'moved' | 'generated' | 'cut')}
+                    className="mt-0.5 px-2 py-1 border border-gray-300 rounded text-sm"
+                  >
+                    <option value="moved">Moved</option>
+                    <option value="generated">Generated</option>
+                    <option value="cut">Cut</option>
+                  </select>
+                </label>
+                <label className="text-xs font-medium text-gray-600 flex flex-col">
+                  Amount
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0.01"
+                    value={moveAmount}
+                    onChange={e => setMoveAmount(e.target.value)}
+                    className="mt-0.5 px-2 py-1 border border-gray-300 rounded text-sm w-28"
+                    aria-label="amount"
+                  />
+                </label>
+                <label className="text-xs font-medium text-gray-600 flex flex-col flex-1 min-w-[180px]">
+                  Description
+                  <input
+                    type="text"
+                    value={moveDescription}
+                    onChange={e => setMoveDescription(e.target.value)}
+                    className="mt-0.5 px-2 py-1 border border-gray-300 rounded text-sm"
+                    aria-label="description"
+                  />
+                </label>
+                <button
+                  type="submit"
+                  disabled={
+                    isAddingMove ||
+                    !moveDescription.trim() ||
+                    !Number.isFinite(parseFloat(moveAmount)) ||
+                    parseFloat(moveAmount) <= 0
+                  }
+                  className="px-3 py-1.5 text-sm bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50"
+                >
+                  {isAddingMove ? 'Saving…' : 'Save move'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setMoveCategory(null); setMoveError(null); }}
+                  className="px-3 py-1.5 text-sm bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                >
+                  Cancel
+                </button>
+                {moveError && <div className="w-full text-xs text-red-600">{moveError}</div>}
+              </form>
+            )}
           </div>
         )}
 
@@ -555,6 +809,24 @@ export function WeeklyPerformanceTracker({
                           <AlertTriangle className="h-3 w-3 text-red-500 mx-auto" />
                         </div>
                       )}
+                      {(() => {
+                        const fin = weekFinancialByDay[i];
+                        const net = fin?.totals.netImpact ?? 0;
+                        const hasData = fin && fin.entries.length > 0;
+                        return (
+                          <MoneyMovePopover entries={fin?.entries ?? []}>
+                            <div
+                              data-testid={`day-money-${i}`}
+                              tabIndex={hasData ? 0 : -1}
+                              className={`mt-1 text-xs font-medium ${
+                                !hasData ? 'text-gray-300' : net > 0 ? 'text-emerald-600' : net < 0 ? 'text-red-600' : 'text-gray-500'
+                              }`}
+                            >
+                              {hasData ? formatCurrency(net) : '—'}
+                            </div>
+                          </MoneyMovePopover>
+                        );
+                      })()}
                     </div>
                   );
                 })}
@@ -599,16 +871,14 @@ export function WeeklyPerformanceTracker({
           <div className="space-y-6">
             {/* Metric Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="p-4 bg-green-50 rounded-lg">
-                <p className="text-sm font-medium text-gray-600">Revenue</p>
-                <p className="text-2xl font-bold text-green-700">
-                  ${currentWeekSummary.revenue.toLocaleString()}
+              <div className="p-4 bg-emerald-50 rounded-lg">
+                <p className="text-sm font-medium text-gray-600">Net Impact</p>
+                <p data-testid="weekly-net-impact" className="text-2xl font-bold text-emerald-700">
+                  {formatCurrency(weekFinancialTotals.netImpact)}
                 </p>
-                {previousWeekSummary.revenue > 0 && (
-                  <p className="text-xs text-gray-500 mt-1">
-                    Last week: ${previousWeekSummary.revenue.toLocaleString()}
-                  </p>
-                )}
+                <p data-testid="weekly-net-impact-prev" className="text-xs text-gray-500 mt-1">
+                  Last week: {formatCurrency(previousWeekFinancialTotals.netImpact)}
+                </p>
               </div>
               <div className="p-4 bg-purple-50 rounded-lg">
                 <p className="text-sm font-medium text-gray-600">Pipeline Total</p>
@@ -642,6 +912,22 @@ export function WeeklyPerformanceTracker({
               </div>
             </div>
 
+            {/* Money Category Cards */}
+            <div className="grid grid-cols-3 gap-3">
+              <div className="p-3 bg-blue-50 rounded-lg text-center">
+                <p className="text-xs text-gray-600">Moved</p>
+                <p data-testid="weekly-moved" className="text-lg font-bold text-blue-700">{formatCurrency(weekFinancialTotals.moved)}</p>
+              </div>
+              <div className="p-3 bg-emerald-50 rounded-lg text-center">
+                <p className="text-xs text-gray-600">Generated</p>
+                <p data-testid="weekly-generated" className="text-lg font-bold text-emerald-700">{formatCurrency(weekFinancialTotals.generated)}</p>
+              </div>
+              <div className="p-3 bg-purple-50 rounded-lg text-center">
+                <p className="text-xs text-gray-600">Cut</p>
+                <p data-testid="weekly-cut" className="text-lg font-bold text-purple-700">{formatCurrency(weekFinancialTotals.cut)}</p>
+              </div>
+            </div>
+
             {/* Days Summary */}
             <div className="grid grid-cols-3 gap-3">
               <div className="text-center p-3 rounded-lg bg-gray-50">
@@ -671,6 +957,12 @@ export function WeeklyPerformanceTracker({
                   <ComparisonRow label="Pipeline" current={`${currentWeekSummary.pipelineTotal}`} previous={`${previousWeekSummary.pipelineTotal}`} better={currentWeekSummary.pipelineTotal >= previousWeekSummary.pipelineTotal} />
                   <ComparisonRow label="Consistency" current={`${currentWeekSummary.consistencyScore}%`} previous={`${previousWeekSummary.consistencyScore}%`} better={currentWeekSummary.consistencyScore >= previousWeekSummary.consistencyScore} />
                   <ComparisonRow label="Good Days" current={`${currentWeekSummary.goodDays}`} previous={`${previousWeekSummary.goodDays}`} better={currentWeekSummary.goodDays >= previousWeekSummary.goodDays} />
+                  <ComparisonRow
+                    label="Net Impact"
+                    current={formatCurrency(weekFinancialTotals.netImpact)}
+                    previous={formatCurrency(previousWeekFinancialTotals.netImpact)}
+                    better={weekFinancialTotals.netImpact >= previousWeekFinancialTotals.netImpact}
+                  />
                 </div>
               </div>
             )}
@@ -680,29 +972,60 @@ export function WeeklyPerformanceTracker({
         {/* Trends Tab */}
         {activeTab === 'trends' && (
           <div className="space-y-6">
-            {deepWorkTrendData.some(d => d.deepWork > 0) ? (
+            {showTrendChart ? (
               <div>
-                <h4 className="text-sm font-medium text-gray-700 mb-3">Deep Work (30 Days)</h4>
-                <ResponsiveContainer width="100%" height={280}>
-                  <LineChart data={deepWorkTrendData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="date" tickFormatter={formatDate} fontSize={11} />
-                    <YAxis fontSize={11} domain={[0, 8]} label={{ value: 'Hours', angle: -90, position: 'insideLeft', fontSize: 11 }} />
-                    <Tooltip
-                      labelFormatter={(label) => formatDate(String(label))}
-                      formatter={(value) => [`${value}h`, 'Deep Work']}
-                    />
-                    <ReferenceLine y={3} stroke="#10B981" strokeDasharray="5 5" label={{ value: '3h target', position: 'right', fontSize: 10, fill: '#10B981' }} />
-                    <Line
-                      type="monotone"
-                      dataKey="deepWork"
-                      stroke="#3B82F6"
-                      strokeWidth={2}
-                      dot={{ r: 2, fill: '#3B82F6' }}
-                      name="Deep Work"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
+                <h4 className="text-sm font-medium text-gray-700 mb-3">Deep Work (30 Days){moneyHasData ? ' + Net $/day' : ''}</h4>
+                <div data-testid={moneyHasData ? 'trends-chart-money' : 'trends-chart'}>
+                  <ResponsiveContainer width="100%" height={280}>
+                    <LineChart data={trendChartMerged}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="date" tickFormatter={formatDate} fontSize={11} />
+                      <YAxis
+                        yAxisId="hours"
+                        fontSize={11}
+                        domain={[0, 8]}
+                        label={{ value: 'Hours', angle: -90, position: 'insideLeft', fontSize: 11 }}
+                      />
+                      {moneyHasData && (
+                        <YAxis
+                          yAxisId="dollars"
+                          orientation="right"
+                          fontSize={11}
+                          tickFormatter={(v) => formatCurrency(Number(v))}
+                        />
+                      )}
+                      <Tooltip
+                        labelFormatter={(label) => formatDate(String(label))}
+                        formatter={(value, name) => {
+                          if (name === 'Deep Work') return [`${value}h`, 'Deep Work'];
+                          if (name === 'Net $/day') return [formatCurrency(Number(value)), 'Net $/day'];
+                          return [value, String(name)];
+                        }}
+                      />
+                      <ReferenceLine yAxisId="hours" y={3} stroke="#10B981" strokeDasharray="5 5" label={{ value: '3h target', position: 'right', fontSize: 10, fill: '#10B981' }} />
+                      <Line
+                        yAxisId="hours"
+                        type="monotone"
+                        dataKey="deepWork"
+                        stroke="#3B82F6"
+                        strokeWidth={2}
+                        dot={{ r: 2, fill: '#3B82F6' }}
+                        name="Deep Work"
+                      />
+                      {moneyHasData && (
+                        <Line
+                          yAxisId="dollars"
+                          type="monotone"
+                          dataKey="netImpact"
+                          stroke="#10B981"
+                          strokeWidth={2}
+                          dot={{ r: 2, fill: '#10B981' }}
+                          name="Net $/day"
+                        />
+                      )}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             ) : (
               <div className="text-center py-8 text-gray-500">
@@ -750,6 +1073,18 @@ export function WeeklyPerformanceTracker({
                         : 0}%
                     </span>
                   </div>
+                  <div>
+                    <span className="text-gray-500">Avg net/day:</span>
+                    <span data-testid="avg-net-per-day" className="ml-2 font-semibold text-gray-900">
+                      {formatCurrency(Math.round(avgNetPerDay))}
+                    </span>
+                  </div>
+                  <div>
+                    <span className="text-gray-500">Best money day:</span>
+                    <span data-testid="best-money-day" className="ml-2 font-semibold text-gray-900">
+                      {bestMoneyDay ? `${formatDate(bestMoneyDay.date)} ${formatCurrency(bestMoneyDay.value)}` : '—'}
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
@@ -765,36 +1100,8 @@ export function WeeklyPerformanceTracker({
                 {hasCurrentWeekReview ? 'Update Weekly Review' : 'Weekly Review'}
               </h4>
               <form onSubmit={handleReviewSubmit} className="space-y-3">
-                <div>
-                  <label htmlFor="wt-temporal-target" className="block text-sm font-medium text-gray-700 mb-1">
-                    Temporal Target (hours/week)
-                  </label>
-                  <input
-                    id="wt-temporal-target"
-                    type="number"
-                    step="0.5"
-                    min="0"
-                    value={reviewTemporalTarget}
-                    onChange={(e) => setReviewTemporalTarget(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900"
-                    placeholder="e.g., 5"
-                  />
-                </div>
-                <div>
-                  <label htmlFor="wt-revenue" className="block text-sm font-medium text-gray-700 mb-1">
-                    Revenue This Week ($)
-                  </label>
-                  <input
-                    id="wt-revenue"
-                    type="number"
-                    step="0.01"
-                    min="0"
-                    value={reviewRevenue}
-                    onChange={(e) => setReviewRevenue(e.target.value)}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 text-gray-900"
-                    placeholder="e.g., 5000"
-                    required
-                  />
+                <div className="text-xs text-gray-500 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2">
+                  Tip: click the Temporal Target card above to change your weekly target.
                 </div>
                 <div>
                   <label htmlFor="wt-slip" className="block text-sm font-medium text-gray-700 mb-1">
@@ -850,7 +1157,7 @@ export function WeeklyPerformanceTracker({
                 </div>
                 <button
                   type="submit"
-                  disabled={isSubmittingReview || !reviewRevenue}
+                  disabled={isSubmittingReview}
                   className="w-full px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {isSubmittingReview ? 'Submitting...' : 'Submit Weekly Review'}
@@ -870,7 +1177,7 @@ export function WeeklyPerformanceTracker({
                           Week of {formatDate(review.weekStartDate)}
                         </span>
                         <span className="text-sm font-bold text-green-600">
-                          ${review.revenue.toLocaleString()}
+                          ${(review.revenue ?? 0).toLocaleString()}
                         </span>
                       </div>
                       {review.slipAnalysis && (
