@@ -1,0 +1,50 @@
+name: Playwright (production)
+
+# Runs the same Playwright specs against the live Vercel deployment after a
+# successful production deploy completes. Uses the test user (seeded on prod)
+# so writes stay scoped via owner_id — admin/demo data is never touched.
+
+on:
+  deployment_status:
+
+permissions:
+  contents: read
+
+jobs:
+  playwright-production:
+    name: Playwright (production smoke)
+    if: |
+      github.event.deployment_status.state == 'success' &&
+      contains(github.event.deployment.environment, 'Production')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.deployment.sha }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Run Playwright against production
+        run: npx playwright test
+        env:
+          PLAYWRIGHT_TARGET: production
+          PLAYWRIGHT_PRODUCTION_URL: ${{ github.event.deployment_status.environment_url }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+          IRON_SESSION_PASSWORD: ${{ secrets.IRON_SESSION_PASSWORD }}
+
+      - name: Upload Playwright report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-production-report
+          path: test-results/
+          retention-days: 14

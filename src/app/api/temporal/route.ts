@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadJSON, saveJSON, loadText, saveText, appendAuditLog } from '@/lib/storage';
-import { getAdminUserId } from '@/lib/users';
+import { requireEffectiveUserId } from '@/lib/session';
 
 interface TemporalSession {
   id: string;
@@ -54,7 +54,7 @@ async function updateDailyScorecard(ownerId: string, date: string, newTotal: num
 
 export async function GET() {
   try {
-    const ownerId = await getAdminUserId();
+    const ownerId = await requireEffectiveUserId();
     const data = await loadTemporalData(ownerId);
 
     return NextResponse.json({
@@ -84,7 +84,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const ownerId = await getAdminUserId();
+      const ownerId = await requireEffectiveUserId();
       const data = await loadTemporalData(ownerId);
       const now = new Date();
       const today = now.toISOString().split('T')[0];

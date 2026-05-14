@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadJSON, saveJSON } from '@/lib/storage';
 import { checkAuth } from '@/lib/auth';
-import { getAdminUserId } from '@/lib/users';
+import { requireEffectiveUserId } from '@/lib/session';
 import { localTaskToSynced, syncedToLocalTask, mergeTasks } from '@/lib/task-sync';
 import type { LocalTask, SyncedTask, SyncResult } from '@/lib/types';
 
@@ -13,7 +13,7 @@ const STORE_KEY = 'synced-tasks.json';
  */
 export async function GET() {
   try {
-    const ownerId = await getAdminUserId();
+    const ownerId = await requireEffectiveUserId();
     const data = await loadJSON<{ tasks: SyncedTask[] } | null>(ownerId, STORE_KEY, null);
     const tasks = data?.tasks ?? [];
     return NextResponse.json({ tasks, count: tasks.length });
@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action } = body;
-    const ownerId = await getAdminUserId();
+    const ownerId = await requireEffectiveUserId();
 
     switch (action) {
       case 'push': {

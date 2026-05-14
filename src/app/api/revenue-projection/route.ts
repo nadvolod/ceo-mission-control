@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { RevenueProjectionService } from '@/lib/revenue-projection';
 import { checkAuth } from '@/lib/auth';
 import { loadJSON } from '@/lib/storage';
-import { getAdminUserId } from '@/lib/users';
+import { requireEffectiveUserId } from '@/lib/session';
 import type { AdjustmentType } from '@/lib/types';
 
 const VALID_TYPES = new Set<AdjustmentType>(['revenue_gain', 'revenue_loss', 'expense_increase', 'expense_decrease']);
@@ -21,7 +21,7 @@ function validateBaseAmount(amount: unknown): number | null {
 
 export async function GET() {
   try {
-    const ownerId = await getAdminUserId();
+    const ownerId = await requireEffectiveUserId();
     const service = await RevenueProjectionService.create(ownerId);
     const data = service.getData();
 
@@ -81,7 +81,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
   try {
-    const ownerId = await getAdminUserId();
+    const ownerId = await requireEffectiveUserId();
     const service = await RevenueProjectionService.create(ownerId);
     const body = await request.json();
     const { action, ...data } = body;

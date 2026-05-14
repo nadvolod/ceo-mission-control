@@ -4,7 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    # No branches filter — CI runs on every PR regardless of base, so a
+    # stacked PR (e.g. PR 2 of the multi-user series, based on PR 1)
+    # gets the same green-required gate as one targeting main directly.
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -35,6 +37,9 @@ jobs:
           fi
           if [ -z "${{ secrets.TEST_USER_PASSWORD }}" ]; then
             missing+=("TEST_USER_PASSWORD")
+          fi
+          if [ -z "${{ secrets.IRON_SESSION_PASSWORD }}" ]; then
+            missing+=("IRON_SESSION_PASSWORD")
           fi
           if [ ${#missing[@]} -gt 0 ]; then
             echo "::error::Missing required secrets: ${missing[*]}"
@@ -186,16 +191,25 @@ jobs:
           DEMO_USER_PASSWORD: ${{ secrets.DEMO_USER_PASSWORD }}
           TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
 
+      - name: Reseed user passwords from env (idempotent; fixes placeholder hashes)
+        run: npm run db:reseed-users
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ADMIN_INITIAL_PASSWORD: ${{ secrets.ADMIN_INITIAL_PASSWORD }}
+          DEMO_USER_PASSWORD: ${{ secrets.DEMO_USER_PASSWORD }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
-      - name: Start server and run Playwright tests
-        run: |
-          npm start &
-          npx wait-on http://localhost:3000 --timeout 30000
-          DASHBOARD_URL=http://localhost:3000 npm run test:e2e:playwright
+      - name: Run Playwright (local target, real DB scoped to test user)
+        run: npx playwright test
         env:
+          PLAYWRIGHT_TARGET: local
+          CI: true
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          IRON_SESSION_PASSWORD: ${{ secrets.IRON_SESSION_PASSWORD }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
 
       - name: Upload Playwright report
         if: failure()

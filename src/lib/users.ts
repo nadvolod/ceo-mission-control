@@ -81,15 +81,3 @@ export async function setPassword(userId: string, password: string): Promise<voi
   await db`UPDATE users SET password_hash = ${hash} WHERE id = ${userId}`;
 }
 
-/**
- * Resolve the admin user's id. Used by PR 1 route handlers as a temporary
- * stand-in for a real session. Removed in PR 2.
- */
-let cachedAdminId: string | null = null;
-export async function getAdminUserId(): Promise<string> {
-  if (cachedAdminId) return cachedAdminId;
-  const admin = await getUserByRole('admin');
-  if (!admin) throw new Error('No admin user seeded — run db:migrate first');
-  cachedAdminId = admin.id;
-  return cachedAdminId;
-}

@@ -5,13 +5,13 @@ import { WeeklyTracker } from '@/lib/weekly-tracker';
 import { checkAuth } from '@/lib/auth';
 import { loadJSON } from '@/lib/storage';
 import { fetchGarminMetrics, initiateGarminLogin, completeMFALogin } from '@/lib/garmin-client';
-import { getAdminUserId } from '@/lib/users';
+import { requireEffectiveUserId } from '@/lib/session';
 
 export const maxDuration = 60;
 
 export async function GET() {
   try {
-    const ownerId = await getAdminUserId();
+    const ownerId = await requireEffectiveUserId();
     const garmin = await GarminTracker.create(ownerId);
     const notes = await HealthNotesTracker.create(ownerId);
 
@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action, ...data } = body;
-    const ownerId = await getAdminUserId();
+    const ownerId = await requireEffectiveUserId();
 
     switch (action) {
       case 'sync': {

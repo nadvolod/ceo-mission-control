@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { saveJSON, saveText } from '@/lib/storage';
 import { checkAuth } from '@/lib/auth';
-import { getAdminUserId } from '@/lib/users';
+import { requireEffectiveUserId } from '@/lib/session';
 
 /**
  * Sync endpoint - accepts workspace data and persists it to the database.
@@ -17,7 +17,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { files, json } = body;
-    const ownerId = await getAdminUserId();
+    const ownerId = await requireEffectiveUserId();
 
     const results: string[] = [];
 

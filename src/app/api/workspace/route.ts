@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readInitiatives, readDailyScorecard, updateScorecardField } from '@/lib/workspace-reader';
 import { checkAuth } from '@/lib/auth';
-import { getAdminUserId } from '@/lib/users';
+import { requireEffectiveUserId } from '@/lib/session';
 
 export async function GET() {
   try {
-    const ownerId = await getAdminUserId();
+    const ownerId = await requireEffectiveUserId();
     const initiatives = await readInitiatives(ownerId);
     const scorecard = await readDailyScorecard(ownerId);
 
@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
   try {
     const { action, ...data } = await request.json();
 
-    const ownerId = await getAdminUserId();
+    const ownerId = await requireEffectiveUserId();
 
     switch (action) {
       case 'refresh': {

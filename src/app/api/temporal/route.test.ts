@@ -20,8 +20,8 @@ jest.mock('@/lib/storage', () => {
   };
 });
 
-jest.mock('@/lib/users', () => ({
-  getAdminUserId: jest.fn(async () => '00000000-0000-0000-0000-000000000001'),
+jest.mock('@/lib/session', () => ({
+  requireEffectiveUserId: jest.fn(async () => '00000000-0000-0000-0000-000000000001'),
 }));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
