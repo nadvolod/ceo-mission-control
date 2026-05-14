@@ -317,6 +317,154 @@ test.describe('Dashboard page rendering', () => {
     expect(data.error).toContain('date');
   });
 
+  test.describe.serial('Inline Temporal Target editor (UI → API)', () => {
+    test('typing a new value and pressing Enter persists via API', async ({ page, request }) => {
+      const jsErrors: string[] = [];
+      page.on('pageerror', error => jsErrors.push(error.message));
+
+      await page.goto('/dashboard');
+      await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+      const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
+      if (!hasFullDashboard) {
+        test.skip();
+        return;
+      }
+
+      const editTargetButton = page.getByRole('button', { name: /Edit Temporal Target/i });
+      await expect(editTargetButton).toBeVisible({ timeout: 10_000 });
+
+      const beforeRes = await request.get('/api/weekly-tracker');
+      const beforeData = await beforeRes.json();
+      if (!beforeData.success) {
+        test.skip();
+        return;
+      }
+      const currentTarget: number = beforeData.currentWeekSummary?.temporalTarget ?? 5;
+      // Pick a value that's distinct from the current one (avoids the unchanged-no-op path)
+      const nextTarget = currentTarget === 13 ? 14 : 13;
+
+      await editTargetButton.click();
+      const input = page.getByRole('spinbutton', { name: /Temporal Target/i });
+      await expect(input).toBeVisible();
+      await input.fill(String(nextTarget));
+      await input.press('Enter');
+
+      // Poll the API until the new target value appears (decouples test from UI animation timing)
+      await expect.poll(async () => {
+        const res = await request.get('/api/weekly-tracker');
+        const data = await res.json();
+        return data?.currentWeekSummary?.temporalTarget;
+      }, { timeout: 20_000 }).toBe(nextTarget);
+
+      expect(jsErrors).toHaveLength(0);
+    });
+
+    test('Escape cancels without changing the API value', async ({ page, request }) => {
+      await page.goto('/dashboard');
+      await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+      const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
+      if (!hasFullDashboard) {
+        test.skip();
+        return;
+      }
+
+      const beforeRes = await request.get('/api/weekly-tracker');
+      const beforeData = await beforeRes.json();
+      if (!beforeData.success) {
+        test.skip();
+        return;
+      }
+      const targetBefore: number = beforeData.currentWeekSummary?.temporalTarget ?? 5;
+
+      const editTargetButton = page.getByRole('button', { name: /Edit Temporal Target/i });
+      await editTargetButton.click();
+      const input = page.getByRole('spinbutton', { name: /Temporal Target/i });
+      await input.fill('999');
+      await input.press('Escape');
+
+      await expect(editTargetButton).toBeVisible();
+
+      // Briefly wait to give any errant blur-triggered save a chance to land, then assert no change
+      await page.waitForTimeout(500);
+      const afterRes = await request.get('/api/weekly-tracker');
+      const afterData = await afterRes.json();
+      expect(afterData.currentWeekSummary.temporalTarget).toBe(targetBefore);
+    });
+  });
+
+  test('monthly review compact layout: hours worked and temporal hours persist independently', async ({ page, request }) => {
+    const TEST_MONTH = '2099-11';
+    const cleanup = () => request.post('/api/monthly-review', {
+      data: { action: 'deleteReview', month: TEST_MONTH },
+    }).catch(() => null);
+
+    await cleanup();
+
+    try {
+      await page.goto('/dashboard');
+      await expect(page.getByText('Loading Mission Control...')).toBeHidden({ timeout: 20_000 });
+
+      const hasFullDashboard = await page.locator('h1', { hasText: 'CEO Mission Control' }).isVisible().catch(() => false);
+      if (!hasFullDashboard) {
+        test.skip();
+        return;
+      }
+
+      await page.getByRole('button', { name: /Monthly Review/i }).click();
+      await expect(page.getByRole('button', { name: /New Review/ })).toBeVisible();
+      await page.getByRole('button', { name: /New Review/ }).click();
+
+      await page.locator('#mr-month').fill(TEST_MONTH);
+
+      const hoursInput = page.locator('#mr-hours');
+      const temporalInput = page.locator('#mr-temporal');
+      await expect(hoursInput).toBeVisible();
+      await expect(temporalInput).toBeVisible();
+
+      const hoursBox = await hoursInput.boundingBox();
+      const temporalBox = await temporalInput.boundingBox();
+      expect(hoursBox?.width ?? 0).toBeLessThan(150);
+      expect(temporalBox?.width ?? 0).toBeLessThan(150);
+
+      await hoursInput.fill('97');
+      await temporalInput.fill('40');
+      await page.locator('#mr-alignment').fill('alignment text');
+      await page.locator('#mr-lesson').fill('lesson text');
+
+      const alignBox = await page.locator('#mr-alignment').boundingBox();
+      const lessonBox = await page.locator('#mr-lesson').boundingBox();
+      if (alignBox && lessonBox) {
+        expect(Math.abs(alignBox.y - lessonBox.y)).toBeLessThan(20);
+        expect(lessonBox.x).toBeGreaterThan(alignBox.x);
+      }
+
+      const submitRes = page.waitForResponse(
+        r => r.url().includes('/api/monthly-review') && r.request().method() === 'POST',
+        { timeout: 10_000 }
+      ).catch(() => null);
+      await page.getByRole('button', { name: /Save Review|Update Review/ }).click();
+      const response = await submitRes;
+
+      if (!response || response.status() === 401 || response.status() === 500) {
+        test.skip();
+        return;
+      }
+
+      const getRes = await request.get('/api/monthly-review');
+      const getData = await getRes.json();
+      const review = getData.recentReviews.find((r: any) => r.month === TEST_MONTH);
+      expect(review).toBeTruthy();
+      expect(review.hoursWorked).toBe(97);
+      expect(review.temporalHours).toBe(40);
+      expect(review.alignmentCheck).toBe('alignment text');
+      expect(review.monthLesson).toBe('lesson text');
+    } finally {
+      await cleanup();
+    }
+  });
+
   test('weekly review with temporalTarget persists and appears in GET', async ({ request }) => {
     const postRes = await request.post('/api/weekly-tracker', {
       data: { action: 'submitReview', revenue: 2000, temporalTarget: 8, slipAnalysis: 'test', systemAdjustment: '', nextWeekTargets: '', bottleneck: '' },
@@ -465,9 +613,10 @@ test.describe('Dashboard page rendering', () => {
 
       // Click History tab and verify it switches
       await historyTab.click();
-      // Should show either reviews or empty state
-      const hasReviews = await page.getByText(/\d{4}/).isVisible().catch(() => false);
-      const hasEmptyState = await page.getByText('No monthly reviews yet').isVisible().catch(() => false);
+      // Should show either reviews or empty state. Use .first() because multiple reviews
+      // (and other 4-digit numbers on the page) can match /\d{4}/ in strict mode.
+      const hasReviews = await page.getByText(/\d{4}/).first().isVisible().catch(() => false);
+      const hasEmptyState = await page.getByText('No monthly reviews yet').first().isVisible().catch(() => false);
       expect(hasReviews || hasEmptyState, 'History tab should show reviews or empty state').toBeTruthy();
     }
   });

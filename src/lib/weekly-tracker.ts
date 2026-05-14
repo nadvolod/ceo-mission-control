@@ -95,7 +95,9 @@ export class WeeklyTracker {
     const now = new Date();
     const weekStart = review.weekStartDate || format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
     const weekEnd = review.weekEndDate || format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
-    const revenue = review.revenue ?? 0;
+    // Preserve any prior revenue for this week if the caller omitted it (e.g. inline target edit)
+    const existingForWeek = this.data.weeklyReviews.find(r => r.weekStartDate === weekStart);
+    const revenue = review.revenue ?? existingForWeek?.revenue ?? 0;
 
     const fullReview: WeeklyReview = {
       id: `review_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
