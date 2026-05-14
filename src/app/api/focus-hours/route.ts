@@ -3,7 +3,7 @@ import { FocusTracker } from '@/lib/focus-tracker';
 import { checkAuth } from '@/lib/auth';
 import type { FocusCategory, FocusSession } from '@/lib/types';
 import { appendAuditLog } from '@/lib/storage';
-import { getAdminUserId } from '@/lib/users';
+import { requireEffectiveUserId } from '@/lib/session';
 
 const VALID_CATEGORIES: FocusCategory[] = [
   'Temporal', 'Finance', 'Revenue', 'Housing',
@@ -28,7 +28,7 @@ async function logToMemory(ownerId: string, session: FocusSession): Promise<void
 
 export async function GET() {
   try {
-    const ownerId = await getAdminUserId();
+    const ownerId = await requireEffectiveUserId();
     const tracker = await FocusTracker.create(ownerId);
 
     const now = new Date();
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action, ...data } = body;
-    const ownerId = await getAdminUserId();
+    const ownerId = await requireEffectiveUserId();
     const tracker = await FocusTracker.create(ownerId);
 
     switch (action) {

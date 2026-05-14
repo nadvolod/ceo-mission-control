@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ChatSyncManager } from '@/lib/chat-sync';
 import { checkAuth } from '@/lib/auth';
-import { getAdminUserId } from '@/lib/users';
+import { requireEffectiveUserId } from '@/lib/session';
 
 let chatSyncManagerPromise: Promise<ChatSyncManager> | null = null;
 async function getChatSyncManager() {
   if (!chatSyncManagerPromise) {
-    const ownerId = await getAdminUserId();
+    const ownerId = await requireEffectiveUserId();
     chatSyncManagerPromise = ChatSyncManager.create(ownerId);
   }
   return chatSyncManagerPromise;

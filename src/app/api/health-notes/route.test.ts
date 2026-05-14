@@ -11,8 +11,8 @@ jest.mock('@/lib/storage', () => ({
   appendAuditLog: jest.fn(),
 }));
 
-jest.mock('@/lib/users', () => ({
-  getAdminUserId: jest.fn(async () => '00000000-0000-0000-0000-000000000001'),
+jest.mock('@/lib/session', () => ({
+  requireEffectiveUserId: jest.fn(async () => '00000000-0000-0000-0000-000000000001'),
 }));
 
 jest.mock('@/lib/auth', () => ({

@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { updateTask, deleteTask } from '@/lib/task-api';
 import { checkAuth } from '@/lib/auth';
 import { FinancialTracker } from '@/lib/financial-tracker';
-import { getAdminUserId } from '@/lib/users';
+import { requireEffectiveUserId } from '@/lib/session';
 import type { AiTask } from '@/lib/types';
 
 function inferFinancialCategory(task: AiTask): 'moved' | 'generated' | 'cut' {
@@ -37,7 +37,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       const marker = `[task:${taskId}]`;
       (async () => {
         try {
-          const ownerId = await getAdminUserId();
+          const ownerId = await requireEffectiveUserId();
           const tracker = await FinancialTracker.create(ownerId);
           const todaysEntries = tracker.getTodaysMetrics().entries;
           const alreadyLogged = todaysEntries.some((e) => e.description.includes(marker));

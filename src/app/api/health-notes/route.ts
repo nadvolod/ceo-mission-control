@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { HealthNotesTracker } from '@/lib/health-notes-tracker';
 import { checkAuth } from '@/lib/auth';
-import { getAdminUserId } from '@/lib/users';
+import { requireEffectiveUserId } from '@/lib/session';
 
 export async function GET() {
   try {
-    const ownerId = await getAdminUserId();
+    const ownerId = await requireEffectiveUserId();
     const tracker = await HealthNotesTracker.create(ownerId);
 
     return NextResponse.json({
@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action, ...data } = body;
-    const ownerId = await getAdminUserId();
+    const ownerId = await requireEffectiveUserId();
     const tracker = await HealthNotesTracker.create(ownerId);
 
     switch (action) {

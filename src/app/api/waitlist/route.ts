@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadJSON, saveJSON } from '@/lib/storage';
-import { getAdminUserId } from '@/lib/users';
+import { requireEffectiveUserId } from '@/lib/session';
 
 // Waitlist is a shared/global resource — stored under the admin owner.
 // In a real multi-tenant app this would be its own table; keeping it here
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     }
 
-    const ownerId = await getAdminUserId();
+    const ownerId = await requireEffectiveUserId();
     const entries = await loadJSON<WaitlistEntry[]>(ownerId, 'waitlist-entries.json', []);
 
     if (entries.some(e => e.email.toLowerCase() === email.toLowerCase())) {
@@ -63,7 +63,7 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    const ownerId = await getAdminUserId();
+    const ownerId = await requireEffectiveUserId();
     const entries = await loadJSON<WaitlistEntry[]>(ownerId, 'waitlist-entries.json', []);
     return NextResponse.json({ count: entries.length });
   } catch (error) {

@@ -36,6 +36,9 @@ jobs:
           if [ -z "${{ secrets.TEST_USER_PASSWORD }}" ]; then
             missing+=("TEST_USER_PASSWORD")
           fi
+          if [ -z "${{ secrets.IRON_SESSION_PASSWORD }}" ]; then
+            missing+=("IRON_SESSION_PASSWORD")
+          fi
           if [ ${#missing[@]} -gt 0 ]; then
             echo "::error::Missing required secrets: ${missing[*]}"
             echo "Configure these in GitHub repo Settings > Secrets and variables > Actions"
@@ -189,13 +192,14 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
-      - name: Start server and run Playwright tests
-        run: |
-          npm start &
-          npx wait-on http://localhost:3000 --timeout 30000
-          DASHBOARD_URL=http://localhost:3000 npm run test:e2e:playwright
+      - name: Run Playwright (local target, real DB scoped to test user)
+        run: npx playwright test
         env:
+          PLAYWRIGHT_TARGET: local
+          CI: true
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          IRON_SESSION_PASSWORD: ${{ secrets.IRON_SESSION_PASSWORD }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
 
       - name: Upload Playwright report
         if: failure()
