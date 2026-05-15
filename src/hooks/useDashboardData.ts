@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import type { AiTask, TaskStats, FocusCategory, MonarchFinancialSnapshot, AdjustmentType, RevenueProjectionData, MonthProjection, Initiative, DailyScorecard, PerformanceDayEntry, WeeklySummary, WeeklyReview, MonthlyReview, MonthlyReviewRatings } from '@/lib/types';
+import type { AiTask, TaskStats, FocusCategory, MonarchFinancialSnapshot, AdjustmentType, RevenueProjectionData, MonthProjection, Initiative, DailyScorecard, PerformanceDayEntry, WeeklySummary, WeeklyReview, MonthlyReview, MonthlyReviewRatings, ThreeToThriveEntry } from '@/lib/types';
 
 export interface RevenueProjectionApiResponse {
   data: RevenueProjectionData;
@@ -28,6 +28,13 @@ export interface MonthlyReviewApiResponse {
   timestamp: string;
 }
 
+export interface ThreeToThriveApiResponse {
+  success: boolean;
+  todaysEntry: ThreeToThriveEntry;
+  history: ThreeToThriveEntry[];
+  timestamp: string;
+}
+
 export interface DashboardData {
   aiTasks: AiTask[];
   taskStats: TaskStats;
@@ -41,6 +48,7 @@ export interface DashboardData {
   projectionData: RevenueProjectionApiResponse | null;
   weeklyTrackerData: WeeklyTrackerApiResponse | null;
   monthlyReviewData: MonthlyReviewApiResponse | null;
+  threeToThriveData: ThreeToThriveApiResponse | null;
   hasGarminData: boolean;
   isLoading: boolean;
 }
@@ -69,6 +77,7 @@ export interface DashboardHandlers {
   handleDeleteMonthlyReview: (month: string) => Promise<void>;
   handleDeleteDay: (date: string) => Promise<void>;
   handleDeleteWeeklyReview: (id: string) => Promise<void>;
+  handleSaveThreeToThriveAnswer: (date: string, question: string, answer: string) => Promise<void>;
 }
 
 export function useDashboardData(): DashboardData & DashboardHandlers {
@@ -84,6 +93,7 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
   const [projectionData, setProjectionData] = useState<RevenueProjectionApiResponse | null>(null);
   const [weeklyTrackerData, setWeeklyTrackerData] = useState<WeeklyTrackerApiResponse | null>(null);
   const [monthlyReviewData, setMonthlyReviewData] = useState<MonthlyReviewApiResponse | null>(null);
+  const [threeToThriveData, setThreeToThriveData] = useState<ThreeToThriveApiResponse | null>(null);
   const [hasGarminData, setHasGarminData] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -171,6 +181,15 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
             setMonthlyReviewData(data);
           }
         } catch (e) { console.error('Error loading monthly reviews:', e); }
+      },
+      async () => {
+        try {
+          const res = await fetch('/api/three-to-thrive');
+          if (res.ok) {
+            const data = await res.json();
+            setThreeToThriveData(data);
+          }
+        } catch (e) { console.error('Error loading Three to Thrive:', e); }
       },
       async () => {
         try {
@@ -438,14 +457,47 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
     await loadAllData();
   }, [loadAllData]);
 
+  const handleSaveThreeToThriveAnswer = useCallback(async (date: string, question: string, answer: string) => {
+    try {
+      const response = await fetch('/api/three-to-thrive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, question, answer }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to save answer');
+      }
+      const result = await response.json();
+      // Optimistically update local state without full reload
+      if (result.success && threeToThriveData) {
+        setThreeToThriveData(prev => {
+          if (!prev) return prev;
+          const updatedHistory = prev.history.map(e =>
+            e.date === result.todaysEntry.date ? result.todaysEntry : e
+          );
+          const historyHasToday = prev.history.some(e => e.date === result.todaysEntry.date);
+          return {
+            ...prev,
+            todaysEntry: result.todaysEntry,
+            history: historyHasToday ? updatedHistory : [result.todaysEntry, ...prev.history],
+          };
+        });
+      }
+    } catch (error) {
+      console.error('Error saving Three to Thrive answer:', error);
+      throw error;
+    }
+  }, [threeToThriveData]);
+
   return {
     aiTasks, taskStats, initiatives, scorecard, financialData, focusData,
     monarchData, monarchError, monarchLoading, projectionData, weeklyTrackerData,
-    monthlyReviewData, hasGarminData, isLoading,
+    monthlyReviewData, threeToThriveData, hasGarminData, isLoading,
     loadAllData, handleCreateTask, handleUpdateTask, handleDeleteTask,
     handleMonarchRefresh, handleAddProjectionAdjustment, handleRemoveProjectionAdjustment,
     handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleSubmitWeeklyReview,
     handleSubmitMonthlyReview, handleDeleteMonthlyReview,
-    handleDeleteDay, handleDeleteWeeklyReview,
+    handleDeleteDay, handleDeleteWeeklyReview, handleSaveThreeToThriveAnswer,
   };
 }

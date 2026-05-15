@@ -352,6 +352,27 @@ export interface MonthlyReviewData {
   lastUpdated: string;
 }
 
+// Three to Thrive daily focus questions
+
+export interface ThreeToThriveAnswer {
+  id: string;         // UUID
+  date: string;       // YYYY-MM-DD
+  question: string;
+  answer: string;
+  answeredAt: string; // ISO datetime
+}
+
+export interface ThreeToThriveEntry {
+  date: string;       // YYYY-MM-DD
+  questions: string[]; // The 3 questions selected for this day
+  answers: ThreeToThriveAnswer[];
+}
+
+export interface ThreeToThriveData {
+  entries: Record<string, ThreeToThriveEntry>; // keyed by YYYY-MM-DD
+  lastUpdated: string;
+}
+
 // Garmin Health Integration types
 
 export interface GarminDayMetrics {
