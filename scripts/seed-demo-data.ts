@@ -14,7 +14,7 @@
 
 import { neon } from '@neondatabase/serverless';
 import { addDays, format, startOfWeek, subDays } from 'date-fns';
-import { saveJSON, appendAuditLog } from '../src/lib/storage';
+import { saveJSON, saveText, appendAuditLog } from '../src/lib/storage';
 import type {
   WeeklyTrackerData,
   MonthlyReviewData,
@@ -182,6 +182,100 @@ function buildGarmin(): GarminHealthData {
   return data;
 }
 
+function buildDailyScorecard(): string {
+  const today = format(new Date(), 'yyyy-MM-dd');
+  return `# DAILY_SCORECARD.md
+
+## Date
+- ${today}
+
+## priorities
+- Close two pipeline deals this week
+- Ship the onboarding revision by Friday
+- One 1:1 with each direct report
+
+## Temporal focused hours target
+- Target today: 5.0
+- Actual: 3.5
+
+## Focus blocks
+- 09:00–11:00 Pipeline outreach
+- 13:00–14:30 Product strategy
+- 16:00–17:00 Admin / inbox
+
+## Major money move today
+- Sign WHO renewal contract amendment
+
+## Strategic project move today
+- Lock the v2 dashboard roadmap with product
+
+## Taxes / risk reduction move today
+- Forward Q1 estimates to accountant
+
+## What to ignore today
+- Slack non-mentions before 11am
+- Recruiter cold emails
+
+## Biggest blocker
+- Waiting on legal review for the WHO amendment
+
+## Wins:
+- Closed Artis pilot conversation
+- Two new pipeline contacts from Replay
+
+## Misses:
+- Skipped lifting block (third time this week)
+
+## Open loops:
+- Tax prep documents from accountant
+- Comp letter for new hire
+
+## Money advanced:
+- $12k transferred to high-yield savings
+`;
+}
+
+function buildInitiatives(): string {
+  return `# INITIATIVES.md
+
+## Current ranking (${format(new Date(), 'yyyy-MM-dd')})
+
+| Rank | Initiative | Money | Strategic | Urgency | Leverage | Time | Risk | Total |
+|---|---|---:|---:|---:|---:|---:|---:|---:|
+| 1 | Temporal client delivery | 5 | 5 | 5 | 5 | 4 | 3 | 27 |
+| 2 | Onboarding revision | 4 | 5 | 4 | 5 | 3 | 2 | 23 |
+| 3 | WHO renewal close | 5 | 3 | 5 | 4 | 3 | 4 | 24 |
+| 4 | Hiring for product role | 3 | 5 | 3 | 5 | 4 | 3 | 23 |
+
+## 1) Temporal client delivery
+- **Type:** Revenue
+- **Goal:** Hit $25k MRR by end of quarter
+- **Current bottleneck:** Pipeline conversion rate stuck at 12%
+- **Highest-leverage next move:** Run two strategy sessions with stalled prospects
+- **Expected payoff:** +$8k MRR within 30 days
+- **Confidence:** Medium-high
+- **What to deprioritize because of it:** Cold outbound, generic content
+
+## 2) Onboarding revision
+- **Type:** Product
+- **Goal:** Cut time-to-first-value from 3 days to 1
+- **Current bottleneck:** Manual setup steps in the welcome flow
+- **Highest-leverage next move:** Wire up automated workspace seeding
+- **Expected payoff:** 20% improvement in week-1 retention
+- **Confidence:** High
+- **What to deprioritize because of it:** New feature work this sprint
+
+## 3) WHO renewal close
+- **Type:** Revenue
+- **Goal:** Sign 12-month renewal at +15%
+- **Current bottleneck:** Legal review on the amendment
+- **Highest-leverage next move:** Direct call to procurement on Tuesday
+- **Expected payoff:** $35k contract locked
+- **Confidence:** High
+- **What to deprioritize because of it:** New mid-market outbound
+`;
+}
+
 function buildHealthNotes(): HealthNotesData {
   const today = new Date();
   const data: HealthNotesData = {
@@ -241,6 +335,10 @@ async function main() {
 
   console.log('[seed-demo] writing health notes');
   await saveJSON(ownerId, 'health-notes.json', buildHealthNotes());
+
+  console.log('[seed-demo] writing workspace markdown');
+  await saveText(ownerId, 'DAILY_SCORECARD.md', buildDailyScorecard());
+  await saveText(ownerId, 'INITIATIVES.md', buildInitiatives());
 
   await appendAuditLog(
     ownerId,
