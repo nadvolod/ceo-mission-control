@@ -18,24 +18,26 @@ interface DashboardTabsProps {
 
 export function DashboardTabs({ activeTab, onTabChange }: DashboardTabsProps) {
   return (
-    <div className="flex gap-2 mb-6">
-      {TABS.map(({ id, label, icon }) => {
-        const isActive = activeTab === id;
-        return (
-          <button
-            key={id}
-            onClick={() => { if (!isActive) onTabChange(id); }}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              isActive
-                ? 'bg-blue-50 text-blue-700 border border-blue-200'
-                : 'text-gray-600 hover:bg-gray-100 border border-transparent'
-            }`}
-          >
-            {icon}
-            {label}
-          </button>
-        );
-      })}
+    <div className="mb-6 overflow-x-auto" data-testid="dashboard-tabs-scroll">
+      <div className="flex min-w-max sm:min-w-0 sm:w-full gap-2" data-testid="dashboard-tabs">
+        {TABS.map(({ id, label, icon }) => {
+          const isActive = activeTab === id;
+          return (
+            <button
+              key={id}
+              onClick={() => { if (!isActive) onTabChange(id); }}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap shrink-0 sm:shrink ${
+                isActive
+                  ? 'bg-blue-50 text-blue-700 border border-blue-200'
+                  : 'text-gray-600 hover:bg-gray-100 border border-transparent'
+              }`}
+            >
+              {icon}
+              {label}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

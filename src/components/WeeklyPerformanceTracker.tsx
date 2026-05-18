@@ -742,21 +742,23 @@ export function WeeklyPerformanceTracker({
       )}
 
       {/* Tab Navigation */}
-      <div className="flex border-b border-gray-200">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 flex items-center justify-center space-x-2 px-4 py-3 text-sm font-medium transition-colors ${
-              activeTab === tab.id
-                ? 'text-orange-600 border-b-2 border-orange-500 bg-orange-50'
-                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            {tab.icon}
-            <span>{tab.label}</span>
-          </button>
-        ))}
+      <div className="overflow-x-auto border-b border-gray-200" data-testid="weekly-tracker-tabs-scroll">
+        <div className="flex min-w-max sm:min-w-0 sm:w-full">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center justify-center space-x-2 px-4 py-3 text-sm font-medium transition-colors min-w-[120px] sm:min-w-0 sm:flex-1 ${
+                activeTab === tab.id
+                  ? 'text-orange-600 border-b-2 border-orange-500 bg-orange-50'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              {tab.icon}
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Tab Content */}
@@ -767,7 +769,8 @@ export function WeeklyPerformanceTracker({
             {/* Current Week Grid */}
             <div>
               <h4 className="text-sm font-medium text-gray-700 mb-3">This Week</h4>
-              <div className="grid grid-cols-7 gap-2">
+              <div className="overflow-x-auto" data-testid="weekly-grid-scroll">
+                <div className="grid grid-cols-7 gap-2 min-w-[560px]">
                 {DAY_LABELS.map((dayLabel, i) => {
                   const entry = weekEntries[i] || null;
                   const flags = getDayFlags(entry);
@@ -857,6 +860,7 @@ export function WeeklyPerformanceTracker({
                     </div>
                   );
                 })}
+                </div>
               </div>
             </div>
 

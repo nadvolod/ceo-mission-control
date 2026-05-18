@@ -61,19 +61,19 @@ export default function HomePage() {
   const enrichedScorecard = enrichScorecard(scorecard, aiTasks, initiatives);
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="min-h-screen bg-gray-100 overflow-x-hidden">
       {/* Header */}
       <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-8 py-6">
-          <div className="flex items-center justify-between">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">CEO Mission Control</h1>
+              <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">CEO Mission Control</h1>
               <p className="text-gray-600 mt-1">
                 Conversational task command center for {scorecard.date}
               </p>
             </div>
-            <div className="flex items-center gap-6">
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
+            <div className="w-full lg:w-auto flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-center">
                 <div>
                   <div className="text-2xl font-bold text-blue-600">{taskStats.total}</div>
                   <div className="text-xs text-gray-500">Total Tasks</div>
@@ -107,7 +107,7 @@ export default function HomePage() {
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-8 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <DashboardTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
         {/* Dashboard Tab - Daily items */}

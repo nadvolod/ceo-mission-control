@@ -234,6 +234,18 @@ describe('WeeklyPerformanceTracker - Net Today card', () => {
   });
 });
 
+describe('WeeklyPerformanceTracker - Mobile layout', () => {
+  it('renders scroll containers for tab strip and weekly day grid', async () => {
+    const user = userEvent.setup();
+    render(<WeeklyPerformanceTracker {...baseProps} />);
+
+    await user.click(screen.getByRole('button', { name: /^Daily$/i }));
+
+    expect(screen.getByTestId('weekly-tracker-tabs-scroll').className).toMatch(/overflow-x-auto/);
+    expect(screen.getByTestId('weekly-grid-scroll').className).toMatch(/overflow-x-auto/);
+  });
+});
+
 describe('WeeklyPerformanceTracker - Money Move quick-add', () => {
   it('clicking + Cut opens the form with cut preselected and submits to onAddFinancialEntry', async () => {
     const user = userEvent.setup();
