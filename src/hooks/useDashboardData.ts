@@ -469,26 +469,31 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
         throw new Error(err.error || 'Failed to save answer');
       }
       const result = await response.json();
-      // Optimistically update local state without full reload
-      if (result.success && threeToThriveData) {
+      // Optimistically update local state without full reload.
+      // Uses functional setState so the callback identity is stable and the
+      // update is applied even if the initial GET hasn't resolved yet.
+      if (result.success) {
         setThreeToThriveData(prev => {
-          if (!prev) return prev;
-          const updatedHistory = prev.history.map(e =>
-            e.date === result.todaysEntry.date ? result.todaysEntry : e
-          );
+          if (!prev) {
+            return {
+              success: true,
+              todaysEntry: result.todaysEntry,
+              history: [result.todaysEntry],
+              timestamp: new Date().toISOString(),
+            };
+          }
           const historyHasToday = prev.history.some(e => e.date === result.todaysEntry.date);
-          return {
-            ...prev,
-            todaysEntry: result.todaysEntry,
-            history: historyHasToday ? updatedHistory : [result.todaysEntry, ...prev.history],
-          };
+          const history = historyHasToday
+            ? prev.history.map(e => (e.date === result.todaysEntry.date ? result.todaysEntry : e))
+            : [result.todaysEntry, ...prev.history];
+          return { ...prev, todaysEntry: result.todaysEntry, history };
         });
       }
     } catch (error) {
       console.error('Error saving Three to Thrive answer:', error);
       throw error;
     }
-  }, [threeToThriveData]);
+  }, []);
 
   return {
     aiTasks, taskStats, initiatives, scorecard, financialData, focusData,

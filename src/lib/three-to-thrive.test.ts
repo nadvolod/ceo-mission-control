@@ -77,11 +77,20 @@ describe('ThreeToThriveTracker', () => {
       expect(entry.answers).toHaveLength(0);
     });
 
-    it('returns the same entry on repeated calls', async () => {
+    it('returns equivalent entries on repeated calls', async () => {
       const tracker = await ThreeToThriveTracker.create(UNIT_TEST_OWNER_ID);
       const a = tracker.getTodaysEntry('2026-05-15');
       const b = tracker.getTodaysEntry('2026-05-15');
-      expect(a).toBe(b);
+      expect(a.date).toBe(b.date);
+      expect(a.questions).toEqual(b.questions);
+      expect(a.answers).toEqual(b.answers);
+    });
+
+    it('does not persist a new entry until an answer is saved', async () => {
+      const tracker = await ThreeToThriveTracker.create(UNIT_TEST_OWNER_ID);
+      tracker.getTodaysEntry('2026-05-15');
+      expect(storage.saveJSON).not.toHaveBeenCalled();
+      expect(tracker.getHistory()).toHaveLength(0);
     });
   });
 

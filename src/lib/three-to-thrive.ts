@@ -77,18 +77,19 @@ export class ThreeToThriveTracker {
   }
 
   /**
-   * Get today's entry (creating it if needed), plus all historical entries.
+   * Returns the entry for the given date (or today if omitted). If no entry has
+   * been persisted yet, returns a freshly-computed one without mutating internal
+   * state — the entry is only persisted once an answer is saved against it.
    */
   getTodaysEntry(date?: string): ThreeToThriveEntry {
     const today = date || format(new Date(), 'yyyy-MM-dd');
-    if (!this.data.entries[today]) {
-      this.data.entries[today] = {
+    return (
+      this.data.entries[today] ?? {
         date: today,
         questions: getQuestionsForDate(today),
         answers: [],
-      };
-    }
-    return this.data.entries[today];
+      }
+    );
   }
 
   /**
@@ -106,9 +107,17 @@ export class ThreeToThriveTracker {
       throw new Error('answer must be a string');
     }
 
-    const entry = this.getTodaysEntry(date);
+    // Materialize the entry in storage so subsequent reads see this answer.
+    if (!this.data.entries[date]) {
+      this.data.entries[date] = {
+        date,
+        questions: getQuestionsForDate(date),
+        answers: [],
+      };
+    }
+    const entry = this.data.entries[date];
 
-    // Upsert: remove existing answer for this question if present
+    // Upsert: replace existing answer for this question if present
     const existing = entry.answers.findIndex(a => a.question === question);
     const record: ThreeToThriveAnswer = {
       id: existing >= 0 ? entry.answers[existing].id : randomUUID(),

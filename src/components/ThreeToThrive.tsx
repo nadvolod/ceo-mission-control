@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import type { ThreeToThriveEntry } from '@/lib/types';
 import { ChevronDown, ChevronUp, Flame, CheckCircle, Clock } from 'lucide-react';
 
@@ -29,8 +29,8 @@ export function ThreeToThrive({ todaysEntry, history, onSaveAnswer }: ThreeToThr
   const [showHistory, setShowHistory] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Keep answers in sync when todaysEntry changes (e.g. after reload)
-  useMemo(() => {
+  // Keep answers in sync when todaysEntry changes (e.g. after reload or optimistic save round-trip)
+  useEffect(() => {
     const map: Record<string, string> = {};
     const savedMap: Record<string, boolean> = {};
     for (const a of todaysEntry.answers) {
@@ -39,8 +39,7 @@ export function ThreeToThrive({ todaysEntry, history, onSaveAnswer }: ThreeToThr
     }
     setAnswers(map);
     setSaved(savedMap);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todaysEntry.date]);
+  }, [todaysEntry]);
 
   const allAnswered = todaysEntry.questions.every(
     q => (answers[q] ?? '').trim().length > 0
