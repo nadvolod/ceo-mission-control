@@ -771,95 +771,95 @@ export function WeeklyPerformanceTracker({
               <h4 className="text-sm font-medium text-gray-700 mb-3">This Week</h4>
               <div className="overflow-x-auto" data-testid="weekly-grid-scroll">
                 <div className="grid grid-cols-7 gap-2 min-w-[560px]">
-                {DAY_LABELS.map((dayLabel, i) => {
-                  const entry = weekEntries[i] || null;
-                  const flags = getDayFlags(entry);
-                  const dwColor = entry
-                    ? entry.deepWorkHours >= 3
-                      ? 'bg-green-500'
-                      : entry.deepWorkHours > 0
-                        ? 'bg-amber-400'
-                        : 'bg-red-400'
-                    : 'bg-gray-200';
-                  const dwPct = entry ? Math.min(100, (entry.deepWorkHours / 8) * 100) : 0;
+                  {DAY_LABELS.map((dayLabel, i) => {
+                    const entry = weekEntries[i] || null;
+                    const flags = getDayFlags(entry);
+                    const dwColor = entry
+                      ? entry.deepWorkHours >= 3
+                        ? 'bg-green-500'
+                        : entry.deepWorkHours > 0
+                          ? 'bg-amber-400'
+                          : 'bg-red-400'
+                      : 'bg-gray-200';
+                    const dwPct = entry ? Math.min(100, (entry.deepWorkHours / 8) * 100) : 0;
 
-                  return (
-                    <div key={dayLabel} className="text-center">
-                      <div className="text-xs font-medium text-gray-500 mb-1">{dayLabel}</div>
-                      {/* Deep work bar */}
-                      <div className="h-16 w-full bg-gray-100 rounded relative flex items-end justify-center overflow-hidden">
-                        <div
-                          className={`w-full rounded-t ${dwColor} transition-all duration-300`}
-                          style={{ height: `${dwPct}%` }}
-                        />
-                        {entry && (
-                          <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-gray-800">
-                            {entry.deepWorkHours}h
+                    return (
+                      <div key={dayLabel} className="text-center">
+                        <div className="text-xs font-medium text-gray-500 mb-1">{dayLabel}</div>
+                        {/* Deep work bar */}
+                        <div className="h-16 w-full bg-gray-100 rounded relative flex items-end justify-center overflow-hidden">
+                          <div
+                            className={`w-full rounded-t ${dwColor} transition-all duration-300`}
+                            style={{ height: `${dwPct}%` }}
+                          />
+                          {entry && (
+                            <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-gray-800">
+                              {entry.deepWorkHours}h
+                            </div>
+                          )}
+                        </div>
+                        {/* Pipeline count */}
+                        <div className={`text-xs mt-1 ${entry ? 'text-purple-600 font-semibold' : 'text-gray-300'}`}>
+                          {entry ? `${entry.pipelineActions} pl` : '--'}
+                        </div>
+                        {/* Training indicator */}
+                        <div className="mt-0.5">
+                          {entry == null ? (
+                            <span className="text-gray-300 text-xs">--</span>
+                          ) : entry.trained ? (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-green-500 mx-auto" />
+                          ) : (
+                            <XCircle className="h-3.5 w-3.5 text-red-400 mx-auto" />
+                          )}
+                        </div>
+                        {/* Zero day flag */}
+                        {flags.isZeroDay && (
+                          <div className="mt-0.5">
+                            <AlertTriangle className="h-3 w-3 text-red-500 mx-auto" />
                           </div>
                         )}
-                      </div>
-                      {/* Pipeline count */}
-                      <div className={`text-xs mt-1 ${entry ? 'text-purple-600 font-semibold' : 'text-gray-300'}`}>
-                        {entry ? `${entry.pipelineActions} pl` : '--'}
-                      </div>
-                      {/* Training indicator */}
-                      <div className="mt-0.5">
-                        {entry == null ? (
-                          <span className="text-gray-300 text-xs">--</span>
-                        ) : entry.trained ? (
-                          <CheckCircle2 className="h-3.5 w-3.5 text-green-500 mx-auto" />
-                        ) : (
-                          <XCircle className="h-3.5 w-3.5 text-red-400 mx-auto" />
+                        {/* Curation: delete this day's entry. Only shows
+                            when an entry exists AND the parent supplied an
+                            onDeleteDay handler (admin contexts). */}
+                        {entry && onDeleteDay && (
+                          <button
+                            type="button"
+                            aria-label={`Delete entry for ${entry.date}`}
+                            title={`Delete entry for ${entry.date}`}
+                            onClick={async () => {
+                              if (!window.confirm(`Delete the weekly tracker entry for ${entry.date}? This cannot be undone.`)) return;
+                              try {
+                                await onDeleteDay(entry.date);
+                              } catch (err) {
+                                alert((err as Error).message || 'Failed to delete entry');
+                              }
+                            }}
+                            className="mt-1 text-gray-400 hover:text-rose-600 transition-colors"
+                          >
+                            <Trash2 className="h-3 w-3 mx-auto" />
+                          </button>
                         )}
+                        {(() => {
+                          const fin = weekFinancialByDay[i];
+                          const net = fin?.totals.netImpact ?? 0;
+                          const hasData = fin && fin.entries.length > 0;
+                          return (
+                            <MoneyMovePopover entries={fin?.entries ?? []}>
+                              <div
+                                data-testid={`day-money-${i}`}
+                                tabIndex={hasData ? 0 : -1}
+                                className={`mt-1 text-xs font-medium ${
+                                  !hasData ? 'text-gray-300' : net > 0 ? 'text-emerald-600' : net < 0 ? 'text-red-600' : 'text-gray-500'
+                                }`}
+                              >
+                                {hasData ? formatCurrency(net) : '—'}
+                              </div>
+                            </MoneyMovePopover>
+                          );
+                        })()}
                       </div>
-                      {/* Zero day flag */}
-                      {flags.isZeroDay && (
-                        <div className="mt-0.5">
-                          <AlertTriangle className="h-3 w-3 text-red-500 mx-auto" />
-                        </div>
-                      )}
-                      {/* Curation: delete this day's entry. Only shows
-                          when an entry exists AND the parent supplied an
-                          onDeleteDay handler (admin contexts). */}
-                      {entry && onDeleteDay && (
-                        <button
-                          type="button"
-                          aria-label={`Delete entry for ${entry.date}`}
-                          title={`Delete entry for ${entry.date}`}
-                          onClick={async () => {
-                            if (!window.confirm(`Delete the weekly tracker entry for ${entry.date}? This cannot be undone.`)) return;
-                            try {
-                              await onDeleteDay(entry.date);
-                            } catch (err) {
-                              alert((err as Error).message || 'Failed to delete entry');
-                            }
-                          }}
-                          className="mt-1 text-gray-400 hover:text-rose-600 transition-colors"
-                        >
-                          <Trash2 className="h-3 w-3 mx-auto" />
-                        </button>
-                      )}
-                      {(() => {
-                        const fin = weekFinancialByDay[i];
-                        const net = fin?.totals.netImpact ?? 0;
-                        const hasData = fin && fin.entries.length > 0;
-                        return (
-                          <MoneyMovePopover entries={fin?.entries ?? []}>
-                            <div
-                              data-testid={`day-money-${i}`}
-                              tabIndex={hasData ? 0 : -1}
-                              className={`mt-1 text-xs font-medium ${
-                                !hasData ? 'text-gray-300' : net > 0 ? 'text-emerald-600' : net < 0 ? 'text-red-600' : 'text-gray-500'
-                              }`}
-                            >
-                              {hasData ? formatCurrency(net) : '—'}
-                            </div>
-                          </MoneyMovePopover>
-                        );
-                      })()}
-                    </div>
-                  );
-                })}
+                    );
+                  })}
                 </div>
               </div>
             </div>
