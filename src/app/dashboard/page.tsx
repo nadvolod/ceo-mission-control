@@ -6,6 +6,7 @@ import { FocusOptimization } from '@/components/FocusOptimization';
 import { MissionTracker } from '@/components/MissionTracker';
 import { FinancialCommandCenter } from '@/components/FinancialCommandCenter';
 import { WeeklyPerformanceTracker } from '@/components/WeeklyPerformanceTracker';
+import { ThreeToThrive } from '@/components/ThreeToThrive';
 import { MonthlyReviewTracker } from '@/components/MonthlyReviewTracker';
 import { HealthIntelligenceDashboard } from '@/components/HealthIntelligenceDashboard';
 import { DashboardTabs } from '@/components/DashboardTabs';
@@ -23,6 +24,7 @@ export default function HomePage() {
     handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleSubmitWeeklyReview,
     monthlyReviewData, handleSubmitMonthlyReview, handleDeleteMonthlyReview,
     handleDeleteDay, handleDeleteWeeklyReview,
+    threeToThriveData, handleSaveThreeToThriveAnswer,
   } = useDashboardData();
 
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
@@ -113,6 +115,17 @@ export default function HomePage() {
         {/* Dashboard Tab - Daily items */}
         {activeTab === 'dashboard' && (
           <>
+            {/* Three to Thrive - Daily Focus Questions */}
+            {threeToThriveData && (
+              <div className="mb-8">
+                <ThreeToThrive
+                  todaysEntry={threeToThriveData.todaysEntry}
+                  history={threeToThriveData.history}
+                  onSaveAnswer={handleSaveThreeToThriveAnswer}
+                />
+              </div>
+            )}
+
             {/* Weekly Performance Tracker */}
             {weeklyTrackerData && (
               <div className="mb-8">
