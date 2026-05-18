@@ -69,7 +69,7 @@ export function HeroSection() {
         <div className="absolute inset-0 film-grain" />
       </div>
 
-      <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
+      <div className="relative z-10 max-w-5xl mx-auto px-4 sm:px-6 text-center">
         {/* Badge */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -182,7 +182,7 @@ function DashboardCarousel() {
       className="mt-20"
     >
       {/* View selector tabs */}
-      <div className="flex items-center justify-center gap-2 mb-5">
+      <div className="flex items-center justify-start sm:justify-center gap-2 mb-5 overflow-x-auto">
         {VIEWS.map((view, i) => (
           <button
             key={view.label}
@@ -200,7 +200,7 @@ function DashboardCarousel() {
       </div>
 
       {/* Dashboard frame */}
-      <div className="relative mx-auto max-w-3xl rounded-2xl border border-white/[0.08] bg-[#0c0c14]/80 backdrop-blur-xl p-6 shadow-2xl shadow-indigo-500/5 overflow-hidden"
+      <div className="relative mx-auto max-w-3xl rounded-2xl border border-white/[0.08] bg-[#0c0c14]/80 backdrop-blur-xl p-4 sm:p-6 shadow-2xl shadow-indigo-500/5 overflow-hidden"
         style={{ perspective: '1200px' }}
       >
         {/* Window chrome */}
@@ -214,7 +214,7 @@ function DashboardCarousel() {
         </div>
 
         {/* Stats row (always visible) */}
-        <div className="grid grid-cols-4 gap-3 mb-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
           {[
             { icon: ListTodo, label: 'Active Tasks', value: '24', color: 'text-blue-400' },
             { icon: Clock, label: 'Focus Hours', value: '32h', color: 'text-emerald-400' },

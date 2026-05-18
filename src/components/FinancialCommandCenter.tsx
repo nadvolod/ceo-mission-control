@@ -117,7 +117,7 @@ export function FinancialCommandCenter({ snapshot, isLoading, onRefresh, error }
   return (
     <div className="space-y-6">
       {/* Header with sync info */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
         <h3 className="text-lg font-semibold text-gray-900">Financial Command Center</h3>
         <div className="flex items-center gap-3">
           {isStale && (
