@@ -37,13 +37,13 @@ const baseDashboardData = {
   },
   financialData: {
     todaysMetrics: { date: '2026-04-14', entries: [], totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 } },
-    weeklyTotals: { moved: 0, generated: 0, cut: 0, netImpact: 0 },
+    weeklyTotals: { moved: 1200, generated: 0, cut: 0, netImpact: 1200 },
     monthlyTotals: { moved: 0, generated: 0, cut: 0, netImpact: 0 },
     recentEntries: [],
   },
   focusData: {
     todaysMetrics: { totalHours: 0, sessions: [], byCategory: {} },
-    weeklyTotals: {},
+    weeklyTotals: { Temporal: 6.5 },
     weekOverWeek: { currentTotal: 0, previousTotal: 0, absoluteChange: 0, percentageChange: 0, byCategoryChange: {} },
     dailyTrend: [],
     rollingAverage: [],
@@ -216,6 +216,39 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
   it('renders page header with CEO Mission Control title', () => {
     render(<HomePage />);
     expect(screen.getByText('CEO Mission Control')).toBeInTheDocument();
+  });
+
+  it('renders the requested key metric labels at the top', () => {
+    render(<HomePage />);
+    expect(screen.getByText('Current Cash Position')).toBeInTheDocument();
+    expect(screen.getByText('Cash Growth MoM')).toBeInTheDocument();
+    expect(screen.getByText('Temporal Focus (This Week)')).toBeInTheDocument();
+    expect(screen.getByText('Money Moved (This Week)')).toBeInTheDocument();
+  });
+
+  it('renders fallback dashes for cash metrics when Monarch data is unavailable', () => {
+    mockUseDashboardData.mockReturnValue({ ...baseDashboardData, monarchData: null } as any);
+    render(<HomePage />);
+    const cashFallbacks = screen.getAllByText('—');
+    expect(cashFallbacks).toHaveLength(2);
+  });
+
+  it('renders key metric values from dashboard data', () => {
+    mockUseDashboardData.mockReturnValue({
+      ...baseDashboardData,
+      monarchData: {
+        cashPosition: 10000,
+        monthlyIncome: 5000,
+        monthlyExpenses: 3000,
+        previousMonthIncome: 4000,
+        previousMonthExpenses: 3000,
+      },
+    } as any);
+    render(<HomePage />);
+    expect(screen.getByText('$10,000')).toBeInTheDocument();
+    expect(screen.getByText('+100.0%')).toBeInTheDocument();
+    expect(screen.getByText('6.5h')).toBeInTheDocument();
+    expect(screen.getByText('$1,200')).toBeInTheDocument();
   });
 });
 
