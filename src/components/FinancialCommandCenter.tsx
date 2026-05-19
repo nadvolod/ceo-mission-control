@@ -97,7 +97,9 @@ export function FinancialCommandCenter({ snapshot, isLoading, onRefresh, error }
     {
       title: 'Monthly Burn',
       value: formatCurrency(snapshot.burnRate),
-      subValue: `vs ${formatCurrency(snapshot.monthlyIncome)} income`,
+      subValue: snapshot.burnRateLabel
+        ? `vs ${formatCurrency(snapshot.previousMonthIncome)} income · ${snapshot.burnRateLabel}`
+        : `vs ${formatCurrency(snapshot.monthlyIncome)} income · month-to-date`,
       icon: TrendingDown,
       color: 'text-orange-600',
       bgColor: 'bg-orange-50',
@@ -164,7 +166,18 @@ export function FinancialCommandCenter({ snapshot, isLoading, onRefresh, error }
 
       {/* Runway Visualization */}
       <div className="bg-white rounded-lg shadow-lg p-6">
-        <h3 className="text-lg font-semibold text-gray-900 mb-4">Cash Runway</h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Cash Runway</h3>
+          {snapshot.burnRateLabel ? (
+            <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full">
+              Burn based on {snapshot.burnRateLabel} actuals
+            </span>
+          ) : (
+            <span className="text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+              Burn based on month-to-date (estimate)
+            </span>
+          )}
+        </div>
         <div className="space-y-3">
           <div className="flex items-center justify-between">
             <span className="text-sm font-medium text-gray-700">Current Position</span>
@@ -191,7 +204,7 @@ export function FinancialCommandCenter({ snapshot, isLoading, onRefresh, error }
           {/* Income vs Expenses bar */}
           <div className="mt-4 pt-4 border-t border-gray-200">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-gray-700">This Month</span>
+              <span className="text-sm font-medium text-gray-700">This Month (to date)</span>
             </div>
             <div className="space-y-2">
               <div className="flex items-center gap-3">

@@ -73,6 +73,41 @@ describe('buildSnapshot', () => {
     expect(result.netWorth).toBe(7000);
   });
 
+  it('uses previous month cashflow for burn rate when available', () => {
+    // Simulate mid-month: current data is partial (MTD)
+    const accounts = [makeAccount({ currentBalance: 10000 })];
+    const currentCashflow = makeCashflow({ sumIncome: 1000, sumExpense: -800 }); // partial month
+    const previousCashflow = { sumIncome: 3000, sumExpense: -5000 }; // full previous month
+
+    const result = buildSnapshot(accounts, currentCashflow, previousCashflow, 'Apr 2026');
+
+    // Burn rate uses previous full month: 5000 - 3000 = 2000
+    expect(result.burnRate).toBe(2000);
+    expect(result.runwayMonths).toBe(5); // 10000 / 2000
+    expect(result.burnRateLabel).toBe('Apr 2026');
+    // Current month figures are preserved for display
+    expect(result.monthlyIncome).toBe(1000);
+    expect(result.monthlyExpenses).toBe(800);
+  });
+
+  it('sets burnRateLabel to null when falling back to current-month MTD', () => {
+    const accounts = [makeAccount({ currentBalance: 10000 })];
+    const cashflow = makeCashflow({ sumIncome: 3000, sumExpense: -5000 });
+
+    const result = buildSnapshot(accounts, cashflow);
+
+    expect(result.burnRateLabel).toBeNull();
+  });
+
+  it('sets burnRateLabel to null when previous month cashflow is null', () => {
+    const accounts = [makeAccount({ currentBalance: 10000 })];
+    const cashflow = makeCashflow({ sumIncome: 3000, sumExpense: -5000 });
+
+    const result = buildSnapshot(accounts, cashflow, null, 'Apr 2026');
+
+    expect(result.burnRateLabel).toBeNull();
+  });
+
   it('computes runway from net burn (expenses - income)', () => {
     const accounts = [makeAccount({ currentBalance: 10000 })];
     const cashflow = makeCashflow({ sumIncome: 3000, sumExpense: -5000 });
