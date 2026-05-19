@@ -14,6 +14,7 @@ import type { TabId } from '@/components/DashboardTabs';
 import { enrichScorecard } from '@/lib/derive-focus';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { AdminHandoffButtons } from '@/components/AdminHandoffButtons';
+import { formatCurrency, computeCashGrowthMoM } from '@/lib/dashboard-metrics';
 
 export default function HomePage() {
   const {
@@ -61,6 +62,14 @@ export default function HomePage() {
 
   // scorecard is guaranteed non-null after the early return above
   const enrichedScorecard = enrichScorecard(scorecard, aiTasks, initiatives);
+  const cashGrowthMoM = monarchData
+    ? computeCashGrowthMoM(
+        monarchData.monthlyIncome ?? 0,
+        monarchData.monthlyExpenses ?? 0,
+        monarchData.previousMonthIncome ?? 0,
+        monarchData.previousMonthExpenses ?? 0,
+      )
+    : null;
 
   return (
     <div className="min-h-screen bg-gray-100 overflow-x-hidden">
@@ -74,27 +83,33 @@ export default function HomePage() {
                 Conversational task command center for {scorecard.date}
               </p>
             </div>
-            <div className="w-full lg:w-auto flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-center">
-                <div>
-                  <div className="text-2xl font-bold text-blue-600">{taskStats.total}</div>
-                  <div className="text-xs text-gray-500">Total Tasks</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-green-600">{taskStats.doneToday}</div>
-                  <div className="text-xs text-gray-500">Done Today</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-red-600">{taskStats.overdue}</div>
-                  <div className="text-xs text-gray-500">Overdue</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-gray-900">
-                    {focusData?.todaysMetrics?.totalHours || 0}h
+              <div className="w-full lg:w-auto flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 text-center">
+                  <div>
+                    <div className="text-2xl font-bold text-blue-600">
+                      {monarchData ? formatCurrency(monarchData.cashPosition ?? 0) : '—'}
+                    </div>
+                    <div className="text-xs text-gray-500">Current Cash Position</div>
                   </div>
-                  <div className="text-xs text-gray-500">Focus Hours</div>
+                  <div>
+                    <div className={`text-2xl font-bold ${(cashGrowthMoM ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {cashGrowthMoM === null ? '—' : `${cashGrowthMoM >= 0 ? '+' : ''}${cashGrowthMoM.toFixed(1)}%`}
+                    </div>
+                    <div className="text-xs text-gray-500">Cash Growth MoM</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-purple-600">
+                      {(focusData?.weeklyTotals?.Temporal ?? 0).toFixed(1).replace(/\.0$/, '')}h
+                    </div>
+                    <div className="text-xs text-gray-500">Temporal Focus (This Week)</div>
+                  </div>
+                  <div>
+                    <div className="text-2xl font-bold text-gray-900">
+                      {formatCurrency(financialData?.weeklyTotals?.moved ?? 0)}
+                    </div>
+                    <div className="text-xs text-gray-500">Money Moved (This Week)</div>
+                  </div>
                 </div>
-              </div>
               <AdminHandoffButtons />
               <button
                 onClick={loadAllData}
