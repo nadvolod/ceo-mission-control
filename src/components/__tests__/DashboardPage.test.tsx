@@ -252,6 +252,7 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
   });
 
   it('renders cash growth dash when previous net is zero and current net is non-zero', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     mockUseDashboardData.mockReturnValue({
       ...baseDashboardData,
       monarchData: {
@@ -264,6 +265,10 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
     } as any);
     render(<HomePage />);
     expect(screen.getByText('—')).toBeInTheDocument();
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('cash growth MoM is undefined'),
+    );
+    warnSpy.mockRestore();
   });
 });
 

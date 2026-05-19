@@ -14,28 +14,7 @@ import type { TabId } from '@/components/DashboardTabs';
 import { enrichScorecard } from '@/lib/derive-focus';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { AdminHandoffButtons } from '@/components/AdminHandoffButtons';
-
-function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(amount);
-}
-
-function computeCashGrowthMoM(
-  currentMonthIncome: number,
-  currentMonthExpenses: number,
-  previousMonthIncome: number,
-  previousMonthExpenses: number,
-): number | null {
-  const currentNet = currentMonthIncome - currentMonthExpenses;
-  const previousNet = previousMonthIncome - previousMonthExpenses;
-  if (previousNet === 0) {
-    return currentNet === 0 ? 0 : null;
-  }
-  return ((currentNet - previousNet) / Math.abs(previousNet)) * 100;
-}
+import { formatCurrency, computeCashGrowthMoM } from '@/lib/dashboard-metrics';
 
 export default function HomePage() {
   const {
