@@ -250,6 +250,21 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
     expect(screen.getByText('6.5h')).toBeInTheDocument();
     expect(screen.getByText('$1,200')).toBeInTheDocument();
   });
+
+  it('renders cash growth dash when previous net is zero and current net is non-zero', () => {
+    mockUseDashboardData.mockReturnValue({
+      ...baseDashboardData,
+      monarchData: {
+        cashPosition: 10000,
+        monthlyIncome: 0,
+        monthlyExpenses: 500,
+        previousMonthIncome: 1000,
+        previousMonthExpenses: 1000,
+      },
+    } as any);
+    render(<HomePage />);
+    expect(screen.getByText('—')).toBeInTheDocument();
+  });
 });
 
 describe('Dashboard Page - Phase 3: Tab-based layout', () => {

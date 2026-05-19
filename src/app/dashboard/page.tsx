@@ -28,11 +28,11 @@ function computeCashGrowthMoM(
   currentMonthExpenses: number,
   previousMonthIncome: number,
   previousMonthExpenses: number,
-): number {
+): number | null {
   const currentNet = currentMonthIncome - currentMonthExpenses;
   const previousNet = previousMonthIncome - previousMonthExpenses;
   if (previousNet === 0) {
-    return currentNet === 0 ? 0 : 100;
+    return currentNet === 0 ? 0 : null;
   }
   return ((currentNet - previousNet) / Math.abs(previousNet)) * 100;
 }
