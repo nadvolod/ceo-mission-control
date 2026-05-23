@@ -75,8 +75,12 @@ export function buildSnapshot(
     : monthlyExpenses;
   // Net burn = expenses minus income (0 if profitable)
   const burnRate = Math.max(burnBaseExpenses - burnBaseIncome, 0);
-  // Label indicates which month's data was used; null means we fell back to current-month MTD
-  const burnRateLabel = previousMonthCashflow ? (previousMonthLabel ?? null) : null;
+  // Label indicates which month's data was used; null means we fell back to current-month MTD.
+  // When previous-month cashflow exists but the label is missing/empty, fall back to a generic
+  // "previous month" string so the UI still treats this as full-month data, not MTD.
+  const burnRateLabel = previousMonthCashflow
+    ? (previousMonthLabel && previousMonthLabel.length > 0 ? previousMonthLabel : 'previous month')
+    : null;
   // Use -1 sentinel for "infinite/no burn" since JSON.stringify(Infinity) → null
   const rawRunway = burnRate > 0 ? Math.max(cashPosition / burnRate, 0) : -1;
   const runwayMonths = Number.isFinite(rawRunway) ? rawRunway : -1;

@@ -97,9 +97,14 @@ export function FinancialCommandCenter({ snapshot, isLoading, onRefresh, error }
     {
       title: 'Monthly Burn',
       value: formatCurrency(snapshot.burnRate),
-      subValue: snapshot.burnRateLabel
-        ? `vs ${formatCurrency(snapshot.previousMonthIncome)} income · ${snapshot.burnRateLabel}`
-        : `vs ${formatCurrency(snapshot.monthlyIncome)} income · month-to-date`,
+      subValue: snapshot.burnRateLabel ? (
+        `vs ${formatCurrency(snapshot.previousMonthIncome)} income · ${snapshot.burnRateLabel}`
+      ) : (
+        <>
+          vs {formatCurrency(snapshot.monthlyIncome)} income ·{' '}
+          <span className="text-amber-600 font-medium">month-to-date</span>
+        </>
+      ),
       icon: TrendingDown,
       color: 'text-orange-600',
       bgColor: 'bg-orange-50',

@@ -108,6 +108,21 @@ describe('buildSnapshot', () => {
     expect(result.burnRateLabel).toBeNull();
   });
 
+  it('falls back to generic label when previous month cashflow is present but label is missing', () => {
+    const accounts = [makeAccount({ currentBalance: 10000 })];
+    const currentCashflow = makeCashflow({ sumIncome: 1000, sumExpense: -800 });
+    const previousCashflow = { sumIncome: 3000, sumExpense: -5000 };
+
+    // Label omitted entirely
+    const resultOmitted = buildSnapshot(accounts, currentCashflow, previousCashflow);
+    expect(resultOmitted.burnRate).toBe(2000); // uses previous-month figures
+    expect(resultOmitted.burnRateLabel).toBe('previous month');
+
+    // Empty-string label
+    const resultEmpty = buildSnapshot(accounts, currentCashflow, previousCashflow, '');
+    expect(resultEmpty.burnRateLabel).toBe('previous month');
+  });
+
   it('computes runway from net burn (expenses - income)', () => {
     const accounts = [makeAccount({ currentBalance: 10000 })];
     const cashflow = makeCashflow({ sumIncome: 3000, sumExpense: -5000 });
