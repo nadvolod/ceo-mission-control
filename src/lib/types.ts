@@ -171,6 +171,7 @@ export interface MonarchFinancialSnapshot {
   previousMonthExpenses?: number;
   previousMonthLabel?: string;   // e.g., "Mar 2026"
   burnRate: number;
+  burnRateLabel?: string | null; // e.g. "Apr 2026" — null/undefined means current-month MTD was used
   runwayMonths: number;
   savingsRate: number;
   lastSynced: string;
