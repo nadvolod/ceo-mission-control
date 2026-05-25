@@ -220,7 +220,7 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
     expect(screen.getByText('Mission Control')).toBeInTheDocument();
   });
 
-  it('renders the top-of-dashboard key metrics strip with all six cards', () => {
+  it('renders the top-of-dashboard key metrics strip with all seven cards', () => {
     render(<HomePage />);
     expect(screen.getByTestId('key-metrics-strip')).toBeInTheDocument();
     expect(screen.getByTestId('metric-cash')).toBeInTheDocument();
@@ -228,6 +228,7 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
     expect(screen.getByTestId('metric-net-worth')).toBeInTheDocument();
     expect(screen.getByTestId('metric-total-debt')).toBeInTheDocument();
     expect(screen.getByTestId('metric-temporal')).toBeInTheDocument();
+    expect(screen.getByTestId('metric-focus-hours')).toBeInTheDocument();
     expect(screen.getByTestId('metric-money-moved')).toBeInTheDocument();
   });
 

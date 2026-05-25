@@ -13,6 +13,7 @@ interface KeyMetricsStripProps {
   monarchData: MonarchFinancialSnapshot | null;
   temporalHoursThisWeek: number;
   moneyMovedThisWeek: number;
+  focusHoursThisWeek: number;
 }
 
 const DASH = '—';
@@ -21,6 +22,7 @@ export function KeyMetricsStrip({
   monarchData,
   temporalHoursThisWeek,
   moneyMovedThisWeek,
+  focusHoursThisWeek,
 }: KeyMetricsStripProps) {
   const cashGrowthPct = monarchData
     ? computeCashGrowthMoM(
@@ -53,11 +55,14 @@ export function KeyMetricsStrip({
   const temporalHours = Number.isFinite(temporalHoursThisWeek) ? temporalHoursThisWeek : 0;
   const temporalDisplay = `${temporalHours.toFixed(1).replace(/\.0$/, '')}h`;
 
+  const focusHours = Number.isFinite(focusHoursThisWeek) ? focusHoursThisWeek : 0;
+  const focusHoursDisplay = `${focusHours.toFixed(1).replace(/\.0$/, '')}h`;
+
   return (
     <section
       aria-label="Key metrics"
       data-testid="key-metrics-strip"
-      className="grid grid-cols-3 md:grid-cols-6 gap-2 sm:gap-3"
+      className="grid grid-cols-3 md:grid-cols-7 gap-2 sm:gap-3"
     >
       <MetricCard
         testId="metric-cash"
@@ -104,6 +109,13 @@ export function KeyMetricsStrip({
         title="Temporal"
         valueColor="text-purple-600"
         value={temporalDisplay}
+        subLabel="this week"
+      />
+      <MetricCard
+        testId="metric-focus-hours"
+        title="Focus Hours"
+        valueColor="text-blue-600"
+        value={focusHoursDisplay}
         subLabel="this week"
       />
       <MetricCard

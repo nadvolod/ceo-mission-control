@@ -89,6 +89,7 @@ export default function HomePage() {
           monarchData={monarchData}
           temporalHoursThisWeek={focusData?.weeklyTotals?.Temporal ?? 0}
           moneyMovedThisWeek={financialData?.weeklyTotals?.moved ?? 0}
+          focusHoursThisWeek={weeklyTrackerData?.currentWeekSummary?.deepWorkTotal ?? 0}
         />
       </div>
 
