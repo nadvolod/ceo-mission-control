@@ -2,7 +2,6 @@
 
 Executive command center for portfolio optimization and focus management.
 
-Production login: https://ceo-mission-control-nine.vercel.app/login
 
 ## Features
 
