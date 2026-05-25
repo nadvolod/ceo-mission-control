@@ -2,7 +2,6 @@
 
 Executive command center for portfolio optimization and focus management.
 
-
 ## Features
 
 - **Priority Dashboard**: Live ranking of initiatives from INITIATIVES.md with scoring matrix
