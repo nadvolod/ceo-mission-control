@@ -2,6 +2,8 @@
 
 Executive command center for portfolio optimization and focus management.
 
+Production login: https://ceo-mission-control-nine.vercel.app/login
+
 ## Features
 
 - **Priority Dashboard**: Live ranking of initiatives from INITIATIVES.md with scoring matrix
@@ -34,6 +36,8 @@ Reads directly from OpenClaw workspace at `/Users/nikolay/.openclaw/workspace`.
 ## Deployment
 
 Automatically deploys to Vercel on push to main branch.
+
+Production login URL: https://ceo-mission-control-nine.vercel.app/login
 
 ## Data Sources
 
