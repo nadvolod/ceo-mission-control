@@ -106,9 +106,6 @@ jest.mock('@/hooks/useDashboardData', () => ({
 jest.mock('@/components/WeeklyPerformanceTracker', () => ({
   WeeklyPerformanceTracker: () => <div data-testid="weekly-performance">Weekly Performance Tracker</div>,
 }));
-jest.mock('@/components/FinancialCommandCenter', () => ({
-  FinancialCommandCenter: () => <div data-testid="financial-command">Financial Command Center</div>,
-}));
 jest.mock('@/components/HealthIntelligenceDashboard', () => ({
   HealthIntelligenceDashboard: () => <div data-testid="health-intelligence">Health Intelligence</div>,
 }));
@@ -159,14 +156,20 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
 
   it('renders Weekly Performance Tracker as the first section', () => {
     render(<HomePage />);
-    const sections = screen.getAllByTestId(/weekly-performance|financial-command|health-intelligence|focus-optimization|mission-tracker|monthly-review|task-dashboard/);
+    const sections = screen.getAllByTestId(/weekly-performance|health-intelligence|focus-optimization|mission-tracker|monthly-review|task-dashboard/);
     expect(sections[0]).toHaveAttribute('data-testid', 'weekly-performance');
   });
 
-  it('renders Financial Command Center as the second section', () => {
+  it('renders Health Intelligence as the second section after the strip relocation', () => {
     render(<HomePage />);
-    const sections = screen.getAllByTestId(/weekly-performance|financial-command|health-intelligence|focus-optimization|mission-tracker|monthly-review|task-dashboard/);
-    expect(sections[1]).toHaveAttribute('data-testid', 'financial-command');
+    const sections = screen.getAllByTestId(/weekly-performance|health-intelligence|focus-optimization|mission-tracker|monthly-review|task-dashboard/);
+    expect(sections[1]).toHaveAttribute('data-testid', 'health-intelligence');
+  });
+
+  it('does NOT render the removed Financial Command Center', () => {
+    render(<HomePage />);
+    expect(screen.queryByTestId('financial-command')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /Financial Command Center/i })).not.toBeInTheDocument();
   });
 
   it('does NOT render the removed FinancialMetricsDashboard (Financial Impact Tracking)', () => {
@@ -191,10 +194,9 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
 
   // --- Edge cases ---
 
-  it('renders all 4 dashboard-tab sections on default view', () => {
+  it('renders the remaining 3 dashboard-tab sections on default view', () => {
     render(<HomePage />);
     expect(screen.getByTestId('weekly-performance')).toBeInTheDocument();
-    expect(screen.getByTestId('financial-command')).toBeInTheDocument();
     expect(screen.getByTestId('health-intelligence')).toBeInTheDocument();
     expect(screen.getByTestId('focus-optimization')).toBeInTheDocument();
   });
@@ -213,24 +215,28 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
     expect(screen.queryByTestId('weekly-performance')).not.toBeInTheDocument();
   });
 
-  it('renders page header with CEO Mission Control title', () => {
+  it('renders compact header with Mission Control title', () => {
     render(<HomePage />);
-    expect(screen.getByText('CEO Mission Control')).toBeInTheDocument();
+    expect(screen.getByText('Mission Control')).toBeInTheDocument();
   });
 
-  it('renders the requested key metric labels at the top', () => {
+  it('renders the top-of-dashboard key metrics strip with all six cards', () => {
     render(<HomePage />);
-    expect(screen.getByText('Current Cash Position')).toBeInTheDocument();
-    expect(screen.getByText('Cash Growth MoM')).toBeInTheDocument();
-    expect(screen.getByText('Temporal Focus (This Week)')).toBeInTheDocument();
-    expect(screen.getByText('Money Moved (This Week)')).toBeInTheDocument();
+    expect(screen.getByTestId('key-metrics-strip')).toBeInTheDocument();
+    expect(screen.getByTestId('metric-cash')).toBeInTheDocument();
+    expect(screen.getByTestId('metric-cash-mom')).toBeInTheDocument();
+    expect(screen.getByTestId('metric-net-worth')).toBeInTheDocument();
+    expect(screen.getByTestId('metric-total-debt')).toBeInTheDocument();
+    expect(screen.getByTestId('metric-temporal')).toBeInTheDocument();
+    expect(screen.getByTestId('metric-money-moved')).toBeInTheDocument();
   });
 
-  it('renders fallback dashes for cash metrics when Monarch data is unavailable', () => {
+  it('renders dash fallbacks for monarch-derived metrics when monarchData is null', () => {
     mockUseDashboardData.mockReturnValue({ ...baseDashboardData, monarchData: null } as any);
     render(<HomePage />);
-    const cashFallbacks = screen.getAllByText('—');
-    expect(cashFallbacks).toHaveLength(2);
+    // 4 monarch-backed metric cards (cash, MoM, net worth, total debt) render "—"
+    const dashes = screen.getAllByText('—');
+    expect(dashes.length).toBeGreaterThanOrEqual(4);
   });
 
   it('renders key metric values from dashboard data', () => {
@@ -238,6 +244,10 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
       ...baseDashboardData,
       monarchData: {
         cashPosition: 10000,
+        netWorth: 150000,
+        totalAssets: 200000,
+        totalLiabilities: 50000,
+        runwayMonths: 18,
         monthlyIncome: 5000,
         monthlyExpenses: 3000,
         previousMonthIncome: 4000,
@@ -245,10 +255,13 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
       },
     } as any);
     render(<HomePage />);
-    expect(screen.getByText('$10,000')).toBeInTheDocument();
-    expect(screen.getByText('+100.0%')).toBeInTheDocument();
-    expect(screen.getByText('6.5h')).toBeInTheDocument();
-    expect(screen.getByText('$1,200')).toBeInTheDocument();
+    // Compact formatting: $10K, $150K, $50K, +100.0%, 6.5h, $1.2K
+    expect(screen.getByTestId('metric-cash')).toHaveTextContent('$10.0K');
+    expect(screen.getByTestId('metric-cash-mom')).toHaveTextContent('+100.0%');
+    expect(screen.getByTestId('metric-net-worth')).toHaveTextContent('$150.0K');
+    expect(screen.getByTestId('metric-total-debt')).toHaveTextContent('$50.0K');
+    expect(screen.getByTestId('metric-temporal')).toHaveTextContent('6.5h');
+    expect(screen.getByTestId('metric-money-moved')).toHaveTextContent('$1.2K');
   });
 
   it('renders cash growth dash when previous net is zero and current net is non-zero', () => {
@@ -257,6 +270,10 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
       ...baseDashboardData,
       monarchData: {
         cashPosition: 10000,
+        netWorth: 0,
+        totalAssets: 10000,
+        totalLiabilities: 10000,
+        runwayMonths: 0,
         monthlyIncome: 0,
         monthlyExpenses: 500,
         previousMonthIncome: 1000,
@@ -264,7 +281,7 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
       },
     } as any);
     render(<HomePage />);
-    expect(screen.getByText('—')).toBeInTheDocument();
+    expect(screen.getByTestId('metric-cash-mom')).toHaveTextContent('—');
     expect(warnSpy).toHaveBeenCalledWith(
       expect.stringContaining('cash growth MoM is undefined'),
     );
@@ -284,10 +301,9 @@ describe('Dashboard Page - Phase 3: Tab-based layout', () => {
     expect(screen.getByTestId('dashboard-tabs')).toBeInTheDocument();
   });
 
-  it('default tab shows daily sections (Weekly Perf, Financial Command, etc.)', () => {
+  it('default tab shows daily sections (Weekly Perf, Health, Focus)', () => {
     render(<HomePage />);
     expect(screen.getByTestId('weekly-performance')).toBeInTheDocument();
-    expect(screen.getByTestId('financial-command')).toBeInTheDocument();
     expect(screen.getByTestId('health-intelligence')).toBeInTheDocument();
     expect(screen.getByTestId('focus-optimization')).toBeInTheDocument();
   });
@@ -307,7 +323,7 @@ describe('Dashboard Page - Phase 3: Tab-based layout', () => {
 
     expect(screen.getByTestId('task-dashboard')).toBeInTheDocument();
     expect(screen.queryByTestId('weekly-performance')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('financial-command')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('focus-optimization')).not.toBeInTheDocument();
   });
 
   it('Monthly Review tab shows MonthlyReviewTracker and MissionTracker', async () => {
