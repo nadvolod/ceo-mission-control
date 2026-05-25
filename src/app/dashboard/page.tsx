@@ -21,11 +21,20 @@ export default function HomePage() {
     aiTasks, taskStats, initiatives, scorecard, financialData, focusData,
     monarchData, weeklyTrackerData, isLoading,
     loadAllData, handleCreateTask, handleUpdateTask, handleDeleteTask,
+    handleMonarchRefresh,
     handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleSubmitWeeklyReview,
     monthlyReviewData, handleSubmitMonthlyReview, handleDeleteMonthlyReview,
     handleDeleteDay, handleDeleteWeeklyReview,
     threeToThriveData, handleSaveThreeToThriveAnswer,
   } = useDashboardData();
+
+  // Header refresh: force-refresh Monarch (POST bypasses the 15-min snapshot
+  // cache) AND reload every other dashboard data source. loadAllData alone
+  // would re-read the cached Monarch snapshot via GET.
+  const handleRefreshAll = () => {
+    void handleMonarchRefresh();
+    void loadAllData();
+  };
 
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
 
@@ -63,7 +72,7 @@ export default function HomePage() {
           <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             <AdminHandoffButtons />
             <button
-              onClick={loadAllData}
+              onClick={handleRefreshAll}
               className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
               title="Refresh all data"
               aria-label="Refresh all data"

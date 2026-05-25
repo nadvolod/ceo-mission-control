@@ -76,31 +76,33 @@ test.describe('Top-of-dashboard key metrics strip', () => {
     }
   });
 
-  test('refresh button on the compact header reloads dashboard data', async ({ page }) => {
+  test('refresh button on the compact header reloads every dashboard data source', async ({ page }) => {
     await page.goto('/dashboard');
     await page.waitForSelector('[data-testid="key-metrics-strip"]', { timeout: 15_000 });
 
-    // The compact header exposes refresh as an icon-only button; we ensure
-    // it actually refires the dashboard data load (real wire, no mocks).
-    const apiCalls: string[] = [];
+    // The compact header exposes refresh as an icon-only button. The handler
+    // MUST hit all three metric-backing endpoints; if any is missed the
+    // corresponding cards would silently go stale.
+    const hitEndpoints = new Set<string>();
     page.on('request', (req) => {
       const url = req.url();
-      if (
-        url.includes('/api/monarch') ||
-        url.includes('/api/focus-hours') ||
-        url.includes('/api/financial')
-      ) {
-        apiCalls.push(url);
-      }
+      if (url.includes('/api/monarch')) hitEndpoints.add('/api/monarch');
+      if (url.includes('/api/focus-hours')) hitEndpoints.add('/api/focus-hours');
+      if (url.includes('/api/financial')) hitEndpoints.add('/api/financial');
     });
 
     const refreshBtn = page.getByRole('button', { name: /Refresh all data/i });
     await expect(refreshBtn).toBeVisible();
     await refreshBtn.click();
 
-    // Allow refresh handler to fire (it issues parallel GETs).
-    await page.waitForTimeout(1000);
-    expect(apiCalls.length).toBeGreaterThan(0);
+    // Wait for each expected endpoint independently so a slow request can't
+    // race the assertion. Polls every 100ms up to a generous deadline.
+    await expect
+      .poll(() => hitEndpoints.size, { timeout: 5000 })
+      .toBeGreaterThanOrEqual(3);
+    expect(hitEndpoints).toContain('/api/monarch');
+    expect(hitEndpoints).toContain('/api/focus-hours');
+    expect(hitEndpoints).toContain('/api/financial');
   });
 
   test('metrics strip survives a full page reload (truly persistent, not just first-mount)', async ({ page }) => {
