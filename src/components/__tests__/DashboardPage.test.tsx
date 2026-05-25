@@ -59,25 +59,29 @@ const baseDashboardData = {
     todaysEntry: null,
     currentWeekSummary: {
       weekStartDate: '2026-04-13',
-      totalDeepWork: 0,
-      totalPipeline: 0,
-      daysLogged: 0,
-      goodDays: 0,
+      weekEndDate: '2026-04-19',
+      revenue: 0,
+      pipelineTotal: 0,
+      deepWorkTotal: 12.5,
+      consistencyScore: 0,
+      daysTracked: 0,
       zeroDays: 0,
-      consistency: 0,
-      temporalTarget: 5,
+      goodDays: 0,
       dailyEntries: [],
+      temporalTarget: 5,
     },
     previousWeekSummary: {
       weekStartDate: '2026-04-06',
-      totalDeepWork: 0,
-      totalPipeline: 0,
-      daysLogged: 0,
-      goodDays: 0,
+      weekEndDate: '2026-04-12',
+      revenue: 0,
+      pipelineTotal: 0,
+      deepWorkTotal: 0,
+      consistencyScore: 0,
+      daysTracked: 0,
       zeroDays: 0,
-      consistency: 0,
-      temporalTarget: 5,
+      goodDays: 0,
       dailyEntries: [],
+      temporalTarget: 5,
     },
     dailyTrend: [],
     recentReviews: [],
@@ -230,6 +234,12 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
     expect(screen.getByTestId('metric-temporal')).toBeInTheDocument();
     expect(screen.getByTestId('metric-focus-hours')).toBeInTheDocument();
     expect(screen.getByTestId('metric-money-moved')).toBeInTheDocument();
+  });
+
+  it('renders Focus Hours tile with the weekly deepWorkTotal from the tracker', () => {
+    render(<HomePage />);
+    // baseDashboardData mocks currentWeekSummary.deepWorkTotal = 12.5
+    expect(screen.getByTestId('metric-focus-hours')).toHaveTextContent('12.5h');
   });
 
   it('renders dash fallbacks for monarch-derived metrics when monarchData is null', () => {
