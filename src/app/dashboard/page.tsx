@@ -40,27 +40,10 @@ export default function HomePage() {
     );
   }
 
-  if (!scorecard) {
-    return (
-      <div className="min-h-screen bg-gray-100 p-8">
-        <div className="max-w-7xl mx-auto">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <h2 className="text-lg font-semibold text-red-800 mb-2">Cannot Load Workspace Data</h2>
-            <p className="text-red-700">
-              Unable to read DAILY_SCORECARD.md from workspace.
-              Make sure the file exists and the app has access to your OpenClaw workspace.
-            </p>
-            <div className="mt-4 text-sm text-red-600">
-              <p>Check that workspace data files are available.</p>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // scorecard is guaranteed non-null after the early return above
-  const enrichedScorecard = enrichScorecard(scorecard, aiTasks, initiatives);
+  // scorecard may be null if workspace data hasn't been seeded yet — the
+  // top metrics strip still renders, and the section content below shows a
+  // workspace-missing notice in place of the tabs.
+  const enrichedScorecard = scorecard ? enrichScorecard(scorecard, aiTasks, initiatives) : null;
 
   return (
     <div className="min-h-screen bg-gray-100 overflow-x-hidden">
@@ -71,9 +54,11 @@ export default function HomePage() {
             <h1 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
               Mission Control
             </h1>
-            <span className="text-[11px] sm:text-xs text-gray-500 truncate hidden sm:inline">
-              {scorecard.date}
-            </span>
+            {scorecard && (
+              <span className="text-[11px] sm:text-xs text-gray-500 truncate hidden sm:inline">
+                {scorecard.date}
+              </span>
+            )}
           </div>
           <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             <AdminHandoffButtons />
@@ -89,7 +74,7 @@ export default function HomePage() {
         </div>
       </header>
 
-      {/* Key Metrics Strip */}
+      {/* Key Metrics Strip — always visible, independent of scorecard */}
       <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 pt-3 sm:pt-4">
         <KeyMetricsStrip
           monarchData={monarchData}
@@ -100,6 +85,19 @@ export default function HomePage() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
+        {!scorecard ? (
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <h2 className="text-lg font-semibold text-red-800 mb-2">Cannot Load Workspace Data</h2>
+            <p className="text-red-700">
+              Unable to read DAILY_SCORECARD.md from workspace.
+              Make sure the file exists and the app has access to your OpenClaw workspace.
+            </p>
+            <div className="mt-4 text-sm text-red-600">
+              <p>Check that workspace data files are available.</p>
+            </div>
+          </div>
+        ) : (
+          <>
         <DashboardTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
         {/* Dashboard Tab - Daily items */}
@@ -174,9 +172,11 @@ export default function HomePage() {
             </div>
 
             {/* Today's Plan - Priorities, Critical Moves, Focus Blocks */}
-            <div className="mb-8">
-              <FocusOptimization scorecard={enrichedScorecard} />
-            </div>
+            {enrichedScorecard && (
+              <div className="mb-8">
+                <FocusOptimization scorecard={enrichedScorecard} />
+              </div>
+            )}
           </>
         )}
 
@@ -215,6 +215,8 @@ export default function HomePage() {
                 />
               </div>
             )}
+          </>
+        )}
           </>
         )}
       </main>

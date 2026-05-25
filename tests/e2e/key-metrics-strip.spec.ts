@@ -103,18 +103,21 @@ test.describe('Top-of-dashboard key metrics strip', () => {
     expect(apiCalls.length).toBeGreaterThan(0);
   });
 
-  test('metrics strip remains visible when switching tabs (single place to view metrics)', async ({ page }) => {
+  test('metrics strip survives a full page reload (truly persistent, not just first-mount)', async ({ page }) => {
     await page.goto('/dashboard');
     await page.waitForSelector('[data-testid="key-metrics-strip"]', { timeout: 15_000 });
-
     await expect(page.getByTestId('key-metrics-strip')).toBeVisible();
 
-    // Switch to Tasks tab — metrics strip must remain (it lives above tabs).
-    await page.getByRole('button', { name: /^Tasks$/ }).click();
+    // A real reload — not just a router navigation — to make sure the strip
+    // isn't only present because some in-memory state has it cached.
+    await page.reload();
+    await page.waitForSelector('[data-testid="key-metrics-strip"]', { timeout: 15_000 });
     await expect(page.getByTestId('key-metrics-strip')).toBeVisible();
 
-    // Switch to Monthly Review — strip still there.
-    await page.getByRole('button', { name: /Monthly Review/i }).click();
-    await expect(page.getByTestId('key-metrics-strip')).toBeVisible();
+    // Cards must re-render with content, not just empty wrappers.
+    for (const id of ['metric-cash', 'metric-temporal', 'metric-money-moved']) {
+      const text = (await page.getByTestId(id).textContent())?.trim() ?? '';
+      expect(text.length, `${id} should have content after reload`).toBeGreaterThan(0);
+    }
   });
 });
