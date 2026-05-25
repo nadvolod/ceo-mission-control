@@ -10,7 +10,7 @@ import { test, expect } from '@playwright/test';
  */
 
 test.describe('Top-of-dashboard key metrics strip', () => {
-  test('renders all six metric cards with non-empty values on /dashboard', async ({ page }) => {
+  test('renders all seven metric cards with non-empty values on /dashboard', async ({ page }) => {
     await page.goto('/dashboard');
 
     // Wait until the dashboard finishes its initial data load.
@@ -22,6 +22,7 @@ test.describe('Top-of-dashboard key metrics strip', () => {
       'metric-net-worth',
       'metric-total-debt',
       'metric-temporal',
+      'metric-focus-hours',
       'metric-money-moved',
     ] as const;
 
@@ -47,7 +48,7 @@ test.describe('Top-of-dashboard key metrics strip', () => {
     await expect(page.getByText(/Monthly Burn/)).toHaveCount(0);
   });
 
-  test('all six metric cards fit above the fold on an iPhone 15 Plus viewport', async ({ page }) => {
+  test('all seven metric cards fit above the fold on an iPhone 15 Plus viewport', async ({ page }) => {
     // iPhone 15 Plus logical viewport: 430 × 932.
     await page.setViewportSize({ width: 430, height: 932 });
     await page.goto('/dashboard');
@@ -57,16 +58,17 @@ test.describe('Top-of-dashboard key metrics strip', () => {
     const stripBox = await strip.boundingBox();
     expect(stripBox, 'strip bounding box should be available').not.toBeNull();
     // The whole strip should sit within the 932px viewport — no need to scroll
-    // down to see any of the 6 metric cards.
+    // down to see any of the 7 metric cards.
     expect(stripBox!.y + stripBox!.height).toBeLessThanOrEqual(932);
 
-    // Confirm none of the 6 cards is clipped below the fold individually.
+    // Confirm none of the 7 cards is clipped below the fold individually.
     const cardIds = [
       'metric-cash',
       'metric-cash-mom',
       'metric-net-worth',
       'metric-total-debt',
       'metric-temporal',
+      'metric-focus-hours',
       'metric-money-moved',
     ];
     for (const id of cardIds) {
