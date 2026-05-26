@@ -97,8 +97,8 @@ export class WeeklyTracker {
     }
 
     const now = new Date();
-    const weekStart = review.weekStartDate || format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
-    const weekEnd = review.weekEndDate || format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    const weekStart = review.weekStartDate || format(startOfWeek(now, { weekStartsOn: 0 }), 'yyyy-MM-dd');
+    const weekEnd = review.weekEndDate || format(endOfWeek(now, { weekStartsOn: 0 }), 'yyyy-MM-dd');
     // Preserve any prior revenue for this week if the caller omitted it (e.g. inline target edit)
     const existingForWeek = this.data.weeklyReviews.find(r => r.weekStartDate === weekStart);
     const revenue = review.revenue ?? existingForWeek?.revenue ?? 0;
@@ -180,7 +180,7 @@ export class WeeklyTracker {
   }
 
   private getWeekEntries(dateInWeek: Date): (PerformanceDayEntry | null)[] {
-    const weekStart = startOfWeek(dateInWeek, { weekStartsOn: 1 });
+    const weekStart = startOfWeek(dateInWeek, { weekStartsOn: 0 });
     const entries: (PerformanceDayEntry | null)[] = [];
 
     for (let i = 0; i < 7; i++) {
@@ -201,8 +201,8 @@ export class WeeklyTracker {
   }
 
   getWeekSummary(dateInWeek: Date): WeeklySummary {
-    const weekStart = startOfWeek(dateInWeek, { weekStartsOn: 1 });
-    const weekEnd = endOfWeek(dateInWeek, { weekStartsOn: 1 });
+    const weekStart = startOfWeek(dateInWeek, { weekStartsOn: 0 });
+    const weekEnd = endOfWeek(dateInWeek, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, 'yyyy-MM-dd');
     const weekEndStr = format(weekEnd, 'yyyy-MM-dd');
 

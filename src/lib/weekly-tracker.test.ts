@@ -22,9 +22,9 @@ import { UNIT_TEST_OWNER_ID } from '@/__tests__/utils/owner-id';
 // Use local date (consistent with date-fns format) — not UTC toISOString
 const TODAY = format(new Date(), 'yyyy-MM-dd');
 
-// Helper: get a date string for a specific day of the current week (0=Mon)
+// Helper: get a date string for a specific day of the current week (0=Sun)
 function weekDay(offset: number): string {
-  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const weekStart = startOfWeek(new Date(), { weekStartsOn: 0 });
   return format(addDays(weekStart, offset), 'yyyy-MM-dd');
 }
 

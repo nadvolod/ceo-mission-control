@@ -82,7 +82,7 @@ function getDayStatusLabel(entry: PerformanceDayEntry | null): { label: string; 
   return { label: 'Partial', color: 'text-amber-700', bgColor: 'bg-amber-50' };
 }
 
-const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export function WeeklyPerformanceTracker({
   todaysEntry,

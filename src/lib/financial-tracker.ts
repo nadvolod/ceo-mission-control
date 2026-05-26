@@ -168,7 +168,7 @@ export class FinancialTracker {
    */
   getPreviousWeekTotals(): { moved: number; generated: number; cut: number; netImpact: number } {
     const now = new Date();
-    const prevWeekStart = addDays(startOfWeek(now, { weekStartsOn: 1 }), -7);
+    const prevWeekStart = addDays(startOfWeek(now, { weekStartsOn: 0 }), -7);
     const prevWeekStartStr = format(prevWeekStart, 'yyyy-MM-dd');
     const days = this.getDailyMetricsForWeek(prevWeekStartStr);
     return {

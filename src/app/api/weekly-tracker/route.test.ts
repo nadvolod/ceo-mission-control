@@ -5,9 +5,9 @@ import { NextRequest } from 'next/server';
 import { format, startOfWeek, addDays } from 'date-fns';
 import { GET, POST } from './route';
 
-// Helper: get a date string for a specific day of the current week (0=Mon)
+// Helper: get a date string for a specific day of the current week (0=Sun)
 function weekDay(offset: number): string {
-  const ws = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const ws = startOfWeek(new Date(), { weekStartsOn: 0 });
   return format(addDays(ws, offset), 'yyyy-MM-dd');
 }
 
