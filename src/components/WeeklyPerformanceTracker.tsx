@@ -901,7 +901,7 @@ export function WeeklyPerformanceTracker({
         {activeTab === 'weekly' && (
           <div className="space-y-6">
             {/* Metric Cards */}
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
               <div className="p-4 bg-emerald-50 rounded-lg">
                 <p className="text-sm font-medium text-gray-600">Net Impact</p>
                 <p data-testid="weekly-net-impact" className="text-2xl font-bold text-emerald-700">
@@ -916,6 +916,13 @@ export function WeeklyPerformanceTracker({
                 <p className="text-2xl font-bold text-purple-700">{currentWeekSummary.pipelineTotal}</p>
                 {previousWeekSummary.pipelineTotal > 0 && (
                   <DeltaBadge current={currentWeekSummary.pipelineTotal} previous={previousWeekSummary.pipelineTotal} />
+                )}
+              </div>
+              <div className="p-4 bg-blue-50 rounded-lg">
+                <p className="text-sm font-medium text-gray-600">Deep Work Total</p>
+                <p data-testid="weekly-deep-work-total" className="text-2xl font-bold text-blue-700">{currentWeekSummary.deepWorkTotal}h</p>
+                {previousWeekSummary.deepWorkTotal > 0 && (
+                  <DeltaBadge current={currentWeekSummary.deepWorkTotal} previous={previousWeekSummary.deepWorkTotal} suffix="h" />
                 )}
               </div>
               <div className="p-4 bg-amber-50 rounded-lg">

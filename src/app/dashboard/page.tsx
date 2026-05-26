@@ -15,6 +15,7 @@ import { enrichScorecard } from '@/lib/derive-focus';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { AdminHandoffButtons } from '@/components/AdminHandoffButtons';
 import { KeyMetricsStrip } from '@/components/KeyMetricsStrip';
+import { computeTotalFocusHoursThisWeek } from '@/lib/dashboard-metrics';
 
 export default function HomePage() {
   const {
@@ -89,7 +90,10 @@ export default function HomePage() {
           monarchData={monarchData}
           temporalHoursThisWeek={focusData?.weeklyTotals?.Temporal ?? 0}
           moneyMovedThisWeek={financialData?.weeklyTotals?.moved ?? 0}
-          focusHoursThisWeek={weeklyTrackerData?.currentWeekSummary?.deepWorkTotal ?? 0}
+          focusHoursThisWeek={computeTotalFocusHoursThisWeek(
+            focusData?.weeklyTotals,
+            weeklyTrackerData?.currentWeekSummary?.deepWorkTotal,
+          )}
         />
       </div>
 
