@@ -34,6 +34,53 @@ describe('WeeklyTracker', () => {
     storage._reset();
   });
 
+  describe('addToDay', () => {
+    it('creates a fresh entry when none exists', async () => {
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
+      const entry = await tracker.addToDay(1.5, 1, false, TODAY);
+      expect(entry).toMatchObject({
+        date: TODAY,
+        deepWorkHours: 1.5,
+        pipelineActions: 1,
+        trained: false,
+      });
+    });
+
+    it('accumulates deep-work hours and pipeline actions across calls', async () => {
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
+      await tracker.addToDay(1, 1, false, TODAY);
+      await tracker.addToDay(0.5, 2, false, TODAY);
+      const after = tracker.getTodaysEntry();
+      expect(after?.deepWorkHours).toBe(1.5);
+      expect(after?.pipelineActions).toBe(3);
+      expect(after?.trained).toBe(false);
+    });
+
+    it('latches trained=true and never flips it back to false on subsequent calls', async () => {
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
+      await tracker.addToDay(0, 0, true, TODAY);
+      await tracker.addToDay(0.5, 1, false, TODAY);
+      const after = tracker.getTodaysEntry();
+      expect(after?.trained).toBe(true);
+    });
+
+    it('caps cumulative deepWorkHours at 8', async () => {
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
+      await tracker.addToDay(6, 0, false, TODAY);
+      await tracker.addToDay(4, 0, false, TODAY); // would push to 10 → clamp to 8
+      const after = tracker.getTodaysEntry();
+      expect(after?.deepWorkHours).toBe(8);
+    });
+
+    it('rejects negative or non-finite deltas', async () => {
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
+      await expect(tracker.addToDay(-1, 0, false, TODAY)).rejects.toThrow(/deepWorkDelta/);
+      await expect(tracker.addToDay(0, -1, false, TODAY)).rejects.toThrow(/pipelineDelta/);
+      await expect(tracker.addToDay(Number.NaN, 0, false, TODAY)).rejects.toThrow(/deepWorkDelta/);
+      await expect(tracker.addToDay(0, 1.5, false, TODAY)).rejects.toThrow(/pipelineDelta/);
+    });
+  });
+
   describe('logDay', () => {
     it('should create a daily entry and save', async () => {
       const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);

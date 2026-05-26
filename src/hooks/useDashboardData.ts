@@ -66,6 +66,7 @@ export interface DashboardHandlers {
   handleAddFinancialEntry: (category: 'moved' | 'generated' | 'cut', amount: number, description: string) => Promise<void>;
   handleAddFocusSession: (category: FocusCategory, hours: number, description: string) => Promise<void>;
   handleLogDay: (deepWorkHours: number, pipelineActions: number, trained: boolean) => Promise<void>;
+  handleAddToDay: (deepWorkDelta: number, pipelineDelta: number, setTrained: boolean) => Promise<void>;
   handleSubmitWeeklyReview: (review: {
     slipAnalysis: string;
     systemAdjustment: string;
@@ -350,6 +351,26 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
     }
   }, [loadAllData]);
 
+  const handleAddToDay = useCallback(async (deepWorkDelta: number, pipelineDelta: number, setTrained: boolean) => {
+    try {
+      const now = new Date();
+      const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const response = await fetch('/api/weekly-tracker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'addToDay', deepWorkDelta, pipelineDelta, setTrained, date }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to add to day');
+      }
+      await loadAllData();
+    } catch (error) {
+      console.error('Error adding to day:', error);
+      throw error;
+    }
+  }, [loadAllData]);
+
   const handleLogDay = useCallback(async (deepWorkHours: number, pipelineActions: number, trained: boolean) => {
     try {
       // Use local date to avoid UTC/timezone mismatch on the server
@@ -501,7 +522,7 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
     monthlyReviewData, threeToThriveData, hasGarminData, isLoading,
     loadAllData, handleCreateTask, handleUpdateTask, handleDeleteTask,
     handleMonarchRefresh, handleAddProjectionAdjustment, handleRemoveProjectionAdjustment,
-    handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleSubmitWeeklyReview,
+    handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleAddToDay, handleSubmitWeeklyReview,
     handleSubmitMonthlyReview, handleDeleteMonthlyReview,
     handleDeleteDay, handleDeleteWeeklyReview, handleSaveThreeToThriveAnswer,
   };

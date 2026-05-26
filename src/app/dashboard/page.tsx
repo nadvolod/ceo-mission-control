@@ -23,7 +23,7 @@ export default function HomePage() {
     monarchData, weeklyTrackerData, isLoading,
     loadAllData, handleCreateTask, handleUpdateTask, handleDeleteTask,
     handleMonarchRefresh,
-    handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleSubmitWeeklyReview,
+    handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleAddToDay, handleSubmitWeeklyReview,
     monthlyReviewData, handleSubmitMonthlyReview, handleDeleteMonthlyReview,
     handleDeleteDay, handleDeleteWeeklyReview,
     threeToThriveData, handleSaveThreeToThriveAnswer,
@@ -138,6 +138,7 @@ export default function HomePage() {
                   dailyTrend={weeklyTrackerData.dailyTrend}
                   recentReviews={weeklyTrackerData.recentReviews}
                   onLogDay={handleLogDay}
+                  onAddToDay={handleAddToDay}
                   onSubmitReview={(review) =>
                     handleSubmitWeeklyReview({
                       slipAnalysis: review.slipAnalysis,

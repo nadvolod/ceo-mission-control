@@ -46,6 +46,7 @@ const baseProps = {
   dailyTrend: [],
   recentReviews: [],
   onLogDay: jest.fn().mockResolvedValue(undefined),
+  onAddToDay: jest.fn().mockResolvedValue(undefined),
   onSubmitReview: jest.fn().mockResolvedValue(undefined),
   onAddFocusSession: jest.fn().mockResolvedValue(undefined),
   temporalActual: 0,
@@ -160,11 +161,11 @@ describe('WeeklyPerformanceTracker - Quick-Add Focus Buttons', () => {
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     render(<WeeklyPerformanceTracker {...baseProps} onAddFocusSession={slowAdd} />);
 
-    const buttons = screen.getAllByRole('button', { name: /^\+\d/ });
+    const buttons = screen.getAllByRole('button', { name: /^\+\d+(?:\.\d+)?h\s+(Temporal|Finance|Revenue|Housing|Tax|Personal|Health|Admin|Learning|Other)/ });
     await user.click(buttons[0]);
 
     // All quick-add buttons should be disabled while adding
-    const quickAddButtons = screen.getAllByRole('button', { name: /^\+\d/ });
+    const quickAddButtons = screen.getAllByRole('button', { name: /^\+\d+(?:\.\d+)?h\s+(Temporal|Finance|Revenue|Housing|Tax|Personal|Health|Admin|Learning|Other)/ });
     quickAddButtons.forEach(btn => {
       expect(btn).toBeDisabled();
     });
