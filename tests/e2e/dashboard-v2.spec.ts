@@ -131,15 +131,13 @@ test.describe('Mission Control v2', () => {
     );
   });
 
-  test('parity: /dashboard/v2 shows the same temporal hours as /dashboard', async ({
-    page,
-    request,
-  }) => {
-    // Read what the old dashboard would see.
-    const focus = await request.get('/api/focus-hours').then((r) => r.json());
+  test('parity: /dashboard/v2 shows the same temporal hours as /dashboard', async ({ page }) => {
+    await page.goto('/dashboard/v2');
+    // Read through the same browser session that renders the card. This keeps
+    // the assertion tied to the owner-scoped data source the dashboard uses.
+    const focus = await readFocusHoursFromPage(page);
     const expectedTemporalToday = focus?.todaysMetrics?.byCategory?.Temporal ?? 0;
 
-    await page.goto('/dashboard/v2');
     // The Temporal card surfaces today's Temporal hours in its main value.
     const value = page.getByTestId('metric-card-temporal-value');
     // The value renders as "Nh" or "0h".
