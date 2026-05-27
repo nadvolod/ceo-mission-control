@@ -4,6 +4,7 @@ import {
   formatRunway,
   computeCashGrowthMoM,
   computeCashMoMDelta,
+  computeTotalFocusHoursThisWeek,
 } from '@/lib/dashboard-metrics';
 
 describe('formatCurrency', () => {
@@ -131,5 +132,42 @@ describe('computeCashMoMDelta', () => {
 
   it('handles negative nets (burn periods)', () => {
     expect(computeCashMoMDelta(0, 2000, 0, 1000)).toBe(-1000);
+  });
+});
+
+describe('computeTotalFocusHoursThisWeek', () => {
+  it('returns 0 when both inputs are missing', () => {
+    expect(computeTotalFocusHoursThisWeek(null, null)).toBe(0);
+    expect(computeTotalFocusHoursThisWeek(undefined, undefined)).toBe(0);
+  });
+
+  it('sums all focus session categories', () => {
+    expect(
+      computeTotalFocusHoursThisWeek(
+        { Temporal: 3.5, Finance: 2, Revenue: 1.5 },
+        0,
+      ),
+    ).toBe(7);
+  });
+
+  it('adds weekly tracker deep work hours to the session sum', () => {
+    expect(
+      computeTotalFocusHoursThisWeek({ Temporal: 3.5 }, 4.5),
+    ).toBe(8);
+  });
+
+  it('falls back to 0 for non-finite hour values inside the totals map', () => {
+    expect(
+      computeTotalFocusHoursThisWeek(
+        { Temporal: 3.5, Bad: Number.NaN, Worse: Number.POSITIVE_INFINITY },
+        null,
+      ),
+    ).toBe(3.5);
+  });
+
+  it('falls back to 0 for non-finite deepWorkTotal', () => {
+    expect(
+      computeTotalFocusHoursThisWeek({ Temporal: 2 }, Number.NaN),
+    ).toBe(2);
   });
 });

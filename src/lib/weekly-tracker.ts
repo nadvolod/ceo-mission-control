@@ -82,6 +82,62 @@ export class WeeklyTracker {
     return entry;
   }
 
+  // Adds (does not overwrite) to a day's running totals. Deep work hours and
+  // pipeline counts accumulate; trained latches true once set.
+  async addToDay(
+    deepWorkDelta: number,
+    pipelineDelta: number,
+    setTrained: boolean,
+    date?: string,
+  ): Promise<PerformanceDayEntry> {
+    if (typeof deepWorkDelta !== 'number' || !isFinite(deepWorkDelta) || deepWorkDelta < 0) {
+      throw new Error('deepWorkDelta must be a non-negative number');
+    }
+    if (typeof pipelineDelta !== 'number' || !isFinite(pipelineDelta) || pipelineDelta < 0 || !Number.isInteger(pipelineDelta)) {
+      throw new Error('pipelineDelta must be a non-negative integer');
+    }
+    if (typeof setTrained !== 'boolean') {
+      throw new Error('setTrained must be a boolean');
+    }
+
+    const entryDate = date || format(new Date(), 'yyyy-MM-dd');
+    const existing = this.data.dailyEntries[entryDate];
+    const now = new Date().toISOString();
+
+    const nextDeepWork = Math.min(8, (existing?.deepWorkHours ?? 0) + deepWorkDelta);
+    const nextPipeline = (existing?.pipelineActions ?? 0) + pipelineDelta;
+    const nextTrained = setTrained ? true : (existing?.trained ?? false);
+
+    const entry: PerformanceDayEntry = {
+      date: entryDate,
+      deepWorkHours: Math.round(nextDeepWork * 100) / 100,
+      pipelineActions: nextPipeline,
+      trained: nextTrained,
+      timestamp: now,
+    };
+
+    this.data.dailyEntries[entryDate] = entry;
+    await this.saveData();
+
+    await appendAuditLog(
+      this.ownerId,
+      entryDate,
+      'weekly-tracker',
+      `Incremented day: +${deepWorkDelta}h deep work (→${entry.deepWorkHours}h), ` +
+        `+${pipelineDelta} pipeline (→${entry.pipelineActions}), ` +
+        `trained=${entry.trained}`,
+    );
+    console.log('Weekly tracker day incremented:', {
+      date: entryDate,
+      deepWorkDelta,
+      pipelineDelta,
+      setTrained,
+      nextEntry: entry,
+    });
+
+    return entry;
+  }
+
   async submitWeeklyReview(review: {
     slipAnalysis: string;
     systemAdjustment: string;
@@ -97,8 +153,8 @@ export class WeeklyTracker {
     }
 
     const now = new Date();
-    const weekStart = review.weekStartDate || format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
-    const weekEnd = review.weekEndDate || format(endOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    const weekStart = review.weekStartDate || format(startOfWeek(now, { weekStartsOn: 0 }), 'yyyy-MM-dd');
+    const weekEnd = review.weekEndDate || format(endOfWeek(now, { weekStartsOn: 0 }), 'yyyy-MM-dd');
     // Preserve any prior revenue for this week if the caller omitted it (e.g. inline target edit)
     const existingForWeek = this.data.weeklyReviews.find(r => r.weekStartDate === weekStart);
     const revenue = review.revenue ?? existingForWeek?.revenue ?? 0;
@@ -180,7 +236,7 @@ export class WeeklyTracker {
   }
 
   private getWeekEntries(dateInWeek: Date): (PerformanceDayEntry | null)[] {
-    const weekStart = startOfWeek(dateInWeek, { weekStartsOn: 1 });
+    const weekStart = startOfWeek(dateInWeek, { weekStartsOn: 0 });
     const entries: (PerformanceDayEntry | null)[] = [];
 
     for (let i = 0; i < 7; i++) {
@@ -201,8 +257,8 @@ export class WeeklyTracker {
   }
 
   getWeekSummary(dateInWeek: Date): WeeklySummary {
-    const weekStart = startOfWeek(dateInWeek, { weekStartsOn: 1 });
-    const weekEnd = endOfWeek(dateInWeek, { weekStartsOn: 1 });
+    const weekStart = startOfWeek(dateInWeek, { weekStartsOn: 0 });
+    const weekEnd = endOfWeek(dateInWeek, { weekStartsOn: 0 });
     const weekStartStr = format(weekStart, 'yyyy-MM-dd');
     const weekEndStr = format(weekEnd, 'yyyy-MM-dd');
 

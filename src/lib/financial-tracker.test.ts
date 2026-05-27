@@ -352,22 +352,22 @@ describe('FinancialTracker.getPreviousWeekTotals', () => {
     });
   });
 
-  it('sums only entries from the previous Mon-Sun week (ignores this week and other days)', async () => {
+  it('sums only entries from the previous Sun-Sat week (ignores this week and other days)', async () => {
     const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
 
-    const thisWeekMonday = startOfWeek(new Date(), { weekStartsOn: 1 });
-    const prevWeekMonday = addDays(thisWeekMonday, -7);
-    const prevWeekWednesday = addDays(prevWeekMonday, 2);
+    const thisWeekStart = startOfWeek(new Date(), { weekStartsOn: 0 });
+    const prevWeekStart = addDays(thisWeekStart, -7);
+    const prevWeekMidweek = addDays(prevWeekStart, 2);
 
-    const thisWeekMondayStr = format(thisWeekMonday, 'yyyy-MM-dd');
-    const prevWeekMondayStr = format(prevWeekMonday, 'yyyy-MM-dd');
-    const prevWeekWednesdayStr = format(prevWeekWednesday, 'yyyy-MM-dd');
+    const thisWeekStartStr = format(thisWeekStart, 'yyyy-MM-dd');
+    const prevWeekStartStr = format(prevWeekStart, 'yyyy-MM-dd');
+    const prevWeekMidweekStr = format(prevWeekMidweek, 'yyyy-MM-dd');
 
     // This week entry — must be excluded
-    await tracker.addEntry('generated', 100, 'this week mon', thisWeekMondayStr);
+    await tracker.addEntry('generated', 100, 'this week start', thisWeekStartStr);
     // Previous week entries — must be summed
-    await tracker.addEntry('generated', 50, 'prev week mon', prevWeekMondayStr);
-    await tracker.addEntry('cut', 25, 'prev week wed', prevWeekWednesdayStr);
+    await tracker.addEntry('generated', 50, 'prev week start', prevWeekStartStr);
+    await tracker.addEntry('cut', 25, 'prev week midweek', prevWeekMidweekStr);
 
     expect(tracker.getPreviousWeekTotals()).toEqual({
       moved: 0,

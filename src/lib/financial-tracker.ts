@@ -128,7 +128,7 @@ export class FinancialTracker {
 
   /**
    * Returns a length-7 array of DailyFinancialMetrics, one per day from
-   * `weekStartDate` (Monday, YYYY-MM-DD) through the following Sunday inclusive.
+   * `weekStartDate` (Sunday, YYYY-MM-DD) through the following Saturday inclusive.
    * Days with no recorded entries return zero-filled placeholders.
    */
   getDailyMetricsForWeek(weekStartDate: string): DailyFinancialMetrics[] {
@@ -163,12 +163,12 @@ export class FinancialTracker {
   }
 
   /**
-   * Returns totals across the previous Mon-Sun week (relative to today).
+   * Returns totals across the previous Sun-Sat week (relative to today).
    * Uses cent-based arithmetic via centSum for precision.
    */
   getPreviousWeekTotals(): { moved: number; generated: number; cut: number; netImpact: number } {
     const now = new Date();
-    const prevWeekStart = addDays(startOfWeek(now, { weekStartsOn: 1 }), -7);
+    const prevWeekStart = addDays(startOfWeek(now, { weekStartsOn: 0 }), -7);
     const prevWeekStartStr = format(prevWeekStart, 'yyyy-MM-dd');
     const days = this.getDailyMetricsForWeek(prevWeekStartStr);
     return {

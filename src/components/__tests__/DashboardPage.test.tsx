@@ -236,10 +236,11 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
     expect(screen.getByTestId('metric-money-moved')).toBeInTheDocument();
   });
 
-  it('renders Focus Hours tile with the weekly deepWorkTotal from the tracker', () => {
+  it('renders Focus Hours tile as session totals + weekly tracker deep work hours', () => {
     render(<HomePage />);
-    // baseDashboardData mocks currentWeekSummary.deepWorkTotal = 12.5
-    expect(screen.getByTestId('metric-focus-hours')).toHaveTextContent('12.5h');
+    // baseDashboardData mocks focusData.weeklyTotals.Temporal = 6.5 and
+    // currentWeekSummary.deepWorkTotal = 12.5, so the unified total is 19h.
+    expect(screen.getByTestId('metric-focus-hours')).toHaveTextContent('19h');
   });
 
   it('renders dash fallbacks for monarch-derived metrics when monarchData is null', () => {

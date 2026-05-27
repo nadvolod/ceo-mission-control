@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
     const recentEntries = financialTracker.getRecentEntries(10);
 
     const now = new Date();
-    const weekStart = format(startOfWeek(now, { weekStartsOn: 1 }), 'yyyy-MM-dd');
+    const weekStart = format(startOfWeek(now, { weekStartsOn: 0 }), 'yyyy-MM-dd');
     const weekFinancialByDay = financialTracker.getDailyMetricsForWeek(weekStart);
 
     const rangeEnd = format(now, 'yyyy-MM-dd');

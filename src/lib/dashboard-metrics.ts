@@ -52,3 +52,24 @@ export function computeCashMoMDelta(
   const previousNet = previousMonthIncome - previousMonthExpenses;
   return currentNet - previousNet;
 }
+
+// Total focused work for the week = every focus-session category (Temporal,
+// Finance, Revenue, …) added together, plus any deep-work hours the user
+// logged through the Weekly Performance Tracker form. The two systems are
+// disjoint inputs (session-level tracking vs. a daily aggregate the user
+// enters by hand), so summing them captures all "hours I log."
+export function computeTotalFocusHoursThisWeek(
+  focusWeeklyTotals: Record<string, number> | null | undefined,
+  weeklyTrackerDeepWorkTotal: number | null | undefined,
+): number {
+  const sessionSum = focusWeeklyTotals
+    ? Object.values(focusWeeklyTotals).reduce(
+        (acc, hours) => acc + (Number.isFinite(hours) ? hours : 0),
+        0,
+      )
+    : 0;
+  const deepWork = Number.isFinite(weeklyTrackerDeepWorkTotal)
+    ? (weeklyTrackerDeepWorkTotal as number)
+    : 0;
+  return sessionSum + deepWork;
+}

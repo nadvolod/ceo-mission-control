@@ -15,6 +15,7 @@ import { enrichScorecard } from '@/lib/derive-focus';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { AdminHandoffButtons } from '@/components/AdminHandoffButtons';
 import { KeyMetricsStrip } from '@/components/KeyMetricsStrip';
+import { computeTotalFocusHoursThisWeek } from '@/lib/dashboard-metrics';
 
 export default function HomePage() {
   const {
@@ -22,7 +23,7 @@ export default function HomePage() {
     monarchData, weeklyTrackerData, isLoading,
     loadAllData, handleCreateTask, handleUpdateTask, handleDeleteTask,
     handleMonarchRefresh,
-    handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleSubmitWeeklyReview,
+    handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleAddToDay, handleSubmitWeeklyReview,
     monthlyReviewData, handleSubmitMonthlyReview, handleDeleteMonthlyReview,
     handleDeleteDay, handleDeleteWeeklyReview,
     threeToThriveData, handleSaveThreeToThriveAnswer,
@@ -89,7 +90,10 @@ export default function HomePage() {
           monarchData={monarchData}
           temporalHoursThisWeek={focusData?.weeklyTotals?.Temporal ?? 0}
           moneyMovedThisWeek={financialData?.weeklyTotals?.moved ?? 0}
-          focusHoursThisWeek={weeklyTrackerData?.currentWeekSummary?.deepWorkTotal ?? 0}
+          focusHoursThisWeek={computeTotalFocusHoursThisWeek(
+            focusData?.weeklyTotals,
+            weeklyTrackerData?.currentWeekSummary?.deepWorkTotal,
+          )}
         />
       </div>
 
@@ -134,6 +138,7 @@ export default function HomePage() {
                   dailyTrend={weeklyTrackerData.dailyTrend}
                   recentReviews={weeklyTrackerData.recentReviews}
                   onLogDay={handleLogDay}
+                  onAddToDay={handleAddToDay}
                   onSubmitReview={(review) =>
                     handleSubmitWeeklyReview({
                       slipAnalysis: review.slipAnalysis,
