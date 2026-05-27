@@ -146,13 +146,13 @@ export class FocusTracker {
 
   getWeeklyTotals(): Record<string, number> {
     const now = new Date();
-    const weekStart = startOfWeek(now, { weekStartsOn: 1 }); // Monday
+    const weekStart = startOfWeek(now, { weekStartsOn: 0 }); // Sunday (US convention)
     return this.getTotalsForPeriod(weekStart, now);
   }
 
   getPreviousWeekTotals(): Record<string, number> {
     const now = new Date();
-    const thisWeekStart = startOfWeek(now, { weekStartsOn: 1 });
+    const thisWeekStart = startOfWeek(now, { weekStartsOn: 0 });
     const prevWeekStart = subWeeks(thisWeekStart, 1);
     return this.getTotalsForPeriod(prevWeekStart, subDays(thisWeekStart, 1));
   }

@@ -38,6 +38,7 @@ export class FinancialTracker {
     lastUpdated: new Date().toISOString()
   };
   private readonly ownerId: string;
+  private static readonly DATE_VALIDATION_TIME_UTC = 'T12:00:00Z';
 
   private constructor(ownerId: string) {
     this.ownerId = ownerId;
@@ -51,7 +52,8 @@ export class FinancialTracker {
 
   private async loadData(): Promise<void> {
     const defaultData: FinancialData = { dailyMetrics: {}, lastUpdated: new Date().toISOString() };
-    this.data = await loadJSON(this.ownerId, 'financial-metrics.json', defaultData);
+    const loaded = await loadJSON(this.ownerId, 'financial-metrics.json', defaultData);
+    this.data = this.normalizeLoadedData(loaded, defaultData);
   }
 
   private async saveData(): Promise<void> {
@@ -69,6 +71,9 @@ export class FinancialTracker {
     }
 
     const entryDate = date || new Date().toISOString().split('T')[0];
+    if (!this.isSafeDateKey(entryDate)) {
+      throw new FinancialValidationError(`Invalid date: expected YYYY-MM-DD (received ${entryDate})`);
+    }
     const timestamp = new Date().toISOString();
 
     const entry: FinancialEntry = {
@@ -87,6 +92,7 @@ export class FinancialTracker {
         totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 }
       };
     }
+    this.ensureDayShape(entryDate);
 
     // Add entry
     this.data.dailyMetrics[entryDate].entries.push(entry);
@@ -105,6 +111,7 @@ export class FinancialTracker {
   }
 
   private recalculateTotals(date: string): void {
+    this.ensureDayShape(date);
     const dayMetrics = this.data.dailyMetrics[date];
     if (!dayMetrics) return;
 
@@ -115,6 +122,66 @@ export class FinancialTracker {
     const netImpact = this.centSum([moved, generated, cut]);
 
     dayMetrics.totals = { moved, generated, cut, netImpact };
+  }
+
+  private normalizeLoadedData(data: unknown, fallback: FinancialData): FinancialData {
+    if (!data || typeof data !== 'object') return fallback;
+
+    const loaded = data as Partial<FinancialData>;
+    const normalized: FinancialData = {
+      dailyMetrics: Object.create(null) as Record<string, DailyFinancialMetrics>,
+      lastUpdated: typeof loaded.lastUpdated === 'string' ? loaded.lastUpdated : fallback.lastUpdated,
+    };
+
+    if (loaded.dailyMetrics && typeof loaded.dailyMetrics === 'object') {
+      for (const [date, dayMetrics] of Object.entries(loaded.dailyMetrics)) {
+        if (!this.isSafeDateKey(date)) continue;
+        normalized.dailyMetrics[date] = dayMetrics as DailyFinancialMetrics;
+      }
+    }
+
+    Object.keys(normalized.dailyMetrics).forEach(date => this.ensureDayShape(date, normalized.dailyMetrics));
+    return normalized;
+  }
+
+  private ensureDayShape(date: string, dailyMetrics = this.data.dailyMetrics): void {
+    if (!this.isSafeDateKey(date)) return;
+    const existing = dailyMetrics[date];
+    if (!existing || typeof existing !== 'object') {
+      dailyMetrics[date] = {
+        date,
+        entries: [],
+        totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 },
+      };
+      return;
+    }
+
+    const withDefaults = existing as Partial<DailyFinancialMetrics>;
+    if (!Array.isArray(withDefaults.entries)) {
+      withDefaults.entries = [];
+    }
+    const totals = withDefaults.totals as Partial<DailyFinancialMetrics['totals']> | undefined;
+    if (!totals || typeof totals !== 'object') {
+      withDefaults.totals = { moved: 0, generated: 0, cut: 0, netImpact: 0 };
+    } else {
+      const toFiniteNumber = (value: unknown): number =>
+        typeof value === 'number' && Number.isFinite(value) ? value : 0;
+      withDefaults.totals = {
+        moved: toFiniteNumber(totals.moved),
+        generated: toFiniteNumber(totals.generated),
+        cut: toFiniteNumber(totals.cut),
+        netImpact: toFiniteNumber(totals.netImpact),
+      };
+    }
+    withDefaults.date = withDefaults.date || date;
+    dailyMetrics[date] = withDefaults as DailyFinancialMetrics;
+  }
+
+  private isSafeDateKey(value: string): boolean {
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+    const parsed = new Date(`${value}${FinancialTracker.DATE_VALIDATION_TIME_UTC}`);
+    if (!Number.isFinite(parsed.getTime())) return false;
+    return parsed.toISOString().slice(0, 10) === value;
   }
 
   getTodaysMetrics(): DailyFinancialMetrics {
@@ -128,7 +195,7 @@ export class FinancialTracker {
 
   /**
    * Returns a length-7 array of DailyFinancialMetrics, one per day from
-   * `weekStartDate` (Monday, YYYY-MM-DD) through the following Sunday inclusive.
+   * `weekStartDate` (Sunday, YYYY-MM-DD) through the following Saturday inclusive.
    * Days with no recorded entries return zero-filled placeholders.
    */
   getDailyMetricsForWeek(weekStartDate: string): DailyFinancialMetrics[] {
@@ -163,12 +230,12 @@ export class FinancialTracker {
   }
 
   /**
-   * Returns totals across the previous Mon-Sun week (relative to today).
+   * Returns totals across the previous Sun-Sat week (relative to today).
    * Uses cent-based arithmetic via centSum for precision.
    */
   getPreviousWeekTotals(): { moved: number; generated: number; cut: number; netImpact: number } {
     const now = new Date();
-    const prevWeekStart = addDays(startOfWeek(now, { weekStartsOn: 1 }), -7);
+    const prevWeekStart = addDays(startOfWeek(now, { weekStartsOn: 0 }), -7);
     const prevWeekStartStr = format(prevWeekStart, 'yyyy-MM-dd');
     const days = this.getDailyMetricsForWeek(prevWeekStartStr);
     return {

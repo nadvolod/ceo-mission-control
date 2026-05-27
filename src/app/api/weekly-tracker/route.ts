@@ -80,6 +80,53 @@ export async function POST(request: NextRequest) {
         });
       }
 
+      case 'addToDay': {
+        const { deepWorkDelta, pipelineDelta, setTrained, date } = data;
+
+        if (typeof deepWorkDelta !== 'number' || !isFinite(deepWorkDelta) || deepWorkDelta < 0) {
+          return NextResponse.json(
+            { success: false, error: 'deepWorkDelta must be a non-negative number' },
+            { status: 400 }
+          );
+        }
+
+        if (typeof pipelineDelta !== 'number' || !isFinite(pipelineDelta) || pipelineDelta < 0 || !Number.isInteger(pipelineDelta)) {
+          return NextResponse.json(
+            { success: false, error: 'pipelineDelta must be a non-negative integer' },
+            { status: 400 }
+          );
+        }
+
+        if (typeof setTrained !== 'boolean') {
+          return NextResponse.json(
+            { success: false, error: 'setTrained must be a boolean' },
+            { status: 400 }
+          );
+        }
+
+        if (date !== undefined && (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(new Date(date + 'T00:00:00').getTime()))) {
+          return NextResponse.json(
+            { success: false, error: 'date must be a valid YYYY-MM-DD string' },
+            { status: 400 }
+          );
+        }
+
+        const entry = await tracker.addToDay(deepWorkDelta, pipelineDelta, setTrained, date);
+
+        console.log('Weekly tracker day incremented via API:', {
+          date: entry.date,
+          deepWorkDelta,
+          pipelineDelta,
+          setTrained,
+        });
+
+        return NextResponse.json({
+          success: true,
+          entry,
+          currentWeekSummary: tracker.getCurrentWeekSummary(),
+        });
+      }
+
       case 'submitReview': {
         const { revenue, slipAnalysis, systemAdjustment, nextWeekTargets, bottleneck, temporalTarget, weekStartDate, weekEndDate } = data;
 

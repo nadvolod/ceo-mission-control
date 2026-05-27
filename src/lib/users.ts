@@ -80,4 +80,3 @@ export async function setPassword(userId: string, password: string): Promise<voi
   const hash = await bcrypt.hash(password, BCRYPT_COST);
   await db`UPDATE users SET password_hash = ${hash} WHERE id = ${userId}`;
 }
-

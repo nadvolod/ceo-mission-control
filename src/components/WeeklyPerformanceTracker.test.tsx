@@ -46,6 +46,7 @@ const baseProps = {
   dailyTrend: [],
   recentReviews: [],
   onLogDay: jest.fn().mockResolvedValue(undefined),
+  onAddToDay: jest.fn().mockResolvedValue(undefined),
   onSubmitReview: jest.fn().mockResolvedValue(undefined),
   onAddFocusSession: jest.fn().mockResolvedValue(undefined),
   temporalActual: 0,
@@ -160,11 +161,11 @@ describe('WeeklyPerformanceTracker - Quick-Add Focus Buttons', () => {
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     render(<WeeklyPerformanceTracker {...baseProps} onAddFocusSession={slowAdd} />);
 
-    const buttons = screen.getAllByRole('button', { name: /^\+\d/ });
+    const buttons = screen.getAllByRole('button', { name: /^\+\d+(?:\.\d+)?h\s+(Temporal|Finance|Revenue|Housing|Tax|Personal|Health|Admin|Learning|Other)/ });
     await user.click(buttons[0]);
 
     // All quick-add buttons should be disabled while adding
-    const quickAddButtons = screen.getAllByRole('button', { name: /^\+\d/ });
+    const quickAddButtons = screen.getAllByRole('button', { name: /^\+\d+(?:\.\d+)?h\s+(Temporal|Finance|Revenue|Housing|Tax|Personal|Health|Admin|Learning|Other)/ });
     quickAddButtons.forEach(btn => {
       expect(btn).toBeDisabled();
     });
@@ -267,6 +268,23 @@ describe('WeeklyPerformanceTracker - Money Move quick-add', () => {
     expect(screen.getByRole('button', { name: /save move/i })).toBeDisabled();
     await user.type(screen.getByLabelText(/amount/i), '10');
     expect(screen.getByRole('button', { name: /save move/i })).toBeDisabled();
+  });
+
+  it.each([
+    ['moved', /\+ moved/i, 'Moved funds'],
+    ['generated', /\+ generated/i, 'Generated revenue'],
+    ['cut', /\+ cut/i, 'Cut expenses'],
+  ] as const)('submits %s category from quick-add', async (category, trigger, description) => {
+    const user = userEvent.setup();
+    const onAddFinancialEntry = jest.fn().mockResolvedValue(undefined);
+    render(<WeeklyPerformanceTracker {...baseProps} onAddFinancialEntry={onAddFinancialEntry} />);
+
+    await user.click(screen.getByRole('button', { name: trigger }));
+    await user.type(screen.getByLabelText(/amount/i), '250');
+    await user.type(screen.getByLabelText(/description/i), description);
+    await user.click(screen.getByRole('button', { name: /save move/i }));
+
+    expect(onAddFinancialEntry).toHaveBeenCalledWith(category, 250, description);
   });
 });
 

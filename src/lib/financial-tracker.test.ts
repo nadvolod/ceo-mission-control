@@ -145,12 +145,47 @@ describe('FinancialTracker.addEntry (input validation)', () => {
     expect(data.dailyMetrics[DATE]).toBeUndefined();
   });
 
+  it.each(['__proto__', '2024-13-45'])(
+    'rejects invalid date key "%s"',
+    async (badDate) => {
+      const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
+      await expect(tracker.addEntry('cut', 10, 'bad date', badDate)).rejects.toThrow(
+        /invalid date/i
+      );
+    }
+  );
+
   it('trims a valid description before storing it on the entry', async () => {
     const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     const entry = await tracker.addEntry('generated', 5, '  hello world  ', DATE);
     expect(entry.description).toBe('hello world');
     const data = tracker.getAllData();
     expect(data.dailyMetrics[DATE].entries[0].description).toBe('hello world');
+  });
+
+  it('adds entries when existing day data is legacy and missing entries array', async () => {
+    await storage.saveJSON(UNIT_TEST_OWNER_ID, 'financial-metrics.json', {
+      dailyMetrics: {
+        [DATE]: {
+          date: DATE,
+          totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 },
+        },
+      },
+      lastUpdated: new Date().toISOString(),
+    });
+
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
+
+    await expect(tracker.addEntry('cut', 250, 'Legacy day fix', DATE)).resolves.toMatchObject({
+      category: 'cut',
+      amount: 250,
+      description: 'Legacy day fix',
+    });
+
+    const data = tracker.getAllData();
+    expect(data.dailyMetrics[DATE].entries).toHaveLength(1);
+    expect(data.dailyMetrics[DATE].totals.cut).toBe(250);
+    expect(data.dailyMetrics[DATE].totals.netImpact).toBe(250);
   });
 });
 
@@ -352,22 +387,22 @@ describe('FinancialTracker.getPreviousWeekTotals', () => {
     });
   });
 
-  it('sums only entries from the previous Mon-Sun week (ignores this week and other days)', async () => {
+  it('sums only entries from the previous Sun-Sat week (ignores this week and other days)', async () => {
     const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
 
-    const thisWeekMonday = startOfWeek(new Date(), { weekStartsOn: 1 });
-    const prevWeekMonday = addDays(thisWeekMonday, -7);
-    const prevWeekWednesday = addDays(prevWeekMonday, 2);
+    const thisWeekStart = startOfWeek(new Date(), { weekStartsOn: 0 });
+    const prevWeekStart = addDays(thisWeekStart, -7);
+    const prevWeekMidweek = addDays(prevWeekStart, 2);
 
-    const thisWeekMondayStr = format(thisWeekMonday, 'yyyy-MM-dd');
-    const prevWeekMondayStr = format(prevWeekMonday, 'yyyy-MM-dd');
-    const prevWeekWednesdayStr = format(prevWeekWednesday, 'yyyy-MM-dd');
+    const thisWeekStartStr = format(thisWeekStart, 'yyyy-MM-dd');
+    const prevWeekStartStr = format(prevWeekStart, 'yyyy-MM-dd');
+    const prevWeekMidweekStr = format(prevWeekMidweek, 'yyyy-MM-dd');
 
     // This week entry — must be excluded
-    await tracker.addEntry('generated', 100, 'this week mon', thisWeekMondayStr);
+    await tracker.addEntry('generated', 100, 'this week start', thisWeekStartStr);
     // Previous week entries — must be summed
-    await tracker.addEntry('generated', 50, 'prev week mon', prevWeekMondayStr);
-    await tracker.addEntry('cut', 25, 'prev week wed', prevWeekWednesdayStr);
+    await tracker.addEntry('generated', 50, 'prev week start', prevWeekStartStr);
+    await tracker.addEntry('cut', 25, 'prev week midweek', prevWeekMidweekStr);
 
     expect(tracker.getPreviousWeekTotals()).toEqual({
       moved: 0,

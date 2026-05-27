@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import {
   Flame, Plus, TrendingUp, TrendingDown, CheckCircle2, XCircle,
-  AlertTriangle, BarChart3, Activity, ClipboardList, Target, Trash2
+  AlertTriangle, BarChart3, Activity, ClipboardList, Target, Trash2, Pencil
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -38,6 +38,7 @@ interface WeeklyPerformanceTrackerProps {
   dailyTrend: Array<PerformanceDayEntry & { isEmpty: boolean }>;
   recentReviews: WeeklyReview[];
   onLogDay: (deepWorkHours: number, pipelineActions: number, trained: boolean) => Promise<void>;
+  onAddToDay: (deepWorkDelta: number, pipelineDelta: number, setTrained: boolean) => Promise<void>;
   onSubmitReview: (review: {
     slipAnalysis: string;
     systemAdjustment: string;
@@ -82,7 +83,7 @@ function getDayStatusLabel(entry: PerformanceDayEntry | null): { label: string; 
   return { label: 'Partial', color: 'text-amber-700', bgColor: 'bg-amber-50' };
 }
 
-const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export function WeeklyPerformanceTracker({
   todaysEntry,
@@ -91,6 +92,7 @@ export function WeeklyPerformanceTracker({
   dailyTrend,
   recentReviews,
   onLogDay,
+  onAddToDay,
   onSubmitReview,
   onAddFocusSession,
   temporalActual = 0,
@@ -186,11 +188,30 @@ export function WeeklyPerformanceTracker({
     }
   };
 
+  const handleQuickAdd = async (
+    deepWorkDelta: number,
+    pipelineDelta: number,
+    setTrained: boolean,
+  ) => {
+    setIsSubmitting(true);
+    try {
+      await onAddToDay(deepWorkDelta, pipelineDelta, setTrained);
+    } catch (error) {
+      console.error('Error adding to day:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleQuickGoodDay = async () => {
     setIsSubmitting(true);
     try {
-      await onLogDay(3, 2, true);
-      setIsLogging(false);
+      // Top up to a "good day": fill the gap to 3h deep work and 2 pipeline,
+      // and latch trained. addToDay never overwrites — so if you've already
+      // logged 1.5h + 1 pipeline today, this only adds 1.5h + 1 (not 3 + 2).
+      const dwGap = Math.max(0, 3 - (todaysEntry?.deepWorkHours ?? 0));
+      const plGap = Math.max(0, 2 - (todaysEntry?.pipelineActions ?? 0));
+      await onAddToDay(dwGap, plGap, true);
     } catch (error) {
       console.error('Error logging good day:', error);
     } finally {
@@ -336,27 +357,54 @@ export function WeeklyPerformanceTracker({
             <Flame className="h-6 w-6 text-orange-500" />
             <h3 className="text-lg font-semibold text-gray-900">Weekly Performance Tracker</h3>
           </div>
-          <div className="flex items-center space-x-2">
-            {!isLogging && (
+          <button
+            onClick={() => setIsLogging(!isLogging)}
+            disabled={isSubmitting}
+            className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors disabled:opacity-50"
+            title="Edit today's totals directly (overwrite mode)"
+            aria-label="Edit today's totals"
+          >
+            <Pencil className="h-4 w-4" />
+            <span>Edit Today</span>
+          </button>
+        </div>
+
+        {/* Quick-add buttons — additive, never overwrite. Use Edit Today to fix mistakes. */}
+        {!isLogging && (
+          <div className="mb-4 flex flex-wrap gap-2" data-testid="weekly-tracker-quick-add">
+            {[
+              { label: '+30m Deep Work', dw: 0.5, pl: 0, tr: false, color: 'blue' },
+              { label: '+1h Deep Work',  dw: 1,   pl: 0, tr: false, color: 'blue' },
+              { label: '+2h Deep Work',  dw: 2,   pl: 0, tr: false, color: 'blue' },
+              { label: '+1 Pipeline',    dw: 0,   pl: 1, tr: false, color: 'purple' },
+              { label: '+2 Pipeline',    dw: 0,   pl: 2, tr: false, color: 'purple' },
+              { label: '✓ Trained',      dw: 0,   pl: 0, tr: true,  color: 'green' },
+            ].map(btn => (
               <button
-                onClick={handleQuickGoodDay}
+                key={btn.label}
+                onClick={() => handleQuickAdd(btn.dw, btn.pl, btn.tr)}
                 disabled={isSubmitting}
-                className="flex items-center space-x-1 px-3 py-2 text-sm bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100 transition-colors disabled:opacity-50"
-                title="Log 3h deep work + 2 pipeline + trained"
+                className={`px-3 py-1 text-xs rounded-lg border transition-colors disabled:opacity-50 ${
+                  btn.color === 'blue'
+                    ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                    : btn.color === 'purple'
+                      ? 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
+                      : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
+                }`}
               >
-                <CheckCircle2 className="h-4 w-4" />
-                <span>Good Day</span>
+                {btn.label}
               </button>
-            )}
+            ))}
             <button
-              onClick={() => setIsLogging(!isLogging)}
-              className="flex items-center space-x-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+              onClick={handleQuickGoodDay}
+              disabled={isSubmitting}
+              className="px-3 py-1 text-xs rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50"
+              title="Top up to 3h deep work + 2 pipeline + trained (never lowers values)"
             >
-              <Plus className="h-4 w-4" />
-              <span>Log Today</span>
+              ✓ Good Day
             </button>
           </div>
-        </div>
+        )}
 
         {/* Today's Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -920,7 +968,7 @@ export function WeeklyPerformanceTracker({
               </div>
               <div className="p-4 bg-blue-50 rounded-lg">
                 <p className="text-sm font-medium text-gray-600">Deep Work Total</p>
-                <p className="text-2xl font-bold text-blue-700">{currentWeekSummary.deepWorkTotal}h</p>
+                <p data-testid="weekly-deep-work-total" className="text-2xl font-bold text-blue-700">{currentWeekSummary.deepWorkTotal}h</p>
                 {previousWeekSummary.deepWorkTotal > 0 && (
                   <DeltaBadge current={currentWeekSummary.deepWorkTotal} previous={previousWeekSummary.deepWorkTotal} suffix="h" />
                 )}

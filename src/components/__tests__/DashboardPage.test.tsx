@@ -37,13 +37,13 @@ const baseDashboardData = {
   },
   financialData: {
     todaysMetrics: { date: '2026-04-14', entries: [], totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 } },
-    weeklyTotals: { moved: 0, generated: 0, cut: 0, netImpact: 0 },
+    weeklyTotals: { moved: 1200, generated: 0, cut: 0, netImpact: 1200 },
     monthlyTotals: { moved: 0, generated: 0, cut: 0, netImpact: 0 },
     recentEntries: [],
   },
   focusData: {
     todaysMetrics: { totalHours: 0, sessions: [], byCategory: {} },
-    weeklyTotals: {},
+    weeklyTotals: { Temporal: 6.5 },
     weekOverWeek: { currentTotal: 0, previousTotal: 0, absoluteChange: 0, percentageChange: 0, byCategoryChange: {} },
     dailyTrend: [],
     rollingAverage: [],
@@ -59,25 +59,29 @@ const baseDashboardData = {
     todaysEntry: null,
     currentWeekSummary: {
       weekStartDate: '2026-04-13',
-      totalDeepWork: 0,
-      totalPipeline: 0,
-      daysLogged: 0,
-      goodDays: 0,
+      weekEndDate: '2026-04-19',
+      revenue: 0,
+      pipelineTotal: 0,
+      deepWorkTotal: 12.5,
+      consistencyScore: 0,
+      daysTracked: 0,
       zeroDays: 0,
-      consistency: 0,
-      temporalTarget: 5,
+      goodDays: 0,
       dailyEntries: [],
+      temporalTarget: 5,
     },
     previousWeekSummary: {
       weekStartDate: '2026-04-06',
-      totalDeepWork: 0,
-      totalPipeline: 0,
-      daysLogged: 0,
-      goodDays: 0,
+      weekEndDate: '2026-04-12',
+      revenue: 0,
+      pipelineTotal: 0,
+      deepWorkTotal: 0,
+      consistencyScore: 0,
+      daysTracked: 0,
       zeroDays: 0,
-      consistency: 0,
-      temporalTarget: 5,
+      goodDays: 0,
       dailyEntries: [],
+      temporalTarget: 5,
     },
     dailyTrend: [],
     recentReviews: [],
@@ -105,9 +109,6 @@ jest.mock('@/hooks/useDashboardData', () => ({
 // ---------------------------------------------------------------------------
 jest.mock('@/components/WeeklyPerformanceTracker', () => ({
   WeeklyPerformanceTracker: () => <div data-testid="weekly-performance">Weekly Performance Tracker</div>,
-}));
-jest.mock('@/components/FinancialCommandCenter', () => ({
-  FinancialCommandCenter: () => <div data-testid="financial-command">Financial Command Center</div>,
 }));
 jest.mock('@/components/HealthIntelligenceDashboard', () => ({
   HealthIntelligenceDashboard: () => <div data-testid="health-intelligence">Health Intelligence</div>,
@@ -159,14 +160,20 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
 
   it('renders Weekly Performance Tracker as the first section', () => {
     render(<HomePage />);
-    const sections = screen.getAllByTestId(/weekly-performance|financial-command|health-intelligence|focus-optimization|mission-tracker|monthly-review|task-dashboard/);
+    const sections = screen.getAllByTestId(/weekly-performance|health-intelligence|focus-optimization|mission-tracker|monthly-review|task-dashboard/);
     expect(sections[0]).toHaveAttribute('data-testid', 'weekly-performance');
   });
 
-  it('renders Financial Command Center as the second section', () => {
+  it('renders Health Intelligence as the second section after the strip relocation', () => {
     render(<HomePage />);
-    const sections = screen.getAllByTestId(/weekly-performance|financial-command|health-intelligence|focus-optimization|mission-tracker|monthly-review|task-dashboard/);
-    expect(sections[1]).toHaveAttribute('data-testid', 'financial-command');
+    const sections = screen.getAllByTestId(/weekly-performance|health-intelligence|focus-optimization|mission-tracker|monthly-review|task-dashboard/);
+    expect(sections[1]).toHaveAttribute('data-testid', 'health-intelligence');
+  });
+
+  it('does NOT render the removed Financial Command Center', () => {
+    render(<HomePage />);
+    expect(screen.queryByTestId('financial-command')).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: /Financial Command Center/i })).not.toBeInTheDocument();
   });
 
   it('does NOT render the removed FinancialMetricsDashboard (Financial Impact Tracking)', () => {
@@ -191,10 +198,9 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
 
   // --- Edge cases ---
 
-  it('renders all 4 dashboard-tab sections on default view', () => {
+  it('renders the remaining 3 dashboard-tab sections on default view', () => {
     render(<HomePage />);
     expect(screen.getByTestId('weekly-performance')).toBeInTheDocument();
-    expect(screen.getByTestId('financial-command')).toBeInTheDocument();
     expect(screen.getByTestId('health-intelligence')).toBeInTheDocument();
     expect(screen.getByTestId('focus-optimization')).toBeInTheDocument();
   });
@@ -213,9 +219,83 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
     expect(screen.queryByTestId('weekly-performance')).not.toBeInTheDocument();
   });
 
-  it('renders page header with CEO Mission Control title', () => {
+  it('renders compact header with Mission Control title', () => {
     render(<HomePage />);
-    expect(screen.getByText('CEO Mission Control')).toBeInTheDocument();
+    expect(screen.getByText('Mission Control')).toBeInTheDocument();
+  });
+
+  it('renders the top-of-dashboard key metrics strip with all seven cards', () => {
+    render(<HomePage />);
+    expect(screen.getByTestId('key-metrics-strip')).toBeInTheDocument();
+    expect(screen.getByTestId('metric-cash')).toBeInTheDocument();
+    expect(screen.getByTestId('metric-cash-mom')).toBeInTheDocument();
+    expect(screen.getByTestId('metric-net-worth')).toBeInTheDocument();
+    expect(screen.getByTestId('metric-total-debt')).toBeInTheDocument();
+    expect(screen.getByTestId('metric-temporal')).toBeInTheDocument();
+    expect(screen.getByTestId('metric-focus-hours')).toBeInTheDocument();
+    expect(screen.getByTestId('metric-money-moved')).toBeInTheDocument();
+  });
+
+  it('renders Focus Hours tile as session totals + weekly tracker deep work hours', () => {
+    render(<HomePage />);
+    // baseDashboardData mocks focusData.weeklyTotals.Temporal = 6.5 and
+    // currentWeekSummary.deepWorkTotal = 12.5, so the unified total is 19h.
+    expect(screen.getByTestId('metric-focus-hours')).toHaveTextContent('19h');
+  });
+
+  it('renders dash fallbacks for monarch-derived metrics when monarchData is null', () => {
+    mockUseDashboardData.mockReturnValue({ ...baseDashboardData, monarchData: null } as any);
+    render(<HomePage />);
+    // 4 monarch-backed metric cards (cash, MoM, net worth, total debt) render "—"
+    const dashes = screen.getAllByText('—');
+    expect(dashes.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('renders key metric values from dashboard data', () => {
+    mockUseDashboardData.mockReturnValue({
+      ...baseDashboardData,
+      monarchData: {
+        cashPosition: 10000,
+        netWorth: 150000,
+        totalAssets: 200000,
+        totalLiabilities: 50000,
+        runwayMonths: 18,
+        // currentNet = +2000 → previousCashPosition = 8000 → growth = +25.0%
+        monthlyIncome: 5000,
+        monthlyExpenses: 3000,
+      },
+    } as any);
+    render(<HomePage />);
+    // Compact formatting: $10K, $150K, $50K, +25.0%, 6.5h, $1.2K
+    expect(screen.getByTestId('metric-cash')).toHaveTextContent('$10.0K');
+    expect(screen.getByTestId('metric-cash-mom')).toHaveTextContent('+25.0%');
+    expect(screen.getByTestId('metric-net-worth')).toHaveTextContent('$150.0K');
+    expect(screen.getByTestId('metric-total-debt')).toHaveTextContent('$50.0K');
+    expect(screen.getByTestId('metric-temporal')).toHaveTextContent('6.5h');
+    expect(screen.getByTestId('metric-money-moved')).toHaveTextContent('$1.2K');
+  });
+
+  it('renders cash growth dash when previous cash balance was 0 and current net is non-zero', () => {
+    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+    mockUseDashboardData.mockReturnValue({
+      ...baseDashboardData,
+      monarchData: {
+        // currentNet = -500 → previousCashPosition = -500 - (-500) = 0 → null
+        cashPosition: -500,
+        netWorth: 0,
+        totalAssets: 10000,
+        totalLiabilities: 10000,
+        runwayMonths: 0,
+        monthlyIncome: 0,
+        monthlyExpenses: 500,
+      },
+    } as any);
+    render(<HomePage />);
+    expect(screen.getByTestId('metric-cash-mom')).toHaveTextContent('—');
+    expect(warnSpy).toHaveBeenCalledWith(
+      expect.stringContaining('cash growth MoM is undefined'),
+    );
+    warnSpy.mockRestore();
   });
 });
 
@@ -231,10 +311,9 @@ describe('Dashboard Page - Phase 3: Tab-based layout', () => {
     expect(screen.getByTestId('dashboard-tabs')).toBeInTheDocument();
   });
 
-  it('default tab shows daily sections (Weekly Perf, Financial Command, etc.)', () => {
+  it('default tab shows daily sections (Weekly Perf, Health, Focus)', () => {
     render(<HomePage />);
     expect(screen.getByTestId('weekly-performance')).toBeInTheDocument();
-    expect(screen.getByTestId('financial-command')).toBeInTheDocument();
     expect(screen.getByTestId('health-intelligence')).toBeInTheDocument();
     expect(screen.getByTestId('focus-optimization')).toBeInTheDocument();
   });
@@ -254,7 +333,7 @@ describe('Dashboard Page - Phase 3: Tab-based layout', () => {
 
     expect(screen.getByTestId('task-dashboard')).toBeInTheDocument();
     expect(screen.queryByTestId('weekly-performance')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('financial-command')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('focus-optimization')).not.toBeInTheDocument();
   });
 
   it('Monthly Review tab shows MonthlyReviewTracker and MissionTracker', async () => {
