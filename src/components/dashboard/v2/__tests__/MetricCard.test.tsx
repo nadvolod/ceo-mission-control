@@ -14,7 +14,7 @@ describe('MetricCard', () => {
     render(<MetricCard metric={metric} />);
 
     expect(screen.getByText('Temporal')).toBeInTheDocument();
-    expect(screen.getByText('1.5h')).toBeInTheDocument();
+    expect(screen.getByTestId('metric-card-temporal-value')).toHaveTextContent('1.5h');
     expect(screen.getByText('6.5h/5h')).toBeInTheDocument();
     expect(screen.getByText('6.5h this week')).toBeInTheDocument();
   });

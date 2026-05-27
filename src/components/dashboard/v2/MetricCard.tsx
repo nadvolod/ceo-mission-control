@@ -130,6 +130,7 @@ export function MetricCard({ metric, big = false, onLog }: MetricCardProps) {
             color: 'var(--color-mc-ink)',
             lineHeight: 1,
           }}
+          data-testid={`metric-card-${metric.id}-value`}
         >
           {fmtMetric(metric.today, metric.fmt)}
         </span>

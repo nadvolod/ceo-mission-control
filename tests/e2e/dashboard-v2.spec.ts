@@ -141,9 +141,9 @@ test.describe('Mission Control v2', () => {
 
     await page.goto('/dashboard/v2');
     // The Temporal card surfaces today's Temporal hours in its main value.
-    const card = page.getByTestId('metric-card-temporal');
-    // The value renders as "Nh" or "0h" — read text and parse the integer hours.
-    const text = await card.textContent();
+    const value = page.getByTestId('metric-card-temporal-value');
+    // The value renders as "Nh" or "0h".
+    const text = await value.textContent();
     expect(text).not.toBeNull();
     const match = text!.match(/(\d+(?:\.\d+)?)h/);
     expect(match).not.toBeNull();
