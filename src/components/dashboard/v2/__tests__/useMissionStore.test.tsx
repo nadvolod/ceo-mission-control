@@ -26,15 +26,16 @@ describe('useMissionStore.log', () => {
     ) as unknown as typeof fetch;
   });
 
-  it('posts to /api/temporal with addSession for temporal logs', async () => {
+  it('posts to /api/focus-hours with category=Temporal for temporal logs', async () => {
     const { result } = renderHook(() => useMissionStore());
     await act(async () => {
       await result.current.log('temporal', 1, '+1h');
     });
     const calls = (global.fetch as jest.Mock).mock.calls;
-    expect(calls[0][0]).toBe('/api/temporal');
+    expect(calls[0][0]).toBe('/api/focus-hours');
     const body = JSON.parse(calls[0][1].body);
     expect(body.action).toBe('addSession');
+    expect(body.category).toBe('Temporal');
     expect(body.hours).toBe(1);
     expect(mockLoadAllData).toHaveBeenCalled();
   });
@@ -58,6 +59,23 @@ describe('useMissionStore.log', () => {
     expect(calls[0][0]).toBe('/api/focus-hours');
     const body = JSON.parse(calls[0][1].body);
     expect(body.category).toBe('Other');
+  });
+
+  it('sets trained additively without overwriting weekly-tracker totals', async () => {
+    const { result } = renderHook(() => useMissionStore());
+    await act(async () => {
+      await result.current.log('trained', 1, '+ Session');
+    });
+    const calls = (global.fetch as jest.Mock).mock.calls;
+    expect(calls[0][0]).toBe('/api/weekly-tracker');
+    const body = JSON.parse(calls[0][1].body);
+    expect(body).toMatchObject({
+      action: 'addToDay',
+      deepWorkDelta: 0,
+      pipelineDelta: 0,
+      setTrained: true,
+    });
+    expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   it('rolls back the optimistic activity entry and surfaces a toast on failure', async () => {

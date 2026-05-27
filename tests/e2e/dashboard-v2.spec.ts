@@ -58,12 +58,12 @@ test.describe('Mission Control v2', () => {
     // The dialog closes when the action runs.
     await expect(page.getByTestId('cmdk-dialog')).not.toBeVisible();
 
-    // The temporal endpoint persisted the hour.
-    const res = await request.get('/api/temporal');
+    // The focus-hours endpoint persisted the Temporal hour, which is the same
+    // data source the v2 card and the old dashboard metrics read.
+    const res = await request.get('/api/focus-hours');
     expect(res.status()).toBe(200);
     const body = await res.json();
-    const today = new Date().toISOString().slice(0, 10);
-    expect(body.dailyTotals[today]).toBeGreaterThanOrEqual(1);
+    expect(body.todaysMetrics?.byCategory?.Temporal ?? 0).toBeGreaterThanOrEqual(1);
   });
 
   test('hover preset on the Pipeline card logs +Call to focus-hours', async ({ page, request }) => {

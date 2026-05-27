@@ -16,13 +16,14 @@ type LogResult = { ok: true } | { ok: false; error: string };
 async function postLog(metricId: MetricId, delta: number, label: string): Promise<LogResult> {
   try {
     if (metricId === 'temporal') {
-      const res = await fetch('/api/temporal', {
+      const res = await fetch('/api/focus-hours', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'addSession',
+          category: 'Temporal',
           hours: delta,
-          description: `${label.trim()} via Mission Control`,
+          description: `${label.trim()} Temporal · Mission Control`,
         }),
       });
       if (!res.ok) {
@@ -94,10 +95,11 @@ async function postLog(metricId: MetricId, delta: number, label: string): Promis
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'logDay',
-          deepWorkHours: 0,
-          pipelineActions: 0,
-          trained: true,
+          action: 'addToDay',
+          deepWorkDelta: 0,
+          pipelineDelta: 0,
+          setTrained: true,
+          date: localDateKey(),
         }),
       });
       if (!res.ok) {
@@ -172,6 +174,10 @@ function localReducer(state: LocalState, action: LocalAction): LocalState {
 
 function hhmm(d: Date = new Date()): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function localDateKey(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 // ----- Public hook -------------------------------------------------------
@@ -283,6 +289,10 @@ export function useMissionStore() {
     metrics,
     activity: local.activity,
     toast: local.toast,
+    focusData,
+    financialData,
+    weeklyTrackerData: dashboard.weeklyTrackerData,
+    monarchData,
     threeToThrive: threeToThriveData,
     saveThreeToThriveAnswer: dashboard.handleSaveThreeToThriveAnswer,
     isLoading: dashboard.isLoading,

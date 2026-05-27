@@ -12,7 +12,6 @@ import { CollapsiblePanel } from '@/components/dashboard/v2/CollapsiblePanel';
 import { CmdK } from '@/components/dashboard/v2/CmdK';
 import { ReflectionDrawer } from '@/components/dashboard/v2/ReflectionDrawer';
 import { useMissionStore } from '@/components/dashboard/v2/useMissionStore';
-import { useDashboardData } from '@/hooks/useDashboardData';
 import { deriveActivity, deriveChips, consecutiveStreak } from '@/components/dashboard/v2/derive';
 import { SEED_ACTIVITY } from '@/components/dashboard/v2/seed';
 
@@ -29,8 +28,7 @@ function fmtHeaderDate(d: Date): string {
 
 export default function MissionControlV2Page() {
   const store = useMissionStore();
-  // Pull a couple of extra fields from the dashboard hook for activity + chips.
-  const { focusData, financialData, weeklyTrackerData, monarchData } = useDashboardData();
+  const { focusData, financialData, weeklyTrackerData, monarchData } = store;
 
   const [tab, setTab] = useState<Tab>('overview');
   const [cmdOpen, setCmdOpen] = useState(false);
@@ -75,7 +73,7 @@ export default function MissionControlV2Page() {
     if (!store.toast) return;
     const id = setTimeout(() => store.clearToast(), 4000);
     return () => clearTimeout(id);
-  }, [store.toast, store]);
+  }, [store.toast, store.clearToast]);
 
   // Derive the live activity feed.
   const activity = useMemo(() => {
