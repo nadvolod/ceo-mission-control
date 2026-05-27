@@ -28,7 +28,7 @@ function actionsFor({ onLog, onOpenReflection, onSwitchTab }: Pick<CmdKProps, 'o
     { kw: '+0.5h temporal', label: 'Log +0.5h Temporal',  hint: 'temp 0.5', icon: '⏱', accent: MC_COLORS.pink,  run: () => onLog('temporal', 0.5, '+0.5h') },
     { kw: '+1h temporal',   label: 'Log +1h Temporal',    hint: 'temp 1',   icon: '⏱', accent: MC_COLORS.pink,  run: () => onLog('temporal', 1, '+1h') },
     { kw: '+2h temporal',   label: 'Log +2h Temporal',    hint: 'temp 2',   icon: '⏱', accent: MC_COLORS.pink,  run: () => onLog('temporal', 2, '+2h') },
-    { kw: '+gen generated', label: '+ Generated $2,000',  hint: '$ gen',    icon: '$', accent: MC_COLORS.green, run: () => onLog('moneyMoved', 2000, '+ Generated') },
+    { kw: '+gen generated gen 2000 generated 2000', label: '+ Generated $2,000', hint: '$ gen', icon: '$', accent: MC_COLORS.green, run: () => onLog('moneyMoved', 2000, '+ Generated') },
     { kw: '+moved',         label: '+ Moved $500',        hint: '$ moved',  icon: '$', accent: MC_COLORS.green, run: () => onLog('moneyMoved', 500, '+ Moved') },
     { kw: '+cut',           label: '+ Cut $250',          hint: '$ cut',    icon: '$', accent: MC_COLORS.green, run: () => onLog('moneyMoved', 250, '+ Cut') },
     { kw: '+call pipeline', label: '+ Pipeline call',     hint: 'pipe',     icon: '☎', accent: MC_COLORS.amber, run: () => onLog('pipeline', 0.5, '+ Call') },

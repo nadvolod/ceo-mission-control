@@ -9,7 +9,7 @@
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-body), system-ui, sans-serif;
-  --font-display: var(--font-display), Georgia, serif;
+  --font-display: var(--font-display), georgia, serif;
 
   /* Mission Control · V1·D — dark UV palette */
   --color-mc-bg: #0E0C14;
@@ -28,7 +28,7 @@
 
   --font-mc-sans: var(--font-geist), 'Geist', 'Inter', system-ui, sans-serif;
   --font-mc-mono: var(--font-mono), 'JetBrains Mono', 'Geist Mono', ui-monospace, monospace;
-  --font-mc-serif: var(--font-display), 'Instrument Serif', Georgia, serif;
+  --font-mc-serif: var(--font-display), 'Instrument Serif', georgia, serif;
 }
 
 @media (prefers-color-scheme: dark) {

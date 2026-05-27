@@ -118,4 +118,54 @@ describe('useMissionStore.log', () => {
       await logPromise;
     });
   });
+
+  it('clears the accepted optimistic entry even when refresh fails', async () => {
+    mockLoadAllData.mockRejectedValueOnce(new Error('refresh down'));
+
+    const { result } = renderHook(() => useMissionStore());
+
+    await act(async () => {
+      await result.current.log('temporal', 1, '+1h');
+    });
+
+    expect(result.current.activity).toHaveLength(0);
+    expect(result.current.metrics.temporal.today).toBe(0);
+    expect(result.current.toast?.text).toBe('refresh down');
+  });
+
+  it('commits only the completed optimistic entry while another log is in flight', async () => {
+    const refreshResolvers: Array<() => void> = [];
+    mockLoadAllData.mockImplementation(
+      () => new Promise<void>((res) => { refreshResolvers.push(res); }),
+    );
+
+    const { result } = renderHook(() => useMissionStore());
+
+    let temporalPromise!: Promise<void>;
+    let deepWorkPromise!: Promise<void>;
+    act(() => {
+      temporalPromise = result.current.log('temporal', 1, '+1h');
+      deepWorkPromise = result.current.log('deepWork', 0.5, '+0.5h');
+    });
+
+    await waitFor(() => {
+      expect(result.current.activity).toHaveLength(2);
+    });
+
+    await act(async () => {
+      refreshResolvers[0]();
+      await temporalPromise;
+    });
+
+    expect(result.current.activity).toHaveLength(1);
+    expect(result.current.activity[0].kind).toBe('deepWork');
+    expect(result.current.metrics.deepWork.today).toBe(0.5);
+
+    await act(async () => {
+      refreshResolvers[1]();
+      await deepWorkPromise;
+    });
+
+    expect(result.current.activity).toHaveLength(0);
+  });
 });

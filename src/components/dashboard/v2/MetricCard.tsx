@@ -33,6 +33,7 @@ function presetTestId(metricId: MetricId, label: string): string {
 
 export function MetricCard({ metric, big = false, onLog }: MetricCardProps) {
   const [hover, setHover] = useState(false);
+  const [focusWithin, setFocusWithin] = useState(false);
   const [flash, setFlash] = useState(false);
   const prevRef = useRef<number | undefined>(undefined);
 
@@ -60,7 +61,8 @@ export function MetricCard({ metric, big = false, onLog }: MetricCardProps) {
   const goalPct = goal != null && week != null ? clamp(week / goal, 0, 1) : null;
   const ahead = goal != null && week != null && week >= goal;
   const presets = PRESETS[metric.id] ?? [];
-  const showPresets = hover && presets.length > 0 && !!onLog;
+  const active = hover || focusWithin;
+  const showPresets = active && presets.length > 0 && !!onLog;
 
   const subLine =
     week != null && week !== 0
@@ -71,16 +73,23 @@ export function MetricCard({ metric, big = false, onLog }: MetricCardProps) {
     <div
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
+      onFocusCapture={() => setFocusWithin(true)}
+      onBlurCapture={(e) => {
+        const next = e.relatedTarget as Node | null;
+        if (!next || !e.currentTarget.contains(next)) setFocusWithin(false);
+      }}
       className="relative flex flex-col gap-2 overflow-hidden rounded-xl p-[14px]"
       style={{
         minHeight: 134,
-        background: hover ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.04)',
-        border: `1px solid ${flash ? accent : hover ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.08)'}`,
+        background: active ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${flash ? accent : active ? 'rgba(255,255,255,0.16)' : 'rgba(255,255,255,0.08)'}`,
         backdropFilter: 'blur(20px)',
         transition: 'border-color .35s, background .15s, box-shadow .35s',
         boxShadow: flash ? `0 0 24px ${accent}88, inset 0 0 0 1px ${accent}` : 'none',
       }}
       data-testid={`metric-card-${metric.id}`}
+      tabIndex={presets.length > 0 && onLog ? 0 : undefined}
+      aria-label={`${metric.label} metric`}
     >
       <div
         aria-hidden
@@ -91,7 +100,7 @@ export function MetricCard({ metric, big = false, onLog }: MetricCardProps) {
           width: 90,
           height: 90,
           background: `radial-gradient(circle, ${accent} 0%, transparent 70%)`,
-          opacity: hover ? 0.32 : 0.18,
+          opacity: active ? 0.32 : 0.18,
           transition: 'opacity .2s',
         }}
       />
@@ -212,12 +221,14 @@ export function MetricCard({ metric, big = false, onLog }: MetricCardProps) {
               transition: 'opacity .12s',
               pointerEvents: showPresets ? 'auto' : 'none',
             }}
+            aria-hidden={!showPresets}
           >
             {presets.map((preset) => (
               <button
                 key={preset.label}
                 type="button"
                 onClick={() => onLog(metric.id, preset.delta, preset.label)}
+                tabIndex={showPresets ? 0 : -1}
                 className="flex-1 rounded-md cursor-pointer"
                 style={{
                   padding: '6px 4px',

@@ -10,6 +10,16 @@ async function readFocusHoursFromPage(page: Page) {
   });
 }
 
+async function readThreeToThriveFromPage(page: Page) {
+  return page.evaluate(async () => {
+    const res = await fetch('/api/three-to-thrive');
+    if (!res.ok) {
+      throw new Error(`GET /api/three-to-thrive failed: ${res.status}`);
+    }
+    return res.json();
+  });
+}
+
 function waitForFocusHoursPost(page: Page) {
   return page.waitForResponse((response) =>
     response.url().includes('/api/focus-hours') &&
@@ -19,7 +29,7 @@ function waitForFocusHoursPost(page: Page) {
 }
 
 // These tests exercise the new /dashboard/v2 surface end-to-end:
-//   1. Page renders with the new shell
+//   1. Shell renders and opens the logging palette
 //   2. ⌘K opens, filters, runs a temporal log → server persists it
 //   3. Hover preset on a MetricCard logs to the same data source as /dashboard
 //   4. Reflection drawer auto-saves an answer that survives a reload
@@ -30,7 +40,7 @@ function waitForFocusHoursPost(page: Page) {
 test.describe('Mission Control v2', () => {
   test.describe.configure({ mode: 'serial' });
 
-  test('renders the new shell with the OrbitStar header and the metric grid', async ({ page }) => {
+  test('renders the new shell and opens the log command palette', async ({ page }) => {
     const response = await page.goto('/dashboard/v2');
     expect(response?.status()).toBeLessThan(400);
 
@@ -47,6 +57,10 @@ test.describe('Mission Control v2', () => {
     for (const id of ['cash', 'netWorth', 'temporal', 'pipeline', 'deepWork', 'moneyMoved']) {
       await expect(page.getByTestId(`metric-card-${id}`)).toBeVisible();
     }
+
+    await page.getByTestId('log-button').click();
+    await expect(page.getByTestId('cmdk-dialog')).toBeVisible();
+    await expect(page.getByTestId('cmdk-action-0')).toContainText(/log/i);
   });
 
   test('⌘K opens the palette, filters by keyword, and Esc closes it', async ({ page }) => {
@@ -98,10 +112,7 @@ test.describe('Mission Control v2', () => {
     expect(body.todaysMetrics?.byCategory?.Revenue ?? 0).toBeGreaterThanOrEqual(0.5);
   });
 
-  test('reflection drawer opens, autosaves an answer, and the answer survives reload', async ({
-    page,
-    request,
-  }) => {
+  test('reflection drawer opens, autosaves an answer, and the answer survives reload', async ({ page }) => {
     await page.goto('/dashboard/v2');
     await page.getByTestId('open-reflection').click();
     await expect(page.getByTestId('reflection-drawer')).toBeVisible();
@@ -109,18 +120,12 @@ test.describe('Mission Control v2', () => {
     const phrase = `e2e v2 reflection ${Date.now()}`;
     await page.getByTestId('reflection-input-0').fill(phrase);
 
-    // Auto-save debounce is 600ms; give it room.
-    await page.waitForTimeout(1200);
-
-    // Server confirms persistence.
-    const res = await request.get('/api/three-to-thrive');
-    const body = await res.json();
-    const today = body.todaysEntry;
-    expect(today).toBeTruthy();
-    const found = today.answers.some(
-      (a: { answer: string }) => a.answer.includes(phrase),
-    );
-    expect(found).toBe(true);
+    await expect.poll(async () => {
+      const body = await readThreeToThriveFromPage(page);
+      return body.todaysEntry?.answers?.some(
+        (a: { answer: string }) => a.answer.includes(phrase),
+      ) ?? false;
+    }).toBe(true);
 
     // Reload and confirm the textarea still has it.
     await page.getByTestId('reflection-close').click();

@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MetricCard } from '../MetricCard';
 import { SEED_METRICS, SEED_SPARKS, MC_COLORS } from '../seed';
 
@@ -49,5 +49,17 @@ describe('MetricCard', () => {
     expect(screen.getByTestId('preset-pipeline-call')).toBeInTheDocument();
     expect(screen.getByTestId('preset-pipeline-demo')).toBeInTheDocument();
     expect(screen.getByTestId('preset-pipeline-fu')).toBeInTheDocument();
+  });
+
+  it('reveals preset buttons for keyboard focus and hides them from tab order otherwise', () => {
+    const onLog = jest.fn();
+    render(<MetricCard metric={SEED_METRICS.pipeline} onLog={onLog} />);
+
+    const card = screen.getByTestId('metric-card-pipeline');
+    const call = screen.getByTestId('preset-pipeline-call');
+    expect(call).toHaveAttribute('tabindex', '-1');
+
+    fireEvent.focus(card);
+    expect(call).toHaveAttribute('tabindex', '0');
   });
 });

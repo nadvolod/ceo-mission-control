@@ -53,15 +53,12 @@ export default function MissionControlV2Page() {
         e.preventDefault();
         setCmdOpen((o) => !o);
       } else if (meta && lower === 'r') {
-        // Only intercept if no input is focused — Cmd+R also reloads the page,
-        // but the spec says ⌘R opens reflection. We bias toward the spec when
-        // the dialog isn't already a textarea.
         const target = document.activeElement as HTMLElement | null;
-        const isText = target && ['INPUT', 'TEXTAREA'].includes(target.tagName);
-        if (!isText) {
-          e.preventDefault();
-          setReflectOpen((o) => !o);
-        }
+        const isTypingTarget =
+          !!target &&
+          (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable);
+        e.preventDefault();
+        if (!isTypingTarget) setReflectOpen((o) => !o);
       }
     };
     window.addEventListener('keydown', onKey);

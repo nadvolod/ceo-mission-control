@@ -63,8 +63,7 @@ function financialToActivity(e: FinancialEntryLike): ActivityEntry {
 }
 
 // Merge server-side recent entries with optimistic local entries, dedup,
-// and sort newest-first. The dedup key uses the entry id so optimistic
-// rows replace themselves once the server refresh arrives.
+// and sort newest-first. Optimistic rows win when an id collides.
 export function deriveActivity(opts: {
   focus?: FocusSessionLike[];
   financial?: FinancialEntryLike[];
@@ -85,9 +84,25 @@ export function deriveActivity(opts: {
     seen.add(entry.id);
     deduped.push(entry);
   }
-  // Optimistic entries already carry their HH:mm; for server entries we sort
-  // by the parseable form when available, else preserve insertion order.
-  return deduped.slice(0, limit);
+  return deduped
+    .map((entry, index) => ({ entry, index, time: parseActivityTime(entry.t) }))
+    .sort((a, b) => {
+      if (a.time != null && b.time != null && a.time !== b.time) return b.time - a.time;
+      if (a.time != null && b.time == null) return -1;
+      if (a.time == null && b.time != null) return 1;
+      return a.index - b.index;
+    })
+    .map(({ entry }) => entry)
+    .slice(0, limit);
+}
+
+function parseActivityTime(t: string): number | null {
+  const match = t.match(/^(\d{2}):(\d{2})$/);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  if (hours > 23 || minutes > 59) return null;
+  return hours * 60 + minutes;
 }
 
 // ----- ChipStrip derivation ----------------------------------------------
@@ -97,9 +112,7 @@ type WeeklyTrackerLike = {
   currentWeekSummary?: { dailyEntries?: Array<DailyEntryLike | null> };
 };
 
-// Counts consecutive days back from today that had any deep work logged.
-// We use deep-work hours as the streak signal because that's the most
-// reliable "did you put in real work today" measurement we have.
+// Counts consecutive days back from today that had any work signal logged.
 export function consecutiveStreak(weekly: WeeklyTrackerLike | null | undefined): number {
   const entries = weekly?.currentWeekSummary?.dailyEntries ?? [];
   let count = 0;
@@ -135,13 +148,20 @@ export function deriveChips(opts: {
     });
   }
 
-  if (typeof cashMoMPct === 'number' && Math.abs(cashMoMPct) > 5) {
+  if (typeof cashMoMPct === 'number' && cashMoMPct > 5) {
     chips.push({
       id: 'cashmom',
       kind: 'positive',
       icon: 'arrow-up',
       body: 'Cash MoM',
       emphasis: `${cashMoMPct > 0 ? '+' : ''}${cashMoMPct.toFixed(0)}%`,
+    });
+  } else if (typeof cashMoMPct === 'number' && cashMoMPct < -5) {
+    chips.push({
+      id: 'cashmom-down',
+      kind: 'warning',
+      icon: 'zap',
+      body: `Cash MoM ${cashMoMPct.toFixed(0)}%`,
     });
   }
 
@@ -156,6 +176,7 @@ export function deriveChips(opts: {
 
   if (monarchSyncedAt) {
     const synced = new Date(monarchSyncedAt);
+    if (Number.isNaN(synced.getTime())) return chips;
     const minsAgo = Math.max(0, Math.round((Date.now() - synced.getTime()) / 60_000));
     const human =
       minsAgo < 1 ? 'just now' :

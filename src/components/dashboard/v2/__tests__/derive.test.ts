@@ -36,7 +36,7 @@ describe('consecutiveStreak', () => {
 });
 
 describe('deriveActivity', () => {
-  it('returns optimistic entries first', () => {
+  it('returns optimistic entries when present', () => {
     const result = deriveActivity({
       optimistic: [{ id: 'local-1', t: '09:00', kind: 'temporal', delta: '+1h', label: 'Temporal', meta: 'Quick log' }],
       focus: [],
@@ -71,8 +71,22 @@ describe('deriveActivity', () => {
         { id: 'fin-mv',  category: 'moved',     amount: 500,  description: 'wire to brokerage',       timestamp: '2026-05-27T09:20:00' },
       ],
     });
-    expect(result.map((e) => e.delta)).toEqual(['+ Generated', '+ Cut', '+ Moved']);
-    expect(result[0].label).toBe('$2,000');
+    expect(result.map((e) => e.delta)).toEqual(['+ Moved', '+ Cut', '+ Generated']);
+    expect(result[2].label).toBe('$2,000');
+  });
+
+  it('sorts newest-first while preserving insertion order for unparseable times', () => {
+    const result = deriveActivity({
+      optimistic: [
+        { id: 'local-old', t: '09:00', kind: 'temporal', delta: '+1h', label: 'Temporal', meta: 'old' },
+        { id: 'local-unknown', t: '--:--', kind: 'deepWork', delta: '+1h', label: 'Deep work', meta: 'unknown' },
+      ],
+      focus: [
+        { id: 'new', category: 'Temporal', hours: 1, description: 'new', timestamp: '2026-05-27T13:30:00' },
+      ],
+    });
+
+    expect(result.map((e) => e.id)).toEqual(['new', 'local-old', 'local-unknown']);
   });
 
   it('deduplicates entries by id', () => {
@@ -109,7 +123,7 @@ describe('deriveChips', () => {
     expect(chips.find((c) => c.id === 'streak')).toBeUndefined();
   });
 
-  it('adds a Cash MoM chip when the absolute pct is >5', () => {
+  it('adds a positive Cash MoM chip when pct is >5', () => {
     const chips = deriveChips({ streakDays: 0, cashMoMPct: 228 });
     const mom = chips.find((c) => c.id === 'cashmom');
     expect(mom).toBeDefined();
@@ -120,11 +134,26 @@ describe('deriveChips', () => {
     }
   });
 
+  it('uses a warning chip for negative Cash MoM', () => {
+    const chips = deriveChips({ streakDays: 0, cashMoMPct: -12 });
+    expect(chips.find((c) => c.id === 'cashmom')).toBeUndefined();
+    const mom = chips.find((c) => c.id === 'cashmom-down');
+    expect(mom).toMatchObject({
+      kind: 'warning',
+      body: 'Cash MoM -12%',
+    });
+  });
+
   it('adds a sync chip with human-readable time', () => {
     const oneHourAgo = new Date(Date.now() - 60 * 60_000).toISOString();
     const chips = deriveChips({ streakDays: 0, monarchSyncedAt: oneHourAgo });
     const sync = chips.find((c) => c.id === 'sync');
     expect(sync).toBeDefined();
     expect(sync?.body).toMatch(/1h ago/);
+  });
+
+  it('omits the sync chip for invalid timestamps', () => {
+    const chips = deriveChips({ streakDays: 0, monarchSyncedAt: 'not-a-date' });
+    expect(chips.find((c) => c.id === 'sync')).toBeUndefined();
   });
 });

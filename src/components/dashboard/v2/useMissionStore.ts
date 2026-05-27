@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useReducer, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { SEED_METRICS, SEED_SPARKS } from './seed';
 import type { ActivityEntry, MetricId, MetricSnapshot } from './types';
@@ -126,49 +126,58 @@ type LocalState = {
 
 type LocalAction =
   | { type: 'optimistic'; metricId: MetricId; delta: number; entry: ActivityEntry }
+  | { type: 'commit'; metricId: MetricId; delta: number; entryId: string }
   | { type: 'rollback'; metricId: MetricId; delta: number; entryId: string; error: string }
   | { type: 'clearToast' }
-  | { type: 'reset' };
+  | { type: 'saveError'; error: string };
 
 const initialLocal: LocalState = { overlay: {}, activity: [], toast: null };
+
+function applyOverlayDelta(
+  overlay: LocalState['overlay'],
+  metricId: MetricId,
+  todayDelta: number,
+  weekDelta: number,
+): LocalState['overlay'] {
+  const prev = overlay[metricId] || {};
+  const today = (prev.today ?? 0) + todayDelta;
+  const week = (prev.week ?? 0) + weekDelta;
+  const next = { ...overlay };
+  if (Math.abs(today) < 0.0001 && Math.abs(week) < 0.0001) {
+    delete next[metricId];
+  } else {
+    next[metricId] = { today, week };
+  }
+  return next;
+}
 
 function localReducer(state: LocalState, action: LocalAction): LocalState {
   switch (action.type) {
     case 'optimistic': {
-      const prev = state.overlay[action.metricId] || {};
       return {
         ...state,
-        overlay: {
-          ...state.overlay,
-          [action.metricId]: {
-            today: (prev.today ?? 0) + action.delta,
-            week: (prev.week ?? 0) + action.delta,
-          },
-        },
+        overlay: applyOverlayDelta(state.overlay, action.metricId, action.delta, action.delta),
         activity: [action.entry, ...state.activity].slice(0, 40),
       };
     }
-    case 'rollback': {
-      const prev = state.overlay[action.metricId] || {};
-      const reverted = (prev.today ?? 0) - action.delta;
-      const week = (prev.week ?? 0) - action.delta;
-      const overlay = { ...state.overlay };
-      if (reverted === 0 && week === 0) {
-        delete overlay[action.metricId];
-      } else {
-        overlay[action.metricId] = { today: reverted, week };
-      }
+    case 'commit':
       return {
         ...state,
-        overlay,
+        overlay: applyOverlayDelta(state.overlay, action.metricId, -action.delta, -action.delta),
+        activity: state.activity.filter((e) => e.id !== action.entryId),
+      };
+    case 'rollback': {
+      return {
+        ...state,
+        overlay: applyOverlayDelta(state.overlay, action.metricId, -action.delta, -action.delta),
         activity: state.activity.filter((e) => e.id !== action.entryId),
         toast: { kind: 'error', text: action.error },
       };
     }
     case 'clearToast':
       return { ...state, toast: null };
-    case 'reset':
-      return initialLocal;
+    case 'saveError':
+      return { ...state, toast: { kind: 'error', text: action.error } };
   }
 }
 
@@ -188,7 +197,9 @@ export function useMissionStore() {
 
   const [local, dispatch] = useReducer(localReducer, initialLocal);
   const refreshRef = useRef(dashboard.loadAllData);
-  refreshRef.current = dashboard.loadAllData;
+  useEffect(() => {
+    refreshRef.current = dashboard.loadAllData;
+  }, [dashboard.loadAllData]);
 
   const baseMetrics: Record<MetricId, MetricSnapshot> = useMemo(() => {
     const base: Record<MetricId, MetricSnapshot> = {
@@ -273,11 +284,15 @@ export function useMissionStore() {
         });
         return;
       }
-      // Server accepted — refresh authoritative state and drop the local overlay.
+      // Server accepted. Refresh authoritative state, then clear only the
+      // optimistic mutation owned by this request so concurrent logs stay intact.
       try {
         await refreshRef.current();
+      } catch (err) {
+        const message = err instanceof Error ? err.message : 'Refresh failed';
+        dispatch({ type: 'saveError', error: message });
       } finally {
-        dispatch({ type: 'reset' });
+        dispatch({ type: 'commit', metricId, delta, entryId: entry.id });
       }
     },
     [],

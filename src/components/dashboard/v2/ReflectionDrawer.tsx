@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Check, X } from 'lucide-react';
 import { OrbitStar } from './primitives/OrbitStar';
@@ -42,6 +42,7 @@ export function ReflectionDrawer({ open, onOpenChange, data, onSave }: Reflectio
 
   // Local edit buffer per question so typing isn't latency-bound on saves.
   const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [saveStatus, setSaveStatus] = useState<Record<string, 'idle' | 'saving' | 'saved' | 'error'>>({});
   useEffect(() => {
     if (!open) return;
     // Defer via rAF so the setState is treated as an external-event callback,
@@ -52,6 +53,11 @@ export function ReflectionDrawer({ open, onOpenChange, data, onSave }: Reflectio
         next[q] = initialAnswers.get(q) ?? '';
       });
       setDrafts(next);
+      setSaveStatus(
+        Object.fromEntries(
+          questions.map((q) => [q, (initialAnswers.get(q) ?? '').trim() ? 'saved' : 'idle']),
+        ),
+      );
     });
     return () => cancelAnimationFrame(id);
   }, [open, questions, initialAnswers]);
@@ -68,16 +74,50 @@ export function ReflectionDrawer({ open, onOpenChange, data, onSave }: Reflectio
 
   const onChange = (question: string, value: string) => {
     setDrafts((prev) => ({ ...prev, [question]: value }));
+    setSaveStatus((prev) => ({ ...prev, [question]: value.trim() ? 'saving' : 'idle' }));
     const t = timers.current;
     if (t[question]) clearTimeout(t[question]);
     t[question] = setTimeout(() => {
-      void onSave(todayKey(), question, value).catch((err) => {
-        console.error('Reflection save failed', err);
-      });
+      void onSave(todayKey(), question, value)
+        .then(() => {
+          delete t[question];
+          setSaveStatus((prev) => ({ ...prev, [question]: value.trim() ? 'saved' : 'idle' }));
+        })
+        .catch((err) => {
+          delete t[question];
+          setSaveStatus((prev) => ({ ...prev, [question]: 'error' }));
+          console.error('Reflection save failed', err);
+        });
     }, 600);
   };
 
   const answeredCount = questions.filter((q) => (drafts[q] ?? '').trim()).length;
+
+  const flushAndClose = useCallback(async () => {
+    const date = todayKey();
+    const pending = questions.map(async (q) => {
+      const timer = timers.current[q];
+      if (timer) {
+        clearTimeout(timer);
+        delete timers.current[q];
+      }
+      const answer = drafts[q] ?? '';
+      setSaveStatus((prev) => ({ ...prev, [q]: answer.trim() ? 'saving' : 'idle' }));
+      try {
+        await onSave(date, q, answer);
+        setSaveStatus((prev) => ({ ...prev, [q]: answer.trim() ? 'saved' : 'idle' }));
+      } catch (err) {
+        setSaveStatus((prev) => ({ ...prev, [q]: 'error' }));
+        console.error('Reflection save failed', err);
+        throw err;
+      }
+    });
+
+    const results = await Promise.allSettled(pending);
+    if (results.every((r) => r.status === 'fulfilled')) {
+      onOpenChange(false);
+    }
+  }, [drafts, onOpenChange, onSave, questions]);
 
   // Yesterday's first answer to surface in the bottom card.
   const yesterdayCopy = useMemo(() => {
@@ -95,13 +135,28 @@ export function ReflectionDrawer({ open, onOpenChange, data, onSave }: Reflectio
   }, [data]);
 
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (nextOpen) {
+          onOpenChange(true);
+        } else {
+          void flushAndClose();
+        }
+      }}
+    >
       <Dialog.Portal>
         <Dialog.Overlay
           className="fixed inset-0 z-40"
           style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }}
         />
         <Dialog.Content
+          onKeyDown={(e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') {
+              e.preventDefault();
+              void flushAndClose();
+            }
+          }}
           className="mc-root fixed inset-y-0 right-0 z-50 flex flex-col overflow-hidden"
           style={{
             width: 'min(460px, 95vw)',
@@ -151,9 +206,11 @@ export function ReflectionDrawer({ open, onOpenChange, data, onSave }: Reflectio
                   {todayHeader()} · {answeredCount}/{questions.length || 3} answered
                 </div>
               </div>
-              <Dialog.Close
+              <button
+                type="button"
                 aria-label="Close reflection drawer"
                 className="flex items-center justify-center"
+                onClick={() => { void flushAndClose(); }}
                 style={{
                   width: 30,
                   height: 30,
@@ -166,7 +223,7 @@ export function ReflectionDrawer({ open, onOpenChange, data, onSave }: Reflectio
                 data-testid="reflection-close"
               >
                 <X size={14} aria-hidden />
-              </Dialog.Close>
+              </button>
             </div>
 
             {/* Progress */}
@@ -273,11 +330,15 @@ export function ReflectionDrawer({ open, onOpenChange, data, onSave }: Reflectio
                         style={{
                           marginTop: 4,
                           fontSize: 10,
-                          color: 'var(--color-mc-green)',
+                          color: saveStatus[q] === 'error' ? 'var(--color-mc-red)' : 'var(--color-mc-green)',
                           letterSpacing: '0.06em',
                         }}
                       >
-                        ● SAVED · {value.length} CHARS
+                        {saveStatus[q] === 'saved'
+                          ? `● SAVED · ${value.length} CHARS`
+                          : saveStatus[q] === 'error'
+                            ? `● SAVE FAILED · ${value.length} CHARS`
+                            : `● SAVING · ${value.length} CHARS`}
                       </div>
                     )}
                   </div>
@@ -343,7 +404,7 @@ export function ReflectionDrawer({ open, onOpenChange, data, onSave }: Reflectio
               </span>
               <button
                 type="button"
-                onClick={() => onOpenChange(false)}
+                onClick={() => { void flushAndClose(); }}
                 className="ml-auto"
                 style={{
                   padding: '9px 16px',
