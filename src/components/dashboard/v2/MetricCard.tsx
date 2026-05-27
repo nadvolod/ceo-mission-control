@@ -23,6 +23,14 @@ type MetricCardProps = {
   onLog?: (metricId: MetricId, delta: number, label: string) => void;
 };
 
+function presetTestId(metricId: MetricId, label: string): string {
+  const slug = label
+    .replace(/[^a-z0-9]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase();
+  return `preset-${metricId}-${slug}`;
+}
+
 export function MetricCard({ metric, big = false, onLog }: MetricCardProps) {
   const [hover, setHover] = useState(false);
   const [flash, setFlash] = useState(false);
@@ -219,7 +227,7 @@ export function MetricCard({ metric, big = false, onLog }: MetricCardProps) {
                   border: `1px solid ${accent}66`,
                   font: 'inherit',
                 }}
-                data-testid={`preset-${metric.id}-${preset.label.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}`}
+                data-testid={presetTestId(metric.id, preset.label)}
               >
                 {preset.label}
               </button>

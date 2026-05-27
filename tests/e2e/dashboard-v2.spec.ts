@@ -1,4 +1,22 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+async function readFocusHoursFromPage(page: Page) {
+  return page.evaluate(async () => {
+    const res = await fetch('/api/focus-hours');
+    if (!res.ok) {
+      throw new Error(`GET /api/focus-hours failed: ${res.status}`);
+    }
+    return res.json();
+  });
+}
+
+function waitForFocusHoursPost(page: Page) {
+  return page.waitForResponse((response) =>
+    response.url().includes('/api/focus-hours') &&
+    response.request().method() === 'POST' &&
+    response.status() === 200,
+  );
+}
 
 // These tests exercise the new /dashboard/v2 surface end-to-end:
 //   1. Page renders with the new shell
@@ -47,37 +65,36 @@ test.describe('Mission Control v2', () => {
     await expect(dialog).not.toBeVisible();
   });
 
-  test('⌘K Enter logs +1h Temporal — server records the session', async ({ page, request }) => {
+  test('⌘K Enter logs +1h Temporal — server records the session', async ({ page }) => {
     await page.goto('/dashboard/v2');
 
     // Open palette, filter to "+1h temporal", press Enter.
     await page.getByTestId('cmdk-trigger').click();
     await page.getByTestId('cmdk-input').fill('+1h temporal');
+    const focusPost = waitForFocusHoursPost(page);
     await page.keyboard.press('Enter');
 
     // The dialog closes when the action runs.
     await expect(page.getByTestId('cmdk-dialog')).not.toBeVisible();
+    await focusPost;
 
     // The focus-hours endpoint persisted the Temporal hour, which is the same
     // data source the v2 card and the old dashboard metrics read.
-    const res = await request.get('/api/focus-hours');
-    expect(res.status()).toBe(200);
-    const body = await res.json();
+    const body = await readFocusHoursFromPage(page);
     expect(body.todaysMetrics?.byCategory?.Temporal ?? 0).toBeGreaterThanOrEqual(1);
   });
 
-  test('hover preset on the Pipeline card logs +Call to focus-hours', async ({ page, request }) => {
+  test('hover preset on the Pipeline card logs +Call to focus-hours', async ({ page }) => {
     await page.goto('/dashboard/v2');
 
     const card = page.getByTestId('metric-card-pipeline');
     await card.hover();
+    const focusPost = waitForFocusHoursPost(page);
     await page.getByTestId('preset-pipeline-call').click();
+    await focusPost;
 
     // Server-side: the Revenue category got 0.5h.
-    await page.waitForTimeout(500);
-    const res = await request.get('/api/focus-hours');
-    expect(res.status()).toBe(200);
-    const body = await res.json();
+    const body = await readFocusHoursFromPage(page);
     expect(body.todaysMetrics?.byCategory?.Revenue ?? 0).toBeGreaterThanOrEqual(0.5);
   });
 

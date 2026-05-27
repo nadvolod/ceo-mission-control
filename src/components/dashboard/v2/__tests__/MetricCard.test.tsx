@@ -41,4 +41,13 @@ describe('MetricCard', () => {
     // The note appears twice: once in the sub-line, once in the footer fallback.
     expect(screen.getAllByText(/liabilities/i).length).toBeGreaterThanOrEqual(1);
   });
+
+  it('uses stable preset test ids without leading punctuation from labels', () => {
+    const onLog = jest.fn();
+    render(<MetricCard metric={SEED_METRICS.pipeline} onLog={onLog} />);
+
+    expect(screen.getByTestId('preset-pipeline-call')).toBeInTheDocument();
+    expect(screen.getByTestId('preset-pipeline-demo')).toBeInTheDocument();
+    expect(screen.getByTestId('preset-pipeline-fu')).toBeInTheDocument();
+  });
 });
