@@ -1,0 +1,106 @@
+'use client';
+
+import type { ActivityEntry } from './types';
+
+export function ActivityFeed({ entries }: { entries: ActivityEntry[] }) {
+  return (
+    <div
+      className="flex flex-col overflow-hidden rounded-xl"
+      style={{
+        background: 'rgba(255,255,255,0.04)',
+        border: '1px solid rgba(255,255,255,0.08)',
+        backdropFilter: 'blur(20px)',
+      }}
+    >
+      <div
+        className="flex items-center justify-between"
+        style={{ padding: '12px 14px', borderBottom: '1px solid rgba(255,255,255,0.08)' }}
+      >
+        <div className="flex items-center gap-2">
+          <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-mc-ink)' }}>
+            Activity
+          </span>
+          <span
+            aria-hidden
+            className="mc-pulse"
+            style={{
+              width: 6,
+              height: 6,
+              borderRadius: '50%',
+              background: 'var(--color-mc-green)',
+              boxShadow: '0 0 8px var(--color-mc-green)',
+              display: 'inline-block',
+            }}
+          />
+        </div>
+        <span
+          className="font-numerics"
+          style={{ fontSize: 10, color: 'var(--color-mc-fg-dim)', letterSpacing: '0.08em' }}
+        >
+          LIVE
+        </span>
+      </div>
+      <div className="flex-1 overflow-auto">
+        {entries.map((entry) => (
+          <ActivityRow key={entry.id} entry={entry} />
+        ))}
+        {entries.length === 0 && (
+          <div
+            style={{
+              padding: '18px 14px',
+              fontSize: 12,
+              color: 'var(--color-mc-fg-dim)',
+            }}
+          >
+            No activity yet today.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ActivityRow({ entry }: { entry: ActivityEntry }) {
+  const isPositive = entry.delta.startsWith('+');
+  return (
+    <div
+      className="flex items-start gap-2.5"
+      style={{
+        padding: '10px 14px',
+        borderTop: '1px solid rgba(255,255,255,0.08)',
+      }}
+    >
+      <span
+        className="font-numerics"
+        style={{
+          fontSize: 10,
+          color: 'var(--color-mc-fg-muted)',
+          paddingTop: 2,
+          minWidth: 34,
+        }}
+      >
+        {entry.t}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-1.5">
+          <span
+            className="font-numerics"
+            style={{
+              fontSize: 11,
+              fontWeight: 500,
+              color: isPositive ? 'var(--color-mc-green)' : 'var(--color-mc-fg)',
+            }}
+          >
+            {entry.delta}
+          </span>
+          <span style={{ fontSize: 12, color: 'var(--color-mc-ink)', fontWeight: 500 }}>
+            {entry.label}
+          </span>
+        </div>
+        <div style={{ fontSize: 11, color: 'var(--color-mc-fg-dim)', marginTop: 1 }}>
+          {entry.meta}
+        </div>
+      </div>
+    </div>
+  );
+}

@@ -44,3 +44,11 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Vercel CLI added `.env*` here, which would also exclude .env.example
+# (which the repo intentionally tracks). Narrow it so only real env files
+# stay out of git; the .env*.local + .vercel rules above already cover the
+# Vercel-pulled ones.
+.env
+.env.development
+.env.production

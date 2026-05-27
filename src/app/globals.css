@@ -10,6 +10,25 @@
   --color-foreground: var(--foreground);
   --font-sans: var(--font-body), system-ui, sans-serif;
   --font-display: var(--font-display), Georgia, serif;
+
+  /* Mission Control · V1·D — dark UV palette */
+  --color-mc-bg: #0E0C14;
+  --color-mc-bg-warm: #13111A;
+  --color-mc-ink: #F5F1FF;
+  --color-mc-fg: #D7D2E8;
+  --color-mc-fg-dim: #9890B5;
+  --color-mc-fg-muted: #5E5774;
+  --color-mc-uv: #7C7CFF;
+  --color-mc-uv-hi: #9D9CFF;
+  --color-mc-pink: #FF7AD8;
+  --color-mc-green: #3DDC97;
+  --color-mc-amber: #FFB454;
+  --color-mc-red: #FF6469;
+  --color-mc-cyan: #5DD9FF;
+
+  --font-mc-sans: var(--font-geist), 'Geist', 'Inter', system-ui, sans-serif;
+  --font-mc-mono: var(--font-mono), 'JetBrains Mono', 'Geist Mono', ui-monospace, monospace;
+  --font-mc-serif: var(--font-display), 'Instrument Serif', Georgia, serif;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -107,4 +126,42 @@ input, select, textarea {
 
 html {
   scroll-behavior: smooth;
+}
+
+/* ===== Mission Control · V1·D ===== */
+
+/* JetBrains Mono with tabular numerals + slashed zero + alternate stylistic sets.
+   This is the "techy console" feel — values don't reflow as they update. */
+.font-numerics {
+  font-family: var(--font-mc-mono);
+  font-feature-settings: 'tnum' 1, 'zero' 1, 'ss01' 1, 'cv11' 1;
+  font-variant-numeric: tabular-nums slashed-zero;
+  letter-spacing: -0.02em;
+  font-weight: 500;
+}
+
+@keyframes mc-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.85); }
+}
+
+@keyframes mc-orbit-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes mc-flash {
+  0% { background-color: rgba(124, 124, 255, 0.10); }
+  100% { background-color: transparent; }
+}
+
+.mc-pulse { animation: mc-pulse 2s ease-in-out infinite; }
+.mc-orbit-spin { animation: mc-orbit-spin 14s linear infinite; }
+
+/* The v2 dashboard is dark-by-design — don't let the global "input,select,textarea
+   { color: #171717 }" rule turn its text invisible on the dark surfaces. */
+.mc-root input,
+.mc-root select,
+.mc-root textarea {
+  color: var(--color-mc-ink);
 }
