@@ -5,8 +5,8 @@
 jest.mock('./storage', () => {
   let store: Record<string, any> = {};
   return {
-    loadJSON: jest.fn(async (key: string, defaultValue: any) => store[key] ?? defaultValue),
-    saveJSON: jest.fn(async (key: string, data: any) => { store[key] = data; }),
+    loadJSON: jest.fn(async (_ownerId: string, key: string, defaultValue: any) => store[key] ?? defaultValue),
+    saveJSON: jest.fn(async (_ownerId: string, key: string, data: any) => { store[key] = data; }),
     appendAuditLog: jest.fn(async () => {}),
     _reset: () => { store = {}; },
   };
@@ -17,13 +17,14 @@ const storage = require('./storage');
 
 import { WeeklyTracker } from './weekly-tracker';
 import { format, startOfWeek, addDays } from 'date-fns';
+import { UNIT_TEST_OWNER_ID } from '@/__tests__/utils/owner-id';
 
 // Use local date (consistent with date-fns format) — not UTC toISOString
 const TODAY = format(new Date(), 'yyyy-MM-dd');
 
-// Helper: get a date string for a specific day of the current week (0=Mon)
+// Helper: get a date string for a specific day of the current week (0=Sun)
 function weekDay(offset: number): string {
-  const weekStart = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const weekStart = startOfWeek(new Date(), { weekStartsOn: 0 });
   return format(addDays(weekStart, offset), 'yyyy-MM-dd');
 }
 
@@ -33,9 +34,56 @@ describe('WeeklyTracker', () => {
     storage._reset();
   });
 
+  describe('addToDay', () => {
+    it('creates a fresh entry when none exists', async () => {
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
+      const entry = await tracker.addToDay(1.5, 1, false, TODAY);
+      expect(entry).toMatchObject({
+        date: TODAY,
+        deepWorkHours: 1.5,
+        pipelineActions: 1,
+        trained: false,
+      });
+    });
+
+    it('accumulates deep-work hours and pipeline actions across calls', async () => {
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
+      await tracker.addToDay(1, 1, false, TODAY);
+      await tracker.addToDay(0.5, 2, false, TODAY);
+      const after = tracker.getTodaysEntry();
+      expect(after?.deepWorkHours).toBe(1.5);
+      expect(after?.pipelineActions).toBe(3);
+      expect(after?.trained).toBe(false);
+    });
+
+    it('latches trained=true and never flips it back to false on subsequent calls', async () => {
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
+      await tracker.addToDay(0, 0, true, TODAY);
+      await tracker.addToDay(0.5, 1, false, TODAY);
+      const after = tracker.getTodaysEntry();
+      expect(after?.trained).toBe(true);
+    });
+
+    it('caps cumulative deepWorkHours at 8', async () => {
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
+      await tracker.addToDay(6, 0, false, TODAY);
+      await tracker.addToDay(4, 0, false, TODAY); // would push to 10 → clamp to 8
+      const after = tracker.getTodaysEntry();
+      expect(after?.deepWorkHours).toBe(8);
+    });
+
+    it('rejects negative or non-finite deltas', async () => {
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
+      await expect(tracker.addToDay(-1, 0, false, TODAY)).rejects.toThrow(/deepWorkDelta/);
+      await expect(tracker.addToDay(0, -1, false, TODAY)).rejects.toThrow(/pipelineDelta/);
+      await expect(tracker.addToDay(Number.NaN, 0, false, TODAY)).rejects.toThrow(/deepWorkDelta/);
+      await expect(tracker.addToDay(0, 1.5, false, TODAY)).rejects.toThrow(/pipelineDelta/);
+    });
+  });
+
   describe('logDay', () => {
     it('should create a daily entry and save', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       const entry = await tracker.logDay(3.5, 2, true, TODAY);
 
       expect(entry.date).toBe(TODAY);
@@ -48,7 +96,7 @@ describe('WeeklyTracker', () => {
     });
 
     it('should upsert an existing day', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.logDay(2, 1, false, TODAY);
       await tracker.logDay(4, 3, true, TODAY);
 
@@ -59,51 +107,51 @@ describe('WeeklyTracker', () => {
     });
 
     it('should default to today if no date provided', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       const entry = await tracker.logDay(3, 2, true);
       expect(entry.date).toBe(TODAY);
     });
 
     it('should reject deepWorkHours > 8', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       await expect(tracker.logDay(9, 2, true)).rejects.toThrow('deepWorkHours must be a number between 0 and 8');
     });
 
     it('should reject deepWorkHours < 0', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       await expect(tracker.logDay(-1, 2, true)).rejects.toThrow('deepWorkHours must be a number between 0 and 8');
     });
 
     it('should reject NaN deepWorkHours', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       await expect(tracker.logDay(NaN, 2, true)).rejects.toThrow('deepWorkHours must be a number between 0 and 8');
     });
 
     it('should allow deepWorkHours = 0', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       const entry = await tracker.logDay(0, 2, true, TODAY);
       expect(entry.deepWorkHours).toBe(0);
     });
 
     it('should reject non-integer pipelineActions', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       await expect(tracker.logDay(3, 2.5, true)).rejects.toThrow('pipelineActions must be a non-negative integer');
     });
 
     it('should reject negative pipelineActions', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       await expect(tracker.logDay(3, -1, true)).rejects.toThrow('pipelineActions must be a non-negative integer');
     });
 
     it('should reject non-boolean trained', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       await expect(tracker.logDay(3, 2, 'yes' as unknown as boolean)).rejects.toThrow('trained must be a boolean');
     });
   });
 
   describe('submitWeeklyReview', () => {
     it('should save a review with generated ID', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       const review = await tracker.submitWeeklyReview({
         revenue: 5000,
         slipAnalysis: 'Missed Wednesday',
@@ -122,7 +170,7 @@ describe('WeeklyTracker', () => {
     });
 
     it('should reject negative revenue', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       await expect(tracker.submitWeeklyReview({
         revenue: -100,
         slipAnalysis: '',
@@ -134,7 +182,7 @@ describe('WeeklyTracker', () => {
     });
 
     it('should allow revenue = 0', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       const review = await tracker.submitWeeklyReview({
         revenue: 0,
         slipAnalysis: '',
@@ -147,7 +195,7 @@ describe('WeeklyTracker', () => {
     });
 
     it('accepts a payload without revenue and stores 0', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.submitWeeklyReview({
         slipAnalysis: 'x',
         systemAdjustment: 'y',
@@ -162,12 +210,12 @@ describe('WeeklyTracker', () => {
 
   describe('getTodaysEntry', () => {
     it('returns null when no entry exists', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       expect(tracker.getTodaysEntry()).toBeNull();
     });
 
     it('returns entry when it exists', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.logDay(3, 2, true, TODAY);
       const entry = tracker.getTodaysEntry();
       expect(entry).not.toBeNull();
@@ -177,7 +225,7 @@ describe('WeeklyTracker', () => {
 
   describe('getCurrentWeekSummary', () => {
     it('returns zeros when no data exists', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       const summary = tracker.getCurrentWeekSummary();
 
       expect(summary.daysTracked).toBe(0);
@@ -190,7 +238,7 @@ describe('WeeklyTracker', () => {
     });
 
     it('computes correct totals from multiple days', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       const mon = weekDay(0);
       const tue = weekDay(1);
       const wed = weekDay(2);
@@ -208,7 +256,7 @@ describe('WeeklyTracker', () => {
     });
 
     it('computes consistency score correctly', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       const mon = weekDay(0);
       const tue = weekDay(1);
       const wed = weekDay(2);
@@ -225,13 +273,13 @@ describe('WeeklyTracker', () => {
     });
 
     it('consistency is 0 when no days tracked', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       const summary = tracker.getCurrentWeekSummary();
       expect(summary.consistencyScore).toBe(0);
     });
 
     it('includes revenue from weekly review', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.logDay(3, 2, true, weekDay(0));
 
       const summary1 = tracker.getCurrentWeekSummary();
@@ -287,13 +335,13 @@ describe('WeeklyTracker', () => {
 
   describe('getDailyTrend', () => {
     it('returns correct number of days', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       const trend = tracker.getDailyTrend(7);
       expect(trend.length).toBe(7);
     });
 
     it('fills empty days with isEmpty=true', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       const trend = tracker.getDailyTrend(7);
       trend.forEach(day => {
         expect(day.isEmpty).toBe(true);
@@ -304,7 +352,7 @@ describe('WeeklyTracker', () => {
     });
 
     it('includes logged data with isEmpty=false', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.logDay(3, 2, true, TODAY);
 
       const trend = tracker.getDailyTrend(7);
@@ -316,7 +364,7 @@ describe('WeeklyTracker', () => {
 
   describe('getWeeklyReviews', () => {
     it('returns reviews in reverse chronological order', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       // Use different weekStartDate values so upsert doesn't collapse them
       await tracker.submitWeeklyReview({ revenue: 1000, slipAnalysis: 'first', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', temporalTarget: 5, weekStartDate: '2026-03-23', weekEndDate: '2026-03-29' });
       await tracker.submitWeeklyReview({ revenue: 2000, slipAnalysis: 'second', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', temporalTarget: 5, weekStartDate: '2026-03-30', weekEndDate: '2026-04-05' });
@@ -328,7 +376,7 @@ describe('WeeklyTracker', () => {
     });
 
     it('upserts review for the same week', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.submitWeeklyReview({ revenue: 1000, slipAnalysis: 'first', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', temporalTarget: 5 });
       await tracker.submitWeeklyReview({ revenue: 2000, slipAnalysis: 'updated', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', temporalTarget: 5 });
 
@@ -339,7 +387,7 @@ describe('WeeklyTracker', () => {
     });
 
     it('respects limit', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.submitWeeklyReview({ revenue: 1000, slipAnalysis: '', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', temporalTarget: 5, weekStartDate: '2026-03-16', weekEndDate: '2026-03-22' });
       await tracker.submitWeeklyReview({ revenue: 2000, slipAnalysis: '', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', temporalTarget: 5, weekStartDate: '2026-03-23', weekEndDate: '2026-03-29' });
       await tracker.submitWeeklyReview({ revenue: 3000, slipAnalysis: '', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', temporalTarget: 5, weekStartDate: '2026-03-30', weekEndDate: '2026-04-05' });
@@ -351,12 +399,12 @@ describe('WeeklyTracker', () => {
 
   describe('getLatestReview', () => {
     it('returns null when no reviews exist', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       expect(tracker.getLatestReview()).toBeNull();
     });
 
     it('returns the most recent review', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.submitWeeklyReview({ revenue: 1000, slipAnalysis: '', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', temporalTarget: 5 });
       await tracker.submitWeeklyReview({ revenue: 5000, slipAnalysis: '', systemAdjustment: '', nextWeekTargets: '', bottleneck: '', temporalTarget: 5 });
 
@@ -367,7 +415,7 @@ describe('WeeklyTracker', () => {
 
   describe('week entries alignment', () => {
     it('returns 7-element array with nulls for missing days', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       // Log only Monday (offset 0)
       await tracker.logDay(3, 2, true, weekDay(0));
 
@@ -381,7 +429,7 @@ describe('WeeklyTracker', () => {
     });
 
     it('places sparse entries at correct day positions', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       // Log Monday (0) and Wednesday (2) only
       await tracker.logDay(3, 2, true, weekDay(0));
       await tracker.logDay(4, 3, false, weekDay(2));
@@ -394,7 +442,7 @@ describe('WeeklyTracker', () => {
     });
 
     it('preserves existing day entries when logging a new day', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.logDay(3, 2, true, weekDay(0));
       await tracker.logDay(4, 1, false, weekDay(2));
 
@@ -405,7 +453,7 @@ describe('WeeklyTracker', () => {
     });
 
     it('correctly aggregates only non-null entries', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.logDay(3, 2, true, weekDay(0));
       await tracker.logDay(5, 4, true, weekDay(3));
 
@@ -420,7 +468,7 @@ describe('WeeklyTracker', () => {
 
   describe('temporalTarget', () => {
     it('includes temporalTarget in weekly review', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       const review = await tracker.submitWeeklyReview({
         revenue: 1000, slipAnalysis: '', systemAdjustment: '',
         nextWeekTargets: '', bottleneck: '', temporalTarget: 8,
@@ -429,7 +477,7 @@ describe('WeeklyTracker', () => {
     });
 
     it('defaults temporalTarget to 5 when not provided', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       const review = await tracker.submitWeeklyReview({
         revenue: 1000, slipAnalysis: '', systemAdjustment: '',
         nextWeekTargets: '', bottleneck: '',
@@ -438,7 +486,7 @@ describe('WeeklyTracker', () => {
     });
 
     it('surfaces temporalTarget in week summary', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.submitWeeklyReview({
         revenue: 1000, slipAnalysis: '', systemAdjustment: '',
         nextWeekTargets: '', bottleneck: '', temporalTarget: 10,
@@ -448,7 +496,7 @@ describe('WeeklyTracker', () => {
     });
 
     it('defaults summary temporalTarget to 5 with no review', async () => {
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       const summary = tracker.getCurrentWeekSummary();
       expect(summary.temporalTarget).toBe(5);
     });
@@ -472,7 +520,7 @@ describe('WeeklyTracker', () => {
 
       storage.loadJSON.mockResolvedValueOnce(existingData);
 
-      const tracker = await WeeklyTracker.create();
+      const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
       const entry = tracker.getTodaysEntry();
       expect(entry?.deepWorkHours).toBe(4);
       expect(entry?.pipelineActions).toBe(3);

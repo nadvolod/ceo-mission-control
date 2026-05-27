@@ -1,15 +1,16 @@
 /**
  * @jest-environment node
  */
+import { NextRequest } from 'next/server';
 import { GET } from './route';
 
 jest.mock('@/lib/storage', () => {
   let store: Record<string, unknown> = {};
   return {
     loadJSON: jest.fn(
-      async (key: string, defaultValue: unknown) => store[key] ?? defaultValue
+      async (_ownerId: string, key: string, defaultValue: unknown) => store[key] ?? defaultValue
     ),
-    saveJSON: jest.fn(async (key: string, data: unknown) => {
+    saveJSON: jest.fn(async (_ownerId: string, key: string, data: unknown) => {
       store[key] = data;
     }),
     appendAuditLog: jest.fn(async () => {}),
@@ -18,6 +19,10 @@ jest.mock('@/lib/storage', () => {
     },
   };
 });
+
+jest.mock('@/lib/session', () => ({
+  requireEffectiveUserId: jest.fn(async () => '00000000-0000-0000-0000-000000000001'),
+}));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const storage = require('@/lib/storage');
@@ -29,7 +34,7 @@ describe('/api/financial GET', () => {
   });
 
   it('returns the extended payload shape with weekly/30-day financial data', async () => {
-    const response = await GET();
+    const response = await GET(new NextRequest('http://localhost/'));
     expect(response.status).toBe(200);
 
     const body = await response.json();

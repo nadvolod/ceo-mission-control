@@ -1,7 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { DashboardTabs, TAB_IDS } from './DashboardTabs';
-import type { TabId } from './DashboardTabs';
 
 describe('DashboardTabs', () => {
   const mockOnTabChange = jest.fn();
@@ -78,5 +77,12 @@ describe('DashboardTabs', () => {
 
   it('TAB_IDS array order is dashboard, monthly-review, tasks', () => {
     expect(Array.from(TAB_IDS)).toEqual(['dashboard', 'monthly-review', 'tasks']);
+  });
+
+  it('renders tabs in a horizontally scrollable container for mobile', () => {
+    render(<DashboardTabs activeTab="dashboard" onTabChange={mockOnTabChange} />);
+
+    expect(screen.getByTestId('dashboard-tabs-scroll').className).toMatch(/overflow-x-auto/);
+    expect(screen.getByTestId('dashboard-tabs').className).toMatch(/min-w-max/);
   });
 });

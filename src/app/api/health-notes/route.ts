@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { HealthNotesTracker } from '@/lib/health-notes-tracker';
 import { checkAuth } from '@/lib/auth';
+import { requireEffectiveUserId } from '@/lib/session';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const tracker = await HealthNotesTracker.create();
+    const ownerId = await requireEffectiveUserId(request);
+    const tracker = await HealthNotesTracker.create(ownerId);
 
     return NextResponse.json({
       success: true,
@@ -29,7 +31,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action, ...data } = body;
-    const tracker = await HealthNotesTracker.create();
+    const ownerId = await requireEffectiveUserId(request);
+    const tracker = await HealthNotesTracker.create(ownerId);
 
     switch (action) {
       case 'log': {
@@ -139,6 +142,18 @@ export async function POST(request: NextRequest) {
           success: true,
           templates: tracker.getTemplates(),
         });
+      }
+
+      case 'deleteNote': {
+        const { date } = data;
+        if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          return NextResponse.json(
+            { success: false, error: 'date must be a valid YYYY-MM-DD string' },
+            { status: 400 }
+          );
+        }
+        const deleted = await tracker.deleteNote(date);
+        return NextResponse.json({ success: true, deleted });
       }
 
       default:

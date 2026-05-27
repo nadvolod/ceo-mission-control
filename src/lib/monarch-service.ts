@@ -65,8 +65,22 @@ export function buildSnapshot(
 
   const monthlyIncome = cashflowSummary.sumIncome;
   const monthlyExpenses = Math.abs(cashflowSummary.sumExpense);
+
+  // Prefer the previous full calendar month for burn rate — it is complete data.
+  // The current-month cashflow is month-to-date (MTD) and understates true monthly
+  // spend, which would inflate the runway estimate.
+  const burnBaseIncome = previousMonthCashflow ? previousMonthCashflow.sumIncome : monthlyIncome;
+  const burnBaseExpenses = previousMonthCashflow
+    ? Math.abs(previousMonthCashflow.sumExpense)
+    : monthlyExpenses;
   // Net burn = expenses minus income (0 if profitable)
-  const burnRate = Math.max(monthlyExpenses - monthlyIncome, 0);
+  const burnRate = Math.max(burnBaseExpenses - burnBaseIncome, 0);
+  // Label indicates which month's data was used; null means we fell back to current-month MTD.
+  // When previous-month cashflow exists but the label is missing/empty, fall back to a generic
+  // "previous month" string so the UI still treats this as full-month data, not MTD.
+  const burnRateLabel = previousMonthCashflow
+    ? (previousMonthLabel && previousMonthLabel.length > 0 ? previousMonthLabel : 'previous month')
+    : null;
   // Use -1 sentinel for "infinite/no burn" since JSON.stringify(Infinity) → null
   const rawRunway = burnRate > 0 ? Math.max(cashPosition / burnRate, 0) : -1;
   const runwayMonths = Number.isFinite(rawRunway) ? rawRunway : -1;
@@ -83,6 +97,7 @@ export function buildSnapshot(
     previousMonthExpenses: previousMonthCashflow ? Math.abs(previousMonthCashflow.sumExpense) : monthlyExpenses,
     previousMonthLabel: previousMonthLabel ?? '',
     burnRate,
+    burnRateLabel,
     runwayMonths,
     savingsRate: cashflowSummary.savingsRate,
   };
@@ -98,11 +113,12 @@ function isCacheFresh(lastSynced: string): boolean {
  * Returns cached data if fresh (< 15 min), otherwise fetches from Monarch API.
  */
 export async function getFinancialSnapshot(
+  ownerId: string,
   forceRefresh = false
 ): Promise<MonarchFinancialSnapshot> {
   // Check cache first
   if (!forceRefresh) {
-    const cached = await loadJSON<MonarchFinancialSnapshot | null>(CACHE_KEY, null);
+    const cached = await loadJSON<MonarchFinancialSnapshot | null>(ownerId, CACHE_KEY, null);
     if (cached && cached.lastSynced && isCacheFresh(cached.lastSynced)) {
       return cached;
     }
@@ -125,7 +141,7 @@ export async function getFinancialSnapshot(
   };
 
   // Persist to cache
-  await saveJSON(CACHE_KEY, snapshot);
+  await saveJSON(ownerId, CACHE_KEY, snapshot);
 
   return snapshot;
 }
@@ -134,6 +150,6 @@ export async function getFinancialSnapshot(
  * Get cached snapshot without refreshing.
  * Returns null if no cached data exists.
  */
-export async function getCachedSnapshot(): Promise<MonarchFinancialSnapshot | null> {
-  return loadJSON<MonarchFinancialSnapshot | null>(CACHE_KEY, null);
+export async function getCachedSnapshot(ownerId: string): Promise<MonarchFinancialSnapshot | null> {
+  return loadJSON<MonarchFinancialSnapshot | null>(ownerId, CACHE_KEY, null);
 }

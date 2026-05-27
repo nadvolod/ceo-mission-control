@@ -4,6 +4,7 @@
 import { HealthNotesTracker } from './health-notes-tracker';
 import * as storage from './storage';
 import type { DailyHealthNote, HealthNotesData } from './types';
+import { UNIT_TEST_OWNER_ID } from '@/__tests__/utils/owner-id';
 
 jest.mock('./storage', () => ({
   loadJSON: jest.fn(),
@@ -40,14 +41,14 @@ describe('HealthNotesTracker', () => {
 
   describe('create', () => {
     it('loads data from storage', async () => {
-      await HealthNotesTracker.create();
-      expect(mockLoadJSON).toHaveBeenCalledWith('health-notes.json', expect.any(Object));
+      await HealthNotesTracker.create(UNIT_TEST_OWNER_ID);
+      expect(mockLoadJSON).toHaveBeenCalledWith(UNIT_TEST_OWNER_ID, 'health-notes.json', expect.any(Object));
     });
   });
 
   describe('logNote', () => {
     it('saves a daily health note', async () => {
-      const tracker = await HealthNotesTracker.create();
+      const tracker = await HealthNotesTracker.create(UNIT_TEST_OWNER_ID);
       const note: Omit<DailyHealthNote, 'loggedAt'> = {
         date: '2026-04-13',
         sleepEnvironment: { temperatureF: 68, fanRunning: true, dogInRoom: false, customFields: {} },
@@ -61,6 +62,7 @@ describe('HealthNotesTracker', () => {
       expect(result.date).toBe('2026-04-13');
       expect(result.loggedAt).toBeTruthy();
       expect(mockSaveJSON).toHaveBeenCalledWith(
+        UNIT_TEST_OWNER_ID,
         'health-notes.json',
         expect.objectContaining({
           notes: expect.objectContaining({ '2026-04-13': expect.any(Object) }),
@@ -80,7 +82,7 @@ describe('HealthNotesTracker', () => {
       };
       mockLoadJSON.mockResolvedValue(data);
 
-      const tracker = await HealthNotesTracker.create();
+      const tracker = await HealthNotesTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.logNote({
         date: '2026-04-13',
         sleepEnvironment: { temperatureF: 68, fanRunning: true, dogInRoom: false, customFields: {} },
@@ -89,12 +91,12 @@ describe('HealthNotesTracker', () => {
         freeformNote: 'new note',
       });
 
-      const saved = (mockSaveJSON.mock.calls[0][1] as HealthNotesData);
+      const saved = (mockSaveJSON.mock.calls[0][2] as HealthNotesData);
       expect(saved.notes['2026-04-13'].freeformNote).toBe('new note');
     });
 
     it('rejects invalid date format', async () => {
-      const tracker = await HealthNotesTracker.create();
+      const tracker = await HealthNotesTracker.create(UNIT_TEST_OWNER_ID);
       await expect(tracker.logNote({
         date: 'bad-date',
         sleepEnvironment: { temperatureF: null, fanRunning: false, dogInRoom: false, customFields: {} },
@@ -118,7 +120,7 @@ describe('HealthNotesTracker', () => {
       };
       mockLoadJSON.mockResolvedValue(data);
 
-      const tracker = await HealthNotesTracker.create();
+      const tracker = await HealthNotesTracker.create(UNIT_TEST_OWNER_ID);
       const note = tracker.getNoteForDate('2026-04-13');
 
       expect(note).not.toBeNull();
@@ -126,59 +128,59 @@ describe('HealthNotesTracker', () => {
     });
 
     it('returns null for date with no note', async () => {
-      const tracker = await HealthNotesTracker.create();
+      const tracker = await HealthNotesTracker.create(UNIT_TEST_OWNER_ID);
       expect(tracker.getNoteForDate('2026-01-01')).toBeNull();
     });
   });
 
   describe('template management', () => {
     it('addSupplement adds to template', async () => {
-      const tracker = await HealthNotesTracker.create();
+      const tracker = await HealthNotesTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.addSupplement('Melatonin', 3);
 
-      const saved = (mockSaveJSON.mock.calls[0][1] as HealthNotesData);
+      const saved = (mockSaveJSON.mock.calls[0][2] as HealthNotesData);
       expect(saved.supplementTemplate).toContainEqual({ name: 'Melatonin', defaultDosageMg: 3 });
     });
 
     it('addSupplement rejects duplicate name', async () => {
-      const tracker = await HealthNotesTracker.create();
+      const tracker = await HealthNotesTracker.create(UNIT_TEST_OWNER_ID);
       await expect(tracker.addSupplement('Guanfacine', 2)).rejects.toThrow('already exists');
     });
 
     it('removeSupplement removes from template', async () => {
-      const tracker = await HealthNotesTracker.create();
+      const tracker = await HealthNotesTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.removeSupplement('Advil PM');
 
-      const saved = (mockSaveJSON.mock.calls[0][1] as HealthNotesData);
+      const saved = (mockSaveJSON.mock.calls[0][2] as HealthNotesData);
       expect(saved.supplementTemplate.find(s => s.name === 'Advil PM')).toBeUndefined();
     });
 
     it('addHabit adds to template', async () => {
-      const tracker = await HealthNotesTracker.create();
+      const tracker = await HealthNotesTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.addHabit('Meditation');
 
-      const saved = (mockSaveJSON.mock.calls[0][1] as HealthNotesData);
+      const saved = (mockSaveJSON.mock.calls[0][2] as HealthNotesData);
       expect(saved.habitTemplate).toContainEqual({ name: 'Meditation' });
     });
 
     it('addHabit rejects duplicate name', async () => {
-      const tracker = await HealthNotesTracker.create();
+      const tracker = await HealthNotesTracker.create(UNIT_TEST_OWNER_ID);
       await expect(tracker.addHabit('Red light therapy')).rejects.toThrow('already exists');
     });
 
     it('removeHabit removes from template', async () => {
-      const tracker = await HealthNotesTracker.create();
+      const tracker = await HealthNotesTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.removeHabit('Phone before bed');
 
-      const saved = (mockSaveJSON.mock.calls[0][1] as HealthNotesData);
+      const saved = (mockSaveJSON.mock.calls[0][2] as HealthNotesData);
       expect(saved.habitTemplate.find(h => h.name === 'Phone before bed')).toBeUndefined();
     });
 
     it('addEnvironmentField adds custom field name', async () => {
-      const tracker = await HealthNotesTracker.create();
+      const tracker = await HealthNotesTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.addEnvironmentField('Window open');
 
-      const saved = (mockSaveJSON.mock.calls[0][1] as HealthNotesData);
+      const saved = (mockSaveJSON.mock.calls[0][2] as HealthNotesData);
       expect(saved.environmentTemplate.customFieldNames).toContain('Window open');
     });
 
@@ -187,17 +189,17 @@ describe('HealthNotesTracker', () => {
       data.environmentTemplate.customFieldNames = ['Window open'];
       mockLoadJSON.mockResolvedValue(data);
 
-      const tracker = await HealthNotesTracker.create();
+      const tracker = await HealthNotesTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.removeEnvironmentField('Window open');
 
-      const saved = (mockSaveJSON.mock.calls[0][1] as HealthNotesData);
+      const saved = (mockSaveJSON.mock.calls[0][2] as HealthNotesData);
       expect(saved.environmentTemplate.customFieldNames).not.toContain('Window open');
     });
   });
 
   describe('getTemplates', () => {
     it('returns all templates', async () => {
-      const tracker = await HealthNotesTracker.create();
+      const tracker = await HealthNotesTracker.create(UNIT_TEST_OWNER_ID);
       const templates = tracker.getTemplates();
 
       expect(templates.supplementTemplate).toHaveLength(3);
@@ -214,7 +216,7 @@ describe('HealthNotesTracker', () => {
       data.notes['2026-04-13'] = { date: '2026-04-13', sleepEnvironment: { temperatureF: 66, fanRunning: true, dogInRoom: false, customFields: {} }, supplements: [], habits: [], freeformNote: '', loggedAt: '' };
       mockLoadJSON.mockResolvedValue(data);
 
-      const tracker = await HealthNotesTracker.create();
+      const tracker = await HealthNotesTracker.create(UNIT_TEST_OWNER_ID);
       const result = tracker.getNotesForRange('2026-04-11', '2026-04-12');
 
       expect(result).toHaveLength(2);
@@ -235,7 +237,7 @@ describe('HealthNotesTracker', () => {
       };
       mockLoadJSON.mockResolvedValue(data);
 
-      const tracker = await HealthNotesTracker.create();
+      const tracker = await HealthNotesTracker.create(UNIT_TEST_OWNER_ID);
 
       // Get first copy and mutate it
       const firstCopy = tracker.getAllData();
@@ -254,7 +256,7 @@ describe('HealthNotesTracker', () => {
 
   describe('getTemplates defensive copy', () => {
     it('returns a copy — mutating returned templates does not change internal state', async () => {
-      const tracker = await HealthNotesTracker.create();
+      const tracker = await HealthNotesTracker.create(UNIT_TEST_OWNER_ID);
 
       // Get first copy and mutate it
       const firstCopy = tracker.getTemplates();

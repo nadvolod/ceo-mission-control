@@ -14,7 +14,7 @@
 
 ## Conventions used in this plan
 
-- **Week start**: Monday. Use `startOfWeek(date, { weekStartsOn: 1 })` from `date-fns`, matching `weekly-tracker.ts`.
+- **Week start**: Sunday. Use `startOfWeek(date, { weekStartsOn: 0 })` from `date-fns`, matching `weekly-tracker.ts`.
 - **Date keys**: `YYYY-MM-DD` strings, local time (not UTC) — matches existing code at `useDashboardData.ts:152`.
 - **Cent arithmetic**: every sum runs through a private `centSum(values: number[]) => number` helper that converts each value to integer cents (`Math.round(v * 100)`), sums, divides by 100. Avoids `0.1 + 0.2` drift.
 - **Package manager**: `npm` (no pnpm-lock present). Use `npm test -- <args>`, `npm run lint`, `npm run build`.

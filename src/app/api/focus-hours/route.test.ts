@@ -8,14 +8,18 @@ import { GET, POST } from './route';
 jest.mock('@/lib/storage', () => {
   let store: Record<string, any> = {};
   return {
-    loadJSON: jest.fn(async (key: string, defaultValue: any) => store[key] ?? defaultValue),
-    saveJSON: jest.fn(async (key: string, data: any) => { store[key] = data; }),
+    loadJSON: jest.fn(async (_ownerId: string, key: string, defaultValue: any) => store[key] ?? defaultValue),
+    saveJSON: jest.fn(async (_ownerId: string, key: string, data: any) => { store[key] = data; }),
     loadText: jest.fn(async () => ''),
     saveText: jest.fn(async () => {}),
     appendAuditLog: jest.fn(async () => {}),
     _reset: () => { store = {}; },
   };
 });
+
+jest.mock('@/lib/session', () => ({
+  requireEffectiveUserId: jest.fn(async () => '00000000-0000-0000-0000-000000000001'),
+}));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const storage = require('@/lib/storage');
@@ -30,7 +34,7 @@ describe('/api/focus-hours', () => {
 
   describe('GET', () => {
     it('should return all dashboard data when no data exists', async () => {
-      const response = await GET();
+      const response = await GET(new NextRequest('http://localhost/'));
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -62,7 +66,7 @@ describe('/api/focus-hours', () => {
       };
       storage.loadJSON.mockResolvedValueOnce(existingData);
 
-      const response = await GET();
+      const response = await GET(new NextRequest('http://localhost/'));
       const data = await response.json();
       expect(data.todaysMetrics.totalHours).toBe(3);
     });

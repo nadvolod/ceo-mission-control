@@ -5,13 +5,22 @@ import { WeeklyTracker } from '@/lib/weekly-tracker';
 import { checkAuth } from '@/lib/auth';
 import { loadJSON } from '@/lib/storage';
 import { fetchGarminMetrics, initiateGarminLogin, completeMFALogin } from '@/lib/garmin-client';
+import { requireEffectiveUserId, isRealAdminRequest } from '@/lib/session';
+
+// Garmin uses single global GARMIN_EMAIL/PASSWORD credentials. Any
+// authenticated user could otherwise trigger a login or fetch and cache
+// the admin's Garmin data under their own owner_id. Gate the credential-
+// touching actions to the real admin (not impersonated) until per-user
+// Garmin support exists.
+const ADMIN_ONLY_ACTIONS = new Set(['garmin-login', 'garmin-mfa', 'fetch-garmin']);
 
 export const maxDuration = 60;
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const garmin = await GarminTracker.create();
-    const notes = await HealthNotesTracker.create();
+    const ownerId = await requireEffectiveUserId(request);
+    const garmin = await GarminTracker.create(ownerId);
+    const notes = await HealthNotesTracker.create(ownerId);
 
     return NextResponse.json({
       success: true,
@@ -21,7 +30,7 @@ export async function GET() {
       syncStatus: garmin.getSyncStatus(),
       garminConfigured: !!(process.env.GARMIN_EMAIL && process.env.GARMIN_PASSWORD),
       garminConnected: await (async () => {
-        const tokens = await loadJSON<{ oauth1?: unknown; oauth2?: unknown } | null>('garmin-tokens.json', null);
+        const tokens = await loadJSON<{ oauth1?: unknown; oauth2?: unknown } | null>(ownerId, 'garmin-tokens.json', null);
         return !!(tokens?.oauth1 && tokens?.oauth2);
       })(),
       notes: notes.getAllData().notes,
@@ -45,6 +54,13 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action, ...data } = body;
+    if (ADMIN_ONLY_ACTIONS.has(action) && !(await isRealAdminRequest(request))) {
+      return NextResponse.json(
+        { error: `Action "${action}" is admin-only until per-user Garmin credentials are supported.` },
+        { status: 403 },
+      );
+    }
+    const ownerId = await requireEffectiveUserId(request);
 
     switch (action) {
       case 'sync': {
@@ -56,7 +72,7 @@ export async function POST(request: NextRequest) {
           );
         }
 
-        const garmin = await GarminTracker.create();
+        const garmin = await GarminTracker.create(ownerId);
         const result = await garmin.syncMetrics(metrics);
 
         // Auto-apply training for days with sufficient active minutes
@@ -64,7 +80,7 @@ export async function POST(request: NextRequest) {
           ? trainingThreshold
           : 30;
         let trained = 0;
-        const weeklyTracker = await WeeklyTracker.create();
+        const weeklyTracker = await WeeklyTracker.create(ownerId);
         for (const m of metrics) {
           if (m.date && typeof m.activeMinutes === 'number' && m.activeMinutes >= threshold) {
             const applied = await weeklyTracker.applyGarminTraining(m.date, m.activeMinutes, threshold);
@@ -76,7 +92,7 @@ export async function POST(request: NextRequest) {
       }
 
       case 'garmin-login': {
-        const result = await initiateGarminLogin();
+        const result = await initiateGarminLogin(ownerId);
         if (result.success) {
           return NextResponse.json({ success: true, connected: true });
         }
@@ -91,7 +107,7 @@ export async function POST(request: NextRequest) {
         if (!sessionId || !code) {
           return NextResponse.json({ success: false, error: 'sessionId and code are required' }, { status: 400 });
         }
-        const result = await completeMFALogin(sessionId, code);
+        const result = await completeMFALogin(ownerId, sessionId, code);
         if (result.success) {
           return NextResponse.json({ success: true, connected: true });
         }
@@ -103,13 +119,13 @@ export async function POST(request: NextRequest) {
           ? data.days
           : 7;
 
-        const { metrics: fetchedMetrics, error } = await fetchGarminMetrics(days);
+        const { metrics: fetchedMetrics, error } = await fetchGarminMetrics(ownerId, days);
         if (error) {
           const status = error.includes('environment variables') ? 503 : 502;
           return NextResponse.json({ success: false, error }, { status });
         }
 
-        const garmin = await GarminTracker.create();
+        const garmin = await GarminTracker.create(ownerId);
         const result = await garmin.syncMetrics(fetchedMetrics);
 
         // Auto-apply training (same logic as 'sync' action)
@@ -117,7 +133,7 @@ export async function POST(request: NextRequest) {
           ? data.trainingThreshold
           : 30;
         let trained = 0;
-        const weeklyTracker = await WeeklyTracker.create();
+        const weeklyTracker = await WeeklyTracker.create(ownerId);
         for (const m of fetchedMetrics) {
           if (m.date && typeof m.activeMinutes === 'number' && m.activeMinutes >= threshold) {
             const applied = await weeklyTracker.applyGarminTraining(m.date, m.activeMinutes, threshold);

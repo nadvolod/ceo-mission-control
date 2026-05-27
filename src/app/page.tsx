@@ -8,7 +8,7 @@ import { Footer } from '@/components/landing/Footer';
 
 export default function LandingPage() {
   return (
-    <main className="bg-[#06060a] text-white min-h-screen selection:bg-indigo-500/30">
+    <main className="bg-[#06060a] text-white min-h-screen selection:bg-indigo-500/30 overflow-x-hidden">
       <HeroSection />
       <PainPointsSection />
       <SolutionPreview />

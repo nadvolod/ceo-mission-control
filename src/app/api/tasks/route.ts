@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fetchTasks, createTask, computeTaskStats } from '@/lib/task-api';
 import { checkAuth } from '@/lib/auth';
 import { loadJSON } from '@/lib/storage';
+import { requireEffectiveUserId } from '@/lib/session';
 import type { SyncedTask, AiTask } from '@/lib/types';
 
 function syncedToAiTask(task: SyncedTask, index: number): AiTask {
@@ -27,10 +28,11 @@ function syncedToAiTask(task: SyncedTask, index: number): AiTask {
   };
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
     // Try synced tasks from Neon first
-    const syncedData = await loadJSON<{ tasks: SyncedTask[] } | null>('synced-tasks.json', null);
+    const ownerId = await requireEffectiveUserId(request);
+    const syncedData = await loadJSON<{ tasks: SyncedTask[] } | null>(ownerId, 'synced-tasks.json', null);
     if (syncedData?.tasks && syncedData.tasks.length > 0) {
       const tasks = syncedData.tasks.map(syncedToAiTask);
       const stats = computeTaskStats(tasks);

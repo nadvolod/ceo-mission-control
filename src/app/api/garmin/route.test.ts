@@ -11,6 +11,10 @@ jest.mock('@/lib/storage', () => ({
   appendAuditLog: jest.fn(),
 }));
 
+jest.mock('@/lib/session', () => ({
+  requireEffectiveUserId: jest.fn(async () => '00000000-0000-0000-0000-000000000001'),
+}));
+
 jest.mock('@/lib/auth', () => ({
   checkAuth: jest.fn((req: NextRequest) => {
     return req.headers.get('x-sync-api-key') === 'test-key';
@@ -37,7 +41,7 @@ function makeRequest(method: string, body?: unknown, headers?: Record<string, st
 describe('/api/garmin', () => {
   beforeEach(() => {
     jest.clearAllMocks();
-    mockLoadJSON.mockImplementation((key: string) => {
+    (mockLoadJSON as jest.Mock).mockImplementation((_ownerId: string, key: string) => {
       if (key === 'garmin-health.json') {
         return Promise.resolve({ metrics: {}, lastSyncedAt: '', syncStatus: 'idle', syncError: null });
       }
@@ -62,7 +66,7 @@ describe('/api/garmin', () => {
 
   describe('GET', () => {
     it('returns garmin metrics and health notes', async () => {
-      const response = await GET();
+      const response = await GET(new NextRequest('http://localhost/'));
       const data = await response.json();
 
       expect(response.status).toBe(200);

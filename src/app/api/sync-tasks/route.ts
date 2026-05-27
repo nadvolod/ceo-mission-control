@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadJSON, saveJSON } from '@/lib/storage';
 import { checkAuth } from '@/lib/auth';
+import { requireEffectiveUserId } from '@/lib/session';
 import { localTaskToSynced, syncedToLocalTask, mergeTasks } from '@/lib/task-sync';
 import type { LocalTask, SyncedTask, SyncResult } from '@/lib/types';
 
@@ -10,9 +11,10 @@ const STORE_KEY = 'synced-tasks.json';
  * GET /api/sync-tasks
  * Returns current synced tasks from Neon (for dashboard consumption).
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const data = await loadJSON<{ tasks: SyncedTask[] } | null>(STORE_KEY, null);
+    const ownerId = await requireEffectiveUserId(request);
+    const data = await loadJSON<{ tasks: SyncedTask[] } | null>(ownerId, STORE_KEY, null);
     const tasks = data?.tasks ?? [];
     return NextResponse.json({ tasks, count: tasks.length });
   } catch (error) {
@@ -35,6 +37,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action } = body;
+    const ownerId = await requireEffectiveUserId(request);
 
     switch (action) {
       case 'push': {
@@ -44,10 +47,10 @@ export async function POST(request: NextRequest) {
         }
 
         const incoming = localTasks.map(localTaskToSynced);
-        const existing = (await loadJSON<{ tasks: SyncedTask[] } | null>(STORE_KEY, null))?.tasks ?? [];
+        const existing = (await loadJSON<{ tasks: SyncedTask[] } | null>(ownerId, STORE_KEY, null))?.tasks ?? [];
         const merged = mergeTasks(incoming, existing);
 
-        await saveJSON(STORE_KEY, { tasks: merged, lastSynced: new Date().toISOString() });
+        await saveJSON(ownerId, STORE_KEY, { tasks: merged, lastSynced: new Date().toISOString() });
 
         const result: SyncResult = {
           pushed: incoming.length,
@@ -61,7 +64,7 @@ export async function POST(request: NextRequest) {
       }
 
       case 'pull': {
-        const data = await loadJSON<{ tasks: SyncedTask[] } | null>(STORE_KEY, null);
+        const data = await loadJSON<{ tasks: SyncedTask[] } | null>(ownerId, STORE_KEY, null);
         const tasks = data?.tasks ?? [];
         const localTasks = tasks.map(syncedToLocalTask);
 

@@ -5,21 +5,25 @@ import { NextRequest } from 'next/server';
 import { format, startOfWeek, addDays } from 'date-fns';
 import { GET, POST } from './route';
 
-// Helper: get a date string for a specific day of the current week (0=Mon)
+// Helper: get a date string for a specific day of the current week (0=Sun)
 function weekDay(offset: number): string {
-  const ws = startOfWeek(new Date(), { weekStartsOn: 1 });
+  const ws = startOfWeek(new Date(), { weekStartsOn: 0 });
   return format(addDays(ws, offset), 'yyyy-MM-dd');
 }
 
 jest.mock('@/lib/storage', () => {
   let store: Record<string, any> = {};
   return {
-    loadJSON: jest.fn(async (key: string, defaultValue: any) => store[key] ?? defaultValue),
-    saveJSON: jest.fn(async (key: string, data: any) => { store[key] = data; }),
+    loadJSON: jest.fn(async (_ownerId: string, key: string, defaultValue: any) => store[key] ?? defaultValue),
+    saveJSON: jest.fn(async (_ownerId: string, key: string, data: any) => { store[key] = data; }),
     appendAuditLog: jest.fn(async () => {}),
     _reset: () => { store = {}; },
   };
 });
+
+jest.mock('@/lib/session', () => ({
+  requireEffectiveUserId: jest.fn(async () => '00000000-0000-0000-0000-000000000001'),
+}));
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const storage = require('@/lib/storage');
@@ -32,7 +36,7 @@ describe('/api/weekly-tracker', () => {
 
   describe('GET', () => {
     it('should return correct structure with empty data', async () => {
-      const response = await GET();
+      const response = await GET(new NextRequest('http://localhost/'));
       const data = await response.json();
 
       expect(response.status).toBe(200);
@@ -65,7 +69,7 @@ describe('/api/weekly-tracker', () => {
       };
       storage.loadJSON.mockResolvedValueOnce(existingData);
 
-      const response = await GET();
+      const response = await GET(new NextRequest('http://localhost/'));
       const data = await response.json();
 
       expect(data.todaysEntry).not.toBeNull();
@@ -179,7 +183,7 @@ describe('/api/weekly-tracker', () => {
       expect(data.review.temporalTarget).toBe(8);
 
       // Verify it appears in GET response
-      const getResponse = await GET();
+      const getResponse = await GET(new NextRequest('http://localhost/'));
       const getData = await getResponse.json();
       expect(getData.currentWeekSummary.temporalTarget).toBe(8);
     });
@@ -265,7 +269,7 @@ describe('/api/weekly-tracker', () => {
       });
       await POST(req2);
 
-      const getResponse = await GET();
+      const getResponse = await GET(new NextRequest('http://localhost/'));
       const data = await getResponse.json();
 
       // Both entries should be present in the week summary

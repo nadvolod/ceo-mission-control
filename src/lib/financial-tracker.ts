@@ -37,25 +37,28 @@ export class FinancialTracker {
     dailyMetrics: {},
     lastUpdated: new Date().toISOString()
   };
-
-  private constructor() {}
+  private readonly ownerId: string;
   private static readonly DATE_VALIDATION_TIME_UTC = 'T12:00:00Z';
 
-  static async create(): Promise<FinancialTracker> {
-    const tracker = new FinancialTracker();
+  private constructor(ownerId: string) {
+    this.ownerId = ownerId;
+  }
+
+  static async create(ownerId: string): Promise<FinancialTracker> {
+    const tracker = new FinancialTracker(ownerId);
     await tracker.loadData();
     return tracker;
   }
 
   private async loadData(): Promise<void> {
     const defaultData: FinancialData = { dailyMetrics: {}, lastUpdated: new Date().toISOString() };
-    const loaded = await loadJSON('financial-metrics.json', defaultData);
+    const loaded = await loadJSON(this.ownerId, 'financial-metrics.json', defaultData);
     this.data = this.normalizeLoadedData(loaded, defaultData);
   }
 
   private async saveData(): Promise<void> {
     this.data.lastUpdated = new Date().toISOString();
-    await saveJSON('financial-metrics.json', this.data);
+    await saveJSON(this.ownerId, 'financial-metrics.json', this.data);
   }
 
   async addEntry(category: 'moved' | 'generated' | 'cut', amount: number, description: string, date?: string): Promise<FinancialEntry> {
@@ -192,7 +195,7 @@ export class FinancialTracker {
 
   /**
    * Returns a length-7 array of DailyFinancialMetrics, one per day from
-   * `weekStartDate` (Monday, YYYY-MM-DD) through the following Sunday inclusive.
+   * `weekStartDate` (Sunday, YYYY-MM-DD) through the following Saturday inclusive.
    * Days with no recorded entries return zero-filled placeholders.
    */
   getDailyMetricsForWeek(weekStartDate: string): DailyFinancialMetrics[] {
@@ -227,12 +230,12 @@ export class FinancialTracker {
   }
 
   /**
-   * Returns totals across the previous Mon-Sun week (relative to today).
+   * Returns totals across the previous Sun-Sat week (relative to today).
    * Uses cent-based arithmetic via centSum for precision.
    */
   getPreviousWeekTotals(): { moved: number; generated: number; cut: number; netImpact: number } {
     const now = new Date();
-    const prevWeekStart = addDays(startOfWeek(now, { weekStartsOn: 1 }), -7);
+    const prevWeekStart = addDays(startOfWeek(now, { weekStartsOn: 0 }), -7);
     const prevWeekStartStr = format(prevWeekStart, 'yyyy-MM-dd');
     const days = this.getDailyMetricsForWeek(prevWeekStartStr);
     return {

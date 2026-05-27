@@ -22,17 +22,20 @@ function defaultData(): HealthNotesData {
 
 export class HealthNotesTracker {
   private data: HealthNotesData = defaultData();
+  private readonly ownerId: string;
 
-  private constructor() {}
+  private constructor(ownerId: string) {
+    this.ownerId = ownerId;
+  }
 
-  static async create(): Promise<HealthNotesTracker> {
-    const tracker = new HealthNotesTracker();
+  static async create(ownerId: string): Promise<HealthNotesTracker> {
+    const tracker = new HealthNotesTracker(ownerId);
     await tracker.loadData();
     return tracker;
   }
 
   private async loadData(): Promise<void> {
-    const stored = await loadJSON(STORAGE_KEY, defaultData());
+    const stored = await loadJSON<HealthNotesData>(this.ownerId, STORAGE_KEY, defaultData());
     this.data = {
       ...defaultData(),
       ...stored,
@@ -42,7 +45,7 @@ export class HealthNotesTracker {
 
   private async saveData(): Promise<void> {
     this.data.lastUpdated = new Date().toISOString();
-    await saveJSON(STORAGE_KEY, this.data);
+    await saveJSON(this.ownerId, STORAGE_KEY, this.data);
   }
 
   async logNote(note: Omit<DailyHealthNote, 'loggedAt'>): Promise<DailyHealthNote> {
@@ -65,6 +68,7 @@ export class HealthNotesTracker {
     await this.saveData();
 
     await appendAuditLog(
+      this.ownerId,
       note.date,
       'health-notes',
       `Morning log: ${note.supplements.filter(s => s.taken).map(s => `${s.name} ${s.dosageMg}mg`).join(', ') || 'no supplements'}`
@@ -72,6 +76,26 @@ export class HealthNotesTracker {
 
     console.log('Health note logged:', { date: note.date });
     return fullNote;
+  }
+
+  /** Delete the note for a specific YYYY-MM-DD. Returns true if it existed. */
+  async deleteNote(date: string): Promise<boolean> {
+    // Defense in depth: validate even though API routes also check.
+    // Without this, a caller could pass `__proto__` or similar and walk
+    // the prototype chain.
+    if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      throw new Error('date must be a valid YYYY-MM-DD string');
+    }
+    if (!this.data.notes[date]) return false;
+    delete this.data.notes[date];
+    await this.saveData();
+    await appendAuditLog(
+      this.ownerId,
+      date,
+      'health-notes',
+      `Note deleted for ${date}`,
+    );
+    return true;
   }
 
   getNoteForDate(date: string): DailyHealthNote | null {

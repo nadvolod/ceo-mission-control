@@ -171,6 +171,7 @@ export interface MonarchFinancialSnapshot {
   previousMonthExpenses?: number;
   previousMonthLabel?: string;   // e.g., "Mar 2026"
   burnRate: number;
+  burnRateLabel?: string | null; // e.g. "Apr 2026" — null/undefined means current-month MTD was used
   runwayMonths: number;
   savingsRate: number;
   lastSynced: string;
@@ -349,6 +350,27 @@ export interface MonthlyReview {
 
 export interface MonthlyReviewData {
   reviews: MonthlyReview[];
+  lastUpdated: string;
+}
+
+// Three to Thrive daily focus questions
+
+export interface ThreeToThriveAnswer {
+  id: string;         // UUID
+  date: string;       // YYYY-MM-DD
+  question: string;
+  answer: string;
+  answeredAt: string; // ISO datetime
+}
+
+export interface ThreeToThriveEntry {
+  date: string;       // YYYY-MM-DD
+  questions: string[]; // The 3 questions selected for this day
+  answers: ThreeToThriveAnswer[];
+}
+
+export interface ThreeToThriveData {
+  entries: Record<string, ThreeToThriveEntry>; // keyed by YYYY-MM-DD
   lastUpdated: string;
 }
 

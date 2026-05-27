@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import type { AiTask, TaskStats, FocusCategory, MonarchFinancialSnapshot, AdjustmentType, RevenueProjectionData, MonthProjection, Initiative, DailyScorecard, PerformanceDayEntry, WeeklySummary, WeeklyReview, MonthlyReview, MonthlyReviewRatings } from '@/lib/types';
+import type { AiTask, TaskStats, FocusCategory, MonarchFinancialSnapshot, AdjustmentType, RevenueProjectionData, MonthProjection, Initiative, DailyScorecard, PerformanceDayEntry, WeeklySummary, WeeklyReview, MonthlyReview, MonthlyReviewRatings, ThreeToThriveEntry } from '@/lib/types';
 
 export interface RevenueProjectionApiResponse {
   data: RevenueProjectionData;
@@ -28,6 +28,13 @@ export interface MonthlyReviewApiResponse {
   timestamp: string;
 }
 
+export interface ThreeToThriveApiResponse {
+  success: boolean;
+  todaysEntry: ThreeToThriveEntry;
+  history: ThreeToThriveEntry[];
+  timestamp: string;
+}
+
 export interface DashboardData {
   aiTasks: AiTask[];
   taskStats: TaskStats;
@@ -41,6 +48,7 @@ export interface DashboardData {
   projectionData: RevenueProjectionApiResponse | null;
   weeklyTrackerData: WeeklyTrackerApiResponse | null;
   monthlyReviewData: MonthlyReviewApiResponse | null;
+  threeToThriveData: ThreeToThriveApiResponse | null;
   hasGarminData: boolean;
   isLoading: boolean;
 }
@@ -58,6 +66,7 @@ export interface DashboardHandlers {
   handleAddFinancialEntry: (category: 'moved' | 'generated' | 'cut', amount: number, description: string) => Promise<void>;
   handleAddFocusSession: (category: FocusCategory, hours: number, description: string) => Promise<void>;
   handleLogDay: (deepWorkHours: number, pipelineActions: number, trained: boolean) => Promise<void>;
+  handleAddToDay: (deepWorkDelta: number, pipelineDelta: number, setTrained: boolean) => Promise<void>;
   handleSubmitWeeklyReview: (review: {
     slipAnalysis: string;
     systemAdjustment: string;
@@ -67,6 +76,9 @@ export interface DashboardHandlers {
   }) => Promise<void>;
   handleSubmitMonthlyReview: (review: Omit<MonthlyReview, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
   handleDeleteMonthlyReview: (month: string) => Promise<void>;
+  handleDeleteDay: (date: string) => Promise<void>;
+  handleDeleteWeeklyReview: (id: string) => Promise<void>;
+  handleSaveThreeToThriveAnswer: (date: string, question: string, answer: string) => Promise<void>;
 }
 
 export function useDashboardData(): DashboardData & DashboardHandlers {
@@ -82,6 +94,7 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
   const [projectionData, setProjectionData] = useState<RevenueProjectionApiResponse | null>(null);
   const [weeklyTrackerData, setWeeklyTrackerData] = useState<WeeklyTrackerApiResponse | null>(null);
   const [monthlyReviewData, setMonthlyReviewData] = useState<MonthlyReviewApiResponse | null>(null);
+  const [threeToThriveData, setThreeToThriveData] = useState<ThreeToThriveApiResponse | null>(null);
   const [hasGarminData, setHasGarminData] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -169,6 +182,15 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
             setMonthlyReviewData(data);
           }
         } catch (e) { console.error('Error loading monthly reviews:', e); }
+      },
+      async () => {
+        try {
+          const res = await fetch('/api/three-to-thrive');
+          if (res.ok) {
+            const data = await res.json();
+            setThreeToThriveData(data);
+          }
+        } catch (e) { console.error('Error loading Three to Thrive:', e); }
       },
       async () => {
         try {
@@ -329,6 +351,26 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
     }
   }, [loadAllData]);
 
+  const handleAddToDay = useCallback(async (deepWorkDelta: number, pipelineDelta: number, setTrained: boolean) => {
+    try {
+      const now = new Date();
+      const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const response = await fetch('/api/weekly-tracker', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'addToDay', deepWorkDelta, pipelineDelta, setTrained, date }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to add to day');
+      }
+      await loadAllData();
+    } catch (error) {
+      console.error('Error adding to day:', error);
+      throw error;
+    }
+  }, [loadAllData]);
+
   const handleLogDay = useCallback(async (deepWorkHours: number, pipelineActions: number, trained: boolean) => {
     try {
       // Use local date to avoid UTC/timezone mismatch on the server
@@ -410,13 +452,78 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
     }
   }, [loadAllData]);
 
+  const handleDeleteDay = useCallback(async (date: string) => {
+    const response = await fetch('/api/weekly-tracker', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'deleteDay', date }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to delete day');
+    }
+    await loadAllData();
+  }, [loadAllData]);
+
+  const handleDeleteWeeklyReview = useCallback(async (id: string) => {
+    const response = await fetch('/api/weekly-tracker', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'deleteReview', id }),
+    });
+    if (!response.ok) {
+      const err = await response.json().catch(() => ({}));
+      throw new Error(err.error || 'Failed to delete review');
+    }
+    await loadAllData();
+  }, [loadAllData]);
+
+  const handleSaveThreeToThriveAnswer = useCallback(async (date: string, question: string, answer: string) => {
+    try {
+      const response = await fetch('/api/three-to-thrive', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date, question, answer }),
+      });
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || 'Failed to save answer');
+      }
+      const result = await response.json();
+      // Optimistically update local state without full reload.
+      // Uses functional setState so the callback identity is stable and the
+      // update is applied even if the initial GET hasn't resolved yet.
+      if (result.success) {
+        setThreeToThriveData(prev => {
+          if (!prev) {
+            return {
+              success: true,
+              todaysEntry: result.todaysEntry,
+              history: [result.todaysEntry],
+              timestamp: new Date().toISOString(),
+            };
+          }
+          const historyHasToday = prev.history.some(e => e.date === result.todaysEntry.date);
+          const history = historyHasToday
+            ? prev.history.map(e => (e.date === result.todaysEntry.date ? result.todaysEntry : e))
+            : [result.todaysEntry, ...prev.history];
+          return { ...prev, todaysEntry: result.todaysEntry, history };
+        });
+      }
+    } catch (error) {
+      console.error('Error saving Three to Thrive answer:', error);
+      throw error;
+    }
+  }, []);
+
   return {
     aiTasks, taskStats, initiatives, scorecard, financialData, focusData,
     monarchData, monarchError, monarchLoading, projectionData, weeklyTrackerData,
-    monthlyReviewData, hasGarminData, isLoading,
+    monthlyReviewData, threeToThriveData, hasGarminData, isLoading,
     loadAllData, handleCreateTask, handleUpdateTask, handleDeleteTask,
     handleMonarchRefresh, handleAddProjectionAdjustment, handleRemoveProjectionAdjustment,
-    handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleSubmitWeeklyReview,
+    handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleAddToDay, handleSubmitWeeklyReview,
     handleSubmitMonthlyReview, handleDeleteMonthlyReview,
+    handleDeleteDay, handleDeleteWeeklyReview, handleSaveThreeToThriveAnswer,
   };
 }

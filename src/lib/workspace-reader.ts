@@ -2,9 +2,9 @@ import matter from 'gray-matter';
 import type { Initiative, DailyScorecard } from './types';
 import { loadText, saveText } from './storage';
 
-export async function readInitiatives(): Promise<Initiative[]> {
+export async function readInitiatives(ownerId: string): Promise<Initiative[]> {
   try {
-    const content = await loadText('INITIATIVES.md', '');
+    const content = await loadText(ownerId, 'INITIATIVES.md', '');
     if (!content) return [];
 
     // Parse markdown table
@@ -73,9 +73,9 @@ export async function readInitiatives(): Promise<Initiative[]> {
   }
 }
 
-export async function readDailyScorecard(): Promise<DailyScorecard | null> {
+export async function readDailyScorecard(ownerId: string): Promise<DailyScorecard | null> {
   try {
-    const content = await loadText('DAILY_SCORECARD.md', '');
+    const content = await loadText(ownerId, 'DAILY_SCORECARD.md', '');
     if (!content) return null;
 
     return {
@@ -118,6 +118,7 @@ const SCORECARD_FIELD_MAP: Record<string, { section: string; isList: boolean }> 
  * For list fields, value should be string[]. For scalar fields, value should be string.
  */
 export async function updateScorecardField(
+  ownerId: string,
   field: string,
   value: string | string[]
 ): Promise<DailyScorecard | null> {
@@ -126,7 +127,7 @@ export async function updateScorecardField(
     throw new Error(`Unknown scorecard field: ${field}. Valid fields: ${Object.keys(SCORECARD_FIELD_MAP).join(', ')}`);
   }
 
-  let content = await loadText('DAILY_SCORECARD.md', '');
+  let content = await loadText(ownerId, 'DAILY_SCORECARD.md', '');
   if (!content) {
     throw new Error('DAILY_SCORECARD.md not found');
   }
@@ -139,8 +140,8 @@ export async function updateScorecardField(
     content = replaceScorecardValue(content, mapping.section, scalar);
   }
 
-  await saveText('DAILY_SCORECARD.md', content);
-  return readDailyScorecard();
+  await saveText(ownerId, 'DAILY_SCORECARD.md', content);
+  return readDailyScorecard(ownerId);
 }
 
 function replaceScorecardList(content: string, section: string, items: string[]): string {

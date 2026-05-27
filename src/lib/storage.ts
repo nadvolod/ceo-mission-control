@@ -1,184 +1,90 @@
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
-import { join, dirname } from 'path';
-import { getDb, ensureDbReady } from './db';
-import { WORKSPACE_PATH, ensureWorkspaceReady } from './workspace-path';
+import { getDb } from './db';
 
-/**
- * Storage abstraction layer.
- * - With DATABASE_URL: uses Neon Postgres
- * - Without DATABASE_URL: uses filesystem (local dev)
- */
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
-function hasDb(): boolean {
-  return !!process.env.DATABASE_URL;
-}
-
-const SYSTEM_OWNER_ID = '00000000-0000-0000-0000-000000000000';
-
-function isOwnerIdRequiredError(error: unknown): boolean {
-  const candidate = error as { code?: string; message?: string };
-  return (
-    candidate?.code === '23502' &&
-    candidate?.message?.includes('owner_id') === true
-  );
-}
-
-// --- JSON data (tasks.json, focus-tracking.json, etc.) ---
-
-export async function loadJSON<T>(filename: string, defaultValue: T): Promise<T> {
-  if (hasDb()) {
-    await ensureDbReady();
-    const db = getDb()!;
-    try {
-      const rows = await db`SELECT data FROM data_store WHERE key = ${filename}`;
-      if (rows.length > 0) {
-        return rows[0].data as T;
-      }
-    } catch (error) {
-      console.error(`DB loadJSON error for ${filename}:`, error);
-    }
-    return defaultValue;
+function assertOwnerId(ownerId: string, op: string, key: string): void {
+  if (typeof ownerId !== 'string' || !UUID_RE.test(ownerId)) {
+    throw new Error(
+      `storage.${op}(${key}): ownerId must be a UUID, got ${JSON.stringify(ownerId)}`,
+    );
   }
+}
 
-  // Filesystem fallback
-  ensureWorkspaceReady();
+function requireDb() {
+  const db = getDb();
+  if (!db) {
+    throw new Error(
+      'DATABASE_URL is not configured. The filesystem storage fallback has been removed; set DATABASE_URL to a Neon Postgres connection string.',
+    );
+  }
+  return db;
+}
+
+// --- JSON data (per-user) ---
+
+export async function loadJSON<T>(ownerId: string, key: string, defaultValue: T): Promise<T> {
+  assertOwnerId(ownerId, 'loadJSON', key);
+  const db = requireDb();
   try {
-    const filePath = join(WORKSPACE_PATH, filename);
-    if (existsSync(filePath)) {
-      return JSON.parse(readFileSync(filePath, 'utf8'));
+    const rows = await db`SELECT data FROM data_store WHERE owner_id = ${ownerId} AND key = ${key}`;
+    if (rows.length > 0) {
+      return rows[0].data as T;
     }
   } catch (error) {
-    console.error(`File loadJSON error for ${filename}:`, error);
+    console.error(`storage.loadJSON error for owner=${ownerId} key=${key}:`, error);
   }
   return defaultValue;
 }
 
-export async function saveJSON(filename: string, data: unknown): Promise<void> {
-  if (hasDb()) {
-    await ensureDbReady();
-    const db = getDb()!;
-    const payload = JSON.stringify(data);
-    const updated = await db`UPDATE data_store
-                             SET data = ${payload}, updated_at = NOW()
-                             WHERE key = ${filename}
-                             RETURNING key`;
-    if (updated.length === 0) {
-      try {
-        await db`INSERT INTO data_store (key, data, updated_at)
-                 VALUES (${filename}, ${payload}, NOW())`;
-      } catch (error) {
-        if (!isOwnerIdRequiredError(error)) {
-          throw error;
-        }
-        await db`INSERT INTO data_store (key, data, updated_at, owner_id)
-                 VALUES (${filename}, ${payload}, NOW(), ${SYSTEM_OWNER_ID})`;
-      }
-    }
-    return;
-  }
-
-  // Filesystem fallback
-  ensureWorkspaceReady();
-  const filePath = join(WORKSPACE_PATH, filename);
-  mkdirSync(dirname(filePath), { recursive: true });
-  writeFileSync(filePath, JSON.stringify(data, null, 2));
+export async function saveJSON(ownerId: string, key: string, data: unknown): Promise<void> {
+  assertOwnerId(ownerId, 'saveJSON', key);
+  const db = requireDb();
+  const payload = JSON.stringify(data);
+  await db`INSERT INTO data_store (owner_id, key, data, updated_at)
+           VALUES (${ownerId}, ${key}, ${payload}, NOW())
+           ON CONFLICT (owner_id, key) DO UPDATE SET data = ${payload}, updated_at = NOW()`;
+  console.log(`[storage] saveJSON owner=${ownerId} key=${key}`);
 }
 
-// --- Text content (INITIATIVES.md, DAILY_SCORECARD.md, etc.) ---
+// --- Text content (per-user) ---
 
-export async function loadText(filename: string, defaultContent: string = ''): Promise<string> {
-  if (hasDb()) {
-    await ensureDbReady();
-    const db = getDb()!;
-    try {
-      const rows = await db`SELECT content FROM text_store WHERE key = ${filename}`;
-      if (rows.length > 0) {
-        return rows[0].content as string;
-      }
-    } catch (error) {
-      console.error(`DB loadText error for ${filename}:`, error);
-    }
-    return defaultContent;
-  }
-
-  // Filesystem fallback
-  ensureWorkspaceReady();
+export async function loadText(ownerId: string, key: string, defaultContent: string = ''): Promise<string> {
+  assertOwnerId(ownerId, 'loadText', key);
+  const db = requireDb();
   try {
-    return readFileSync(join(WORKSPACE_PATH, filename), 'utf8');
+    const rows = await db`SELECT content FROM text_store WHERE owner_id = ${ownerId} AND key = ${key}`;
+    if (rows.length > 0) {
+      return rows[0].content as string;
+    }
   } catch (error) {
-    console.error(`File loadText error for ${filename}:`, error);
+    console.error(`storage.loadText error for owner=${ownerId} key=${key}:`, error);
   }
   return defaultContent;
 }
 
-export async function saveText(filename: string, content: string): Promise<void> {
-  if (hasDb()) {
-    await ensureDbReady();
-    const db = getDb()!;
-    const updated = await db`UPDATE text_store
-                             SET content = ${content}, updated_at = NOW()
-                             WHERE key = ${filename}
-                             RETURNING key`;
-    if (updated.length === 0) {
-      try {
-        await db`INSERT INTO text_store (key, content, updated_at)
-                 VALUES (${filename}, ${content}, NOW())`;
-      } catch (error) {
-        if (!isOwnerIdRequiredError(error)) {
-          throw error;
-        }
-        await db`INSERT INTO text_store (key, content, updated_at, owner_id)
-                 VALUES (${filename}, ${content}, NOW(), ${SYSTEM_OWNER_ID})`;
-      }
-    }
-    return;
-  }
-
-  // Filesystem fallback
-  ensureWorkspaceReady();
-  const filePath = join(WORKSPACE_PATH, filename);
-  mkdirSync(dirname(filePath), { recursive: true });
-  writeFileSync(filePath, content);
+export async function saveText(ownerId: string, key: string, content: string): Promise<void> {
+  assertOwnerId(ownerId, 'saveText', key);
+  const db = requireDb();
+  await db`INSERT INTO text_store (owner_id, key, content, updated_at)
+           VALUES (${ownerId}, ${key}, ${content}, NOW())
+           ON CONFLICT (owner_id, key) DO UPDATE SET content = ${content}, updated_at = NOW()`;
+  console.log(`[storage] saveText owner=${ownerId} key=${key}`);
 }
 
-// --- Audit log (replaces memory/{date}.md) ---
-// Note: appendAuditLog intentionally catches errors so audit failures
-// don't break data operations (saveJSON/saveText propagate errors).
+// --- Audit log (per-user) ---
 
-export async function appendAuditLog(date: string, entryType: string, content: string): Promise<void> {
-  if (hasDb()) {
-    await ensureDbReady();
-    const db = getDb()!;
-    try {
-      await db`INSERT INTO audit_log (date, entry_type, content) VALUES (${date}, ${entryType}, ${content})`;
-    } catch (error) {
-      if (isOwnerIdRequiredError(error)) {
-        try {
-          await db`INSERT INTO audit_log (date, entry_type, content, owner_id)
-                   VALUES (${date}, ${entryType}, ${content}, ${SYSTEM_OWNER_ID})`;
-          return;
-        } catch (retryError) {
-          console.error('DB audit log error:', retryError);
-          return;
-        }
-      }
-      console.error('DB audit log error:', error);
-    }
-    return;
-  }
-
-  // Filesystem fallback - append to memory/{date}.md
-  ensureWorkspaceReady();
+export async function appendAuditLog(
+  ownerId: string,
+  date: string,
+  entryType: string,
+  content: string,
+): Promise<void> {
+  assertOwnerId(ownerId, 'appendAuditLog', `${date}/${entryType}`);
+  const db = requireDb();
   try {
-    const memoryPath = join(WORKSPACE_PATH, `memory/${date}.md`);
-    mkdirSync(dirname(memoryPath), { recursive: true });
-    try {
-      const existing = readFileSync(memoryPath, 'utf8');
-      writeFileSync(memoryPath, existing + content);
-    } catch {
-      writeFileSync(memoryPath, `# Daily Memory - ${date}\n\n${content}`);
-    }
+    await db`INSERT INTO audit_log (owner_id, date, entry_type, content)
+             VALUES (${ownerId}, ${date}, ${entryType}, ${content})`;
   } catch (error) {
-    console.error('File audit log error:', error);
+    console.error('storage.appendAuditLog error:', error);
   }
 }

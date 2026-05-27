@@ -15,6 +15,8 @@ const eslintConfig = defineConfig([
     // Jest config files are CommonJS and must use require()
     "jest.config.js",
     "jest.setup.js",
+    // Stale worktrees are not part of the active codebase.
+    ".claude/worktrees/**",
   ]),
   {
     rules: {

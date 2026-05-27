@@ -10,7 +10,8 @@ const createJestConfig = nextJest({
 const config = {
   coverageProvider: 'v8',
   testEnvironment: 'jsdom',
-  testPathIgnorePatterns: ['/node_modules/', '/tests/e2e/'],
+  testMatch: ['**/?(*.)+(spec|test).[jt]s?(x)'],
+  testPathIgnorePatterns: ['/node_modules/', '/tests/e2e/', '/.claude/worktrees/'],
   setupFilesAfterEnv: ['<rootDir>/jest.setup.js'],
   moduleNameMapper: {
     '^@/components/(.*)$': '<rootDir>/src/components/$1',

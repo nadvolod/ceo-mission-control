@@ -1,13 +1,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { ChatSyncManager } from '@/lib/chat-sync';
 import { checkAuth } from '@/lib/auth';
+import { requireEffectiveUserId } from '@/lib/session';
 
-let chatSyncManagerPromise: Promise<ChatSyncManager> | null = null;
-function getChatSyncManager() {
-  if (!chatSyncManagerPromise) {
-    chatSyncManagerPromise = ChatSyncManager.create();
+// Cache per ownerId — never share a manager across users. The previous
+// process-global cache captured the first caller's ownerId and silently
+// wrote subsequent users' chat updates to that user's trackers.
+const chatSyncManagers = new Map<string, Promise<ChatSyncManager>>();
+async function getChatSyncManager(ownerId: string) {
+  let p = chatSyncManagers.get(ownerId);
+  if (!p) {
+    p = ChatSyncManager.create(ownerId);
+    chatSyncManagers.set(ownerId, p);
   }
-  return chatSyncManagerPromise;
+  return p;
 }
 
 export async function POST(request: NextRequest) {
@@ -21,7 +27,8 @@ export async function POST(request: NextRequest) {
     }
 
     console.log('Processing chat sync for message:', message);
-    const manager = await getChatSyncManager();
+    const ownerId = await requireEffectiveUserId(request);
+    const manager = await getChatSyncManager(ownerId);
     const result = await manager.syncChatUpdate(message);
 
     return NextResponse.json({

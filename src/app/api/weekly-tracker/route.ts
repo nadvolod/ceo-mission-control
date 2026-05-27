@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { WeeklyTracker } from '@/lib/weekly-tracker';
 import { checkAuth } from '@/lib/auth';
+import { requireEffectiveUserId } from '@/lib/session';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const tracker = await WeeklyTracker.create();
+    const ownerId = await requireEffectiveUserId(request);
+    const tracker = await WeeklyTracker.create(ownerId);
 
     return NextResponse.json({
       success: true,
@@ -32,7 +34,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action, ...data } = body;
-    const tracker = await WeeklyTracker.create();
+    const ownerId = await requireEffectiveUserId(request);
+    const tracker = await WeeklyTracker.create(ownerId);
 
     switch (action) {
       case 'logDay': {
@@ -69,6 +72,53 @@ export async function POST(request: NextRequest) {
         const entry = await tracker.logDay(deepWorkHours, pipelineActions, trained, date);
 
         console.log('Weekly tracker day logged via API:', { date: entry.date, deepWorkHours, pipelineActions, trained });
+
+        return NextResponse.json({
+          success: true,
+          entry,
+          currentWeekSummary: tracker.getCurrentWeekSummary(),
+        });
+      }
+
+      case 'addToDay': {
+        const { deepWorkDelta, pipelineDelta, setTrained, date } = data;
+
+        if (typeof deepWorkDelta !== 'number' || !isFinite(deepWorkDelta) || deepWorkDelta < 0) {
+          return NextResponse.json(
+            { success: false, error: 'deepWorkDelta must be a non-negative number' },
+            { status: 400 }
+          );
+        }
+
+        if (typeof pipelineDelta !== 'number' || !isFinite(pipelineDelta) || pipelineDelta < 0 || !Number.isInteger(pipelineDelta)) {
+          return NextResponse.json(
+            { success: false, error: 'pipelineDelta must be a non-negative integer' },
+            { status: 400 }
+          );
+        }
+
+        if (typeof setTrained !== 'boolean') {
+          return NextResponse.json(
+            { success: false, error: 'setTrained must be a boolean' },
+            { status: 400 }
+          );
+        }
+
+        if (date !== undefined && (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date) || isNaN(new Date(date + 'T00:00:00').getTime()))) {
+          return NextResponse.json(
+            { success: false, error: 'date must be a valid YYYY-MM-DD string' },
+            { status: 400 }
+          );
+        }
+
+        const entry = await tracker.addToDay(deepWorkDelta, pipelineDelta, setTrained, date);
+
+        console.log('Weekly tracker day incremented via API:', {
+          date: entry.date,
+          deepWorkDelta,
+          pipelineDelta,
+          setTrained,
+        });
 
         return NextResponse.json({
           success: true,
@@ -116,6 +166,34 @@ export async function POST(request: NextRequest) {
           success: true,
           data: tracker.getAllData(),
         });
+      }
+
+      case 'deleteDay': {
+        const { date } = data;
+        if (typeof date !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+          return NextResponse.json(
+            { success: false, error: 'date must be a valid YYYY-MM-DD string' },
+            { status: 400 }
+          );
+        }
+        const deleted = await tracker.deleteDailyEntry(date);
+        return NextResponse.json({
+          success: true,
+          deleted,
+          currentWeekSummary: tracker.getCurrentWeekSummary(),
+        });
+      }
+
+      case 'deleteReview': {
+        const { id } = data;
+        if (typeof id !== 'string' || !id) {
+          return NextResponse.json(
+            { success: false, error: 'id is required' },
+            { status: 400 }
+          );
+        }
+        const deleted = await tracker.deleteWeeklyReview(id);
+        return NextResponse.json({ success: true, deleted });
       }
 
       case 'applyGarminTraining': {

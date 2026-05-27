@@ -1,11 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { readInitiatives, readDailyScorecard, updateScorecardField } from '@/lib/workspace-reader';
 import { checkAuth } from '@/lib/auth';
+import { requireEffectiveUserId } from '@/lib/session';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const initiatives = await readInitiatives();
-    const scorecard = await readDailyScorecard();
+    const ownerId = await requireEffectiveUserId(request);
+    const initiatives = await readInitiatives(ownerId);
+    const scorecard = await readDailyScorecard(ownerId);
 
     return NextResponse.json({
       initiatives,
@@ -28,10 +30,12 @@ export async function POST(request: NextRequest) {
   try {
     const { action, ...data } = await request.json();
 
+    const ownerId = await requireEffectiveUserId(request);
+
     switch (action) {
       case 'refresh': {
-        const initiatives = await readInitiatives();
-        const scorecard = await readDailyScorecard();
+        const initiatives = await readInitiatives(ownerId);
+        const scorecard = await readDailyScorecard(ownerId);
         return NextResponse.json({ initiatives, scorecard });
       }
 
@@ -45,7 +49,7 @@ export async function POST(request: NextRequest) {
         }
         console.log(`Updating scorecard field "${field}"`);
 
-        const updatedScorecard = await updateScorecardField(field, value);
+        const updatedScorecard = await updateScorecardField(ownerId, field, value);
         return NextResponse.json({ success: true, scorecard: updatedScorecard });
       }
 

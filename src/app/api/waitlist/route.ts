@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadJSON, saveJSON } from '@/lib/storage';
+import { getUserByRole } from '@/lib/users';
+
+// Waitlist is a shared/public resource — middleware allows anonymous access.
+// We resolve the storage owner via role='admin' (not via the session helper)
+// so anonymous waitlist submissions don't 500 on the auth requirement.
 
 interface WaitlistEntry {
   id: string;
@@ -23,7 +28,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Name is required' }, { status: 400 });
     }
 
-    const entries = await loadJSON<WaitlistEntry[]>('waitlist-entries.json', []);
+    const admin = await getUserByRole('admin');
+    if (!admin) {
+      return NextResponse.json({ error: 'Waitlist unavailable' }, { status: 503 });
+    }
+    const ownerId = admin.id;
+    const entries = await loadJSON<WaitlistEntry[]>(ownerId, 'waitlist-entries.json', []);
 
     if (entries.some(e => e.email.toLowerCase() === email.toLowerCase())) {
       return NextResponse.json({ error: 'Already on the waitlist' }, { status: 409 });
@@ -40,7 +50,7 @@ export async function POST(request: NextRequest) {
     };
 
     entries.push(entry);
-    await saveJSON('waitlist-entries.json', entries);
+    await saveJSON(ownerId, 'waitlist-entries.json', entries);
 
     console.log(`[Waitlist] New signup: ${entry.email} (${entry.company || 'no company'})`);
 
@@ -57,7 +67,11 @@ export async function POST(request: NextRequest) {
 
 export async function GET() {
   try {
-    const entries = await loadJSON<WaitlistEntry[]>('waitlist-entries.json', []);
+    const admin = await getUserByRole('admin');
+    if (!admin) {
+      return NextResponse.json({ count: 0 });
+    }
+    const entries = await loadJSON<WaitlistEntry[]>(admin.id, 'waitlist-entries.json', []);
     return NextResponse.json({ count: entries.length });
   } catch (error) {
     console.error('[Waitlist] Error:', error);

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { saveJSON, saveText } from '@/lib/storage';
 import { checkAuth } from '@/lib/auth';
+import { requireEffectiveUserId } from '@/lib/session';
 
 /**
  * Sync endpoint - accepts workspace data and persists it to the database.
@@ -16,6 +17,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { files, json } = body;
+    const ownerId = await requireEffectiveUserId(request);
 
     const results: string[] = [];
 
@@ -23,7 +25,7 @@ export async function POST(request: NextRequest) {
     if (files && typeof files === 'object') {
       for (const [filename, content] of Object.entries(files)) {
         if (typeof content === 'string') {
-          await saveText(filename, content);
+          await saveText(ownerId, filename, content);
           results.push(`text: ${filename}`);
           console.log(`Synced text file: ${filename}`);
         }
@@ -33,7 +35,7 @@ export async function POST(request: NextRequest) {
     // Sync JSON data (tasks.json, focus-tracking.json, etc.)
     if (json && typeof json === 'object') {
       for (const [filename, data] of Object.entries(json)) {
-        await saveJSON(filename, data);
+        await saveJSON(ownerId, filename, data);
         results.push(`json: ${filename}`);
         console.log(`Synced JSON data: ${filename}`);
       }

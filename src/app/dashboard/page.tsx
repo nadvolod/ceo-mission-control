@@ -1,27 +1,41 @@
 'use client';
 
 import { useState } from 'react';
+import { RefreshCw } from 'lucide-react';
 import { TaskDashboard } from '@/components/TaskDashboard';
 import { FocusOptimization } from '@/components/FocusOptimization';
 import { MissionTracker } from '@/components/MissionTracker';
-import { FinancialCommandCenter } from '@/components/FinancialCommandCenter';
 import { WeeklyPerformanceTracker } from '@/components/WeeklyPerformanceTracker';
+import { ThreeToThrive } from '@/components/ThreeToThrive';
 import { MonthlyReviewTracker } from '@/components/MonthlyReviewTracker';
 import { HealthIntelligenceDashboard } from '@/components/HealthIntelligenceDashboard';
 import { DashboardTabs } from '@/components/DashboardTabs';
 import type { TabId } from '@/components/DashboardTabs';
 import { enrichScorecard } from '@/lib/derive-focus';
 import { useDashboardData } from '@/hooks/useDashboardData';
+import { AdminHandoffButtons } from '@/components/AdminHandoffButtons';
+import { KeyMetricsStrip } from '@/components/KeyMetricsStrip';
+import { computeTotalFocusHoursThisWeek } from '@/lib/dashboard-metrics';
 
 export default function HomePage() {
   const {
     aiTasks, taskStats, initiatives, scorecard, financialData, focusData,
-    monarchData, monarchError, monarchLoading, weeklyTrackerData, isLoading,
+    monarchData, weeklyTrackerData, isLoading,
     loadAllData, handleCreateTask, handleUpdateTask, handleDeleteTask,
     handleMonarchRefresh,
-    handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleSubmitWeeklyReview,
+    handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleAddToDay, handleSubmitWeeklyReview,
     monthlyReviewData, handleSubmitMonthlyReview, handleDeleteMonthlyReview,
+    handleDeleteDay, handleDeleteWeeklyReview,
+    threeToThriveData, handleSaveThreeToThriveAnswer,
   } = useDashboardData();
+
+  // Header refresh: force-refresh Monarch (POST bypasses the 15-min snapshot
+  // cache) AND reload every other dashboard data source. loadAllData alone
+  // would re-read the cached Monarch snapshot via GET.
+  const handleRefreshAll = () => {
+    void handleMonarchRefresh();
+    void loadAllData();
+  };
 
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
 
@@ -36,10 +50,56 @@ export default function HomePage() {
     );
   }
 
-  if (!scorecard) {
-    return (
-      <div className="min-h-screen bg-gray-100 p-8">
-        <div className="max-w-7xl mx-auto">
+  // scorecard may be null if workspace data hasn't been seeded yet — the
+  // top metrics strip still renders, and the section content below shows a
+  // workspace-missing notice in place of the tabs.
+  const enrichedScorecard = scorecard ? enrichScorecard(scorecard, aiTasks, initiatives) : null;
+
+  return (
+    <div className="min-h-screen bg-gray-100 overflow-x-hidden">
+      {/* Compact header */}
+      <header className="bg-white shadow-sm border-b border-gray-200">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-2 sm:py-2.5 flex items-center justify-between gap-3">
+          <div className="flex items-baseline gap-2 min-w-0">
+            <h1 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
+              Mission Control
+            </h1>
+            {scorecard && (
+              <span className="text-[11px] sm:text-xs text-gray-500 truncate hidden sm:inline">
+                {scorecard.date}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
+            <AdminHandoffButtons />
+            <button
+              onClick={handleRefreshAll}
+              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
+              title="Refresh all data"
+              aria-label="Refresh all data"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Key Metrics Strip — always visible, independent of scorecard */}
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 pt-3 sm:pt-4">
+        <KeyMetricsStrip
+          monarchData={monarchData}
+          temporalHoursThisWeek={focusData?.weeklyTotals?.Temporal ?? 0}
+          moneyMovedThisWeek={financialData?.weeklyTotals?.moved ?? 0}
+          focusHoursThisWeek={computeTotalFocusHoursThisWeek(
+            focusData?.weeklyTotals,
+            weeklyTrackerData?.currentWeekSummary?.deepWorkTotal,
+          )}
+        />
+      </div>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
+        {!scorecard ? (
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <h2 className="text-lg font-semibold text-red-800 mb-2">Cannot Load Workspace Data</h2>
             <p className="text-red-700">
@@ -50,66 +110,24 @@ export default function HomePage() {
               <p>Check that workspace data files are available.</p>
             </div>
           </div>
-        </div>
-      </div>
-    );
-  }
-
-  // scorecard is guaranteed non-null after the early return above
-  const enrichedScorecard = enrichScorecard(scorecard, aiTasks, initiatives);
-
-  return (
-    <div className="min-h-screen bg-gray-100">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-8 py-6">
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900">CEO Mission Control</h1>
-              <p className="text-gray-600 mt-1">
-                Conversational task command center for {scorecard.date}
-              </p>
-            </div>
-            <div className="flex items-center gap-6">
-              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 text-center">
-                <div>
-                  <div className="text-2xl font-bold text-blue-600">{taskStats.total}</div>
-                  <div className="text-xs text-gray-500">Total Tasks</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-green-600">{taskStats.doneToday}</div>
-                  <div className="text-xs text-gray-500">Done Today</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-red-600">{taskStats.overdue}</div>
-                  <div className="text-xs text-gray-500">Overdue</div>
-                </div>
-                <div>
-                  <div className="text-2xl font-bold text-gray-900">
-                    {focusData?.todaysMetrics?.totalHours || 0}h
-                  </div>
-                  <div className="text-xs text-gray-500">Focus Hours</div>
-                </div>
-              </div>
-              <button
-                onClick={loadAllData}
-                className="flex-shrink-0 px-3 py-2 text-sm bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors"
-                title="Refresh all data"
-              >
-                Refresh
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-8 py-8">
+        ) : (
+          <>
         <DashboardTabs activeTab={activeTab} onTabChange={setActiveTab} />
 
         {/* Dashboard Tab - Daily items */}
         {activeTab === 'dashboard' && (
           <>
+            {/* Three to Thrive - Daily Focus Questions */}
+            {threeToThriveData && (
+              <div className="mb-8">
+                <ThreeToThrive
+                  todaysEntry={threeToThriveData.todaysEntry}
+                  history={threeToThriveData.history}
+                  onSaveAnswer={handleSaveThreeToThriveAnswer}
+                />
+              </div>
+            )}
+
             {/* Weekly Performance Tracker */}
             {weeklyTrackerData && (
               <div className="mb-8">
@@ -120,6 +138,7 @@ export default function HomePage() {
                   dailyTrend={weeklyTrackerData.dailyTrend}
                   recentReviews={weeklyTrackerData.recentReviews}
                   onLogDay={handleLogDay}
+                  onAddToDay={handleAddToDay}
                   onSubmitReview={(review) =>
                     handleSubmitWeeklyReview({
                       slipAnalysis: review.slipAnalysis,
@@ -156,19 +175,11 @@ export default function HomePage() {
                   }
                   dailyFinancialTrend={financialData?.dailyFinancialTrend ?? []}
                   onAddFinancialEntry={handleAddFinancialEntry}
+                  onDeleteDay={handleDeleteDay}
+                  onDeleteReview={handleDeleteWeeklyReview}
                 />
               </div>
             )}
-
-            {/* Financial Command Center - Real Monarch data */}
-            <div className="mb-8">
-              <FinancialCommandCenter
-                snapshot={monarchData}
-                isLoading={monarchLoading}
-                onRefresh={handleMonarchRefresh}
-                error={monarchError}
-              />
-            </div>
 
             {/* Health Intelligence */}
             <div className="mb-8">
@@ -176,9 +187,11 @@ export default function HomePage() {
             </div>
 
             {/* Today's Plan - Priorities, Critical Moves, Focus Blocks */}
-            <div className="mb-8">
-              <FocusOptimization scorecard={enrichedScorecard} />
-            </div>
+            {enrichedScorecard && (
+              <div className="mb-8">
+                <FocusOptimization scorecard={enrichedScorecard} />
+              </div>
+            )}
           </>
         )}
 
@@ -217,6 +230,8 @@ export default function HomePage() {
                 />
               </div>
             )}
+          </>
+        )}
           </>
         )}
       </main>

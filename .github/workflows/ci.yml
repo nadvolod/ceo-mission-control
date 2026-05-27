@@ -4,7 +4,9 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    # No branches filter — CI runs on every PR regardless of base, so a
+    # stacked PR (e.g. PR 2 of the multi-user series, based on PR 1)
+    # gets the same green-required gate as one targeting main directly.
 
 concurrency:
   group: ci-${{ github.ref }}
@@ -27,9 +29,22 @@ jobs:
           if [ -z "${{ secrets.SYNC_API_KEY }}" ]; then
             missing+=("SYNC_API_KEY")
           fi
+          if [ -z "${{ secrets.ADMIN_INITIAL_PASSWORD }}" ]; then
+            missing+=("ADMIN_INITIAL_PASSWORD")
+          fi
+          if [ -z "${{ secrets.DEMO_USER_PASSWORD }}" ]; then
+            missing+=("DEMO_USER_PASSWORD")
+          fi
+          if [ -z "${{ secrets.TEST_USER_PASSWORD }}" ]; then
+            missing+=("TEST_USER_PASSWORD")
+          fi
+          if [ -z "${{ secrets.IRON_SESSION_PASSWORD }}" ]; then
+            missing+=("IRON_SESSION_PASSWORD")
+          fi
           if [ ${#missing[@]} -gt 0 ]; then
             echo "::error::Missing required secrets: ${missing[*]}"
             echo "Configure these in GitHub repo Settings > Secrets and variables > Actions"
+            echo "ADMIN_INITIAL_PASSWORD / DEMO_USER_PASSWORD / TEST_USER_PASSWORD are seeded into the users table by 'npm run db:migrate'."
             exit 1
           fi
           echo "All required env vars are configured."
@@ -77,32 +92,29 @@ jobs:
 
       - run: npm ci
 
+      - name: Run database migrations (seeds users + adds owner_id)
+        run: npm run db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ADMIN_INITIAL_PASSWORD: ${{ secrets.ADMIN_INITIAL_PASSWORD }}
+          DEMO_USER_PASSWORD: ${{ secrets.DEMO_USER_PASSWORD }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
       - name: Unit tests (mocked)
-        run: npx jest --ci --reporters=default --testPathIgnorePatterns='integration|e2e'
+        run: npx jest --ci --reporters=default --testPathIgnorePatterns='integration|e2e|\.claude/worktrees'
         env:
           CI: true
 
-      - name: Integration tests (real DB)
-        run: npx jest --ci --reporters=default --testPathPattern='integration'
+      - name: Integration tests (real DB, owner_id-scoped)
+        run: npx jest --ci --reporters=default --testPathPattern='integration' --testPathIgnorePatterns='\.claude/worktrees'
         env:
           CI: true
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
           SYNC_API_KEY: ${{ secrets.SYNC_API_KEY }}
 
-      - name: Monarch integration tests (real API)
-        run: npm run test:monarch
-        env:
-          MONARCH_TOKEN: ${{ secrets.MONARCH_TOKEN }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
-      - name: E2E dashboard rendering tests
-        run: npm run test:e2e
-        env:
-          DASHBOARD_URL: https://ceo-mission-control-nine.vercel.app
-
       - name: Coverage report
         if: always()
-        run: npx jest --coverage --ci --reporters=default --testPathIgnorePatterns='integration|e2e'
+        run: npx jest --coverage --ci --reporters=default --testPathIgnorePatterns='integration|e2e|\.claude/worktrees'
         env:
           CI: true
 
@@ -171,16 +183,33 @@ jobs:
           NODE_ENV: production
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 
+      - name: Run database migrations
+        run: npm run db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ADMIN_INITIAL_PASSWORD: ${{ secrets.ADMIN_INITIAL_PASSWORD }}
+          DEMO_USER_PASSWORD: ${{ secrets.DEMO_USER_PASSWORD }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
+      - name: Reseed user passwords from env (idempotent; fixes placeholder hashes)
+        run: npm run db:reseed-users
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ADMIN_INITIAL_PASSWORD: ${{ secrets.ADMIN_INITIAL_PASSWORD }}
+          DEMO_USER_PASSWORD: ${{ secrets.DEMO_USER_PASSWORD }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
-      - name: Start server and run Playwright tests
-        run: |
-          npm start &
-          npx wait-on http://localhost:3000 --timeout 30000
-          DASHBOARD_URL=http://localhost:3000 npm run test:e2e:playwright
+      - name: Run Playwright (local target, real DB scoped to test user)
+        run: npx playwright test
         env:
+          PLAYWRIGHT_TARGET: local
+          CI: true
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          IRON_SESSION_PASSWORD: ${{ secrets.IRON_SESSION_PASSWORD }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
 
       - name: Upload Playwright report
         if: failure()

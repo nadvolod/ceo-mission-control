@@ -1,23 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getFinancialSnapshot, getCachedSnapshot } from '@/lib/monarch-service';
+import { requireEffectiveUserId, isRealAdminRequest } from '@/lib/session';
 
-export async function GET() {
+// Monarch uses a single global MONARCH_TOKEN. A demo or test user with an
+// empty cache could otherwise trigger a fresh fetch and store admin's real
+// financial accounts under their own owner_id. Until per-user Monarch
+// credentials exist, gate this route to the real admin (not impersonated).
+async function requireRealAdmin(request: NextRequest): Promise<NextResponse | null> {
+  if (!(await isRealAdminRequest(request))) {
+    return NextResponse.json(
+      { error: 'Monarch data is admin-only until per-user credentials are supported.' },
+      { status: 403 },
+    );
+  }
+  return null;
+}
+
+export async function GET(request: NextRequest) {
+  const blocked = await requireRealAdmin(request);
+  if (blocked) return blocked;
+
+  // No MONARCH_TOKEN? Serve stale cache when we have one, 503 otherwise.
+  // The earlier "fail fast on missing token" regressed the stale-cache
+  // path that admins relied on during brief token outages.
+  const ownerId = await requireEffectiveUserId(request);
   if (!process.env.MONARCH_TOKEN) {
+    const stale = await getCachedSnapshot(ownerId);
+    if (stale) {
+      return NextResponse.json({ ...stale, stale: true });
+    }
     return NextResponse.json(
       { error: 'Monarch Money not configured. Set MONARCH_TOKEN environment variable.' },
-      { status: 503 }
+      { status: 503 },
     );
   }
 
   try {
-    const snapshot = await getFinancialSnapshot();
+    const snapshot = await getFinancialSnapshot(ownerId);
     return NextResponse.json(snapshot);
   } catch (error) {
     console.error('Error fetching Monarch data:', error);
 
     // Try to serve stale cache on error
     try {
-      const stale = await getCachedSnapshot();
+      const stale = await getCachedSnapshot(ownerId);
       if (stale) {
         return NextResponse.json({ ...stale, stale: true });
       }
@@ -33,10 +59,14 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  const blocked = await requireRealAdmin(request);
+  if (blocked) return blocked;
+
+  // POST exclusively triggers fresh fetches — token MUST be present.
   if (!process.env.MONARCH_TOKEN) {
     return NextResponse.json(
       { error: 'Monarch Money not configured. Set MONARCH_TOKEN environment variable.' },
-      { status: 503 }
+      { status: 503 },
     );
   }
 
@@ -46,7 +76,8 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'refresh': {
-        const snapshot = await getFinancialSnapshot(true);
+        const ownerId = await requireEffectiveUserId(request);
+        const snapshot = await getFinancialSnapshot(ownerId, true);
         return NextResponse.json(snapshot);
       }
 

@@ -35,6 +35,8 @@ Reads directly from OpenClaw workspace at `/Users/nikolay/.openclaw/workspace`.
 
 Automatically deploys to Vercel on push to main branch.
 
+Production login URL: https://ceo-mission-control-nine.vercel.app/login
+
 ## Data Sources
 
 - `INITIATIVES.md` - Portfolio ranking and scoring

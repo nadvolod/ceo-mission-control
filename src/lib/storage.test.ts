@@ -2,170 +2,129 @@
  * @jest-environment node
  */
 
-import { appendAuditLog, saveJSON, saveText } from './storage';
-import { getDb, ensureDbReady } from './db';
+import { UNIT_TEST_OWNER_ID } from '@/__tests__/utils/owner-id';
+import { appendAuditLog, loadJSON, loadText, saveJSON, saveText } from './storage';
+import { getDb } from './db';
 
 jest.mock('./db', () => ({
   getDb: jest.fn(),
-  ensureDbReady: jest.fn(async () => {}),
 }));
 
 describe('storage DB writes', () => {
-  const originalDatabaseUrl = process.env.DATABASE_URL;
-
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env.DATABASE_URL = 'postgres://example.test/db';
   });
 
-  afterAll(() => {
-    process.env.DATABASE_URL = originalDatabaseUrl;
-  });
-
-  it('saveJSON updates first, then inserts when no rows were updated', async () => {
+  it('saveJSON performs one owner-scoped atomic upsert', async () => {
     const sqlCalls: string[] = [];
     const queryValues: unknown[][] = [];
     const db = jest.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
-      const sql = strings.join(' ');
-      sqlCalls.push(sql);
+      sqlCalls.push(strings.join(' '));
       queryValues.push(values);
-      if (sql.includes('UPDATE data_store')) return [];
       return [];
     });
     (getDb as jest.Mock).mockReturnValue(db);
 
-    await saveJSON('financial-metrics.json', { hello: 'world' });
+    await saveJSON(UNIT_TEST_OWNER_ID, 'financial-metrics.json', { hello: 'world' });
 
-    expect(ensureDbReady).toHaveBeenCalled();
-    expect(sqlCalls.some(sql => sql.includes('UPDATE data_store'))).toBe(true);
-    expect(sqlCalls.some(sql => sql.includes('INSERT INTO data_store'))).toBe(true);
-    expect(sqlCalls.some(sql => sql.includes('ON CONFLICT'))).toBe(false);
-    expect(queryValues).toContainEqual([
+    expect(db).toHaveBeenCalledTimes(1);
+    expect(sqlCalls[0]).toContain('INSERT INTO data_store (owner_id, key, data, updated_at)');
+    expect(sqlCalls[0]).toContain('ON CONFLICT (owner_id, key) DO UPDATE');
+    expect(sqlCalls[0]).not.toContain('UPDATE data_store');
+    expect(queryValues[0]).toEqual([
+      UNIT_TEST_OWNER_ID,
+      'financial-metrics.json',
       '{"hello":"world"}',
-      'financial-metrics.json',
-    ]);
-    expect(queryValues).toContainEqual([
-      'financial-metrics.json',
       '{"hello":"world"}',
     ]);
   });
 
-  it('saveJSON does not insert when update already matched rows', async () => {
-    const sqlCalls: string[] = [];
-    const db = jest.fn(async (strings: TemplateStringsArray) => {
-      const sql = strings.join(' ');
-      sqlCalls.push(sql);
-      if (sql.includes('UPDATE data_store')) return [{ key: 'financial-metrics.json' }];
-      return [];
-    });
-    (getDb as jest.Mock).mockReturnValue(db);
-
-    await saveJSON('financial-metrics.json', { ok: true });
-
-    expect(sqlCalls.some(sql => sql.includes('UPDATE data_store'))).toBe(true);
-    expect(sqlCalls.some(sql => sql.includes('INSERT INTO data_store'))).toBe(false);
-  });
-
-  it('saveJSON retries insert with default owner_id when required by schema', async () => {
-    const sqlCalls: string[] = [];
-    const db = jest.fn(async (strings: TemplateStringsArray) => {
-      const sql = strings.join(' ');
-      sqlCalls.push(sql);
-      if (sql.includes('UPDATE data_store')) return [];
-      if (sql.includes('INSERT INTO data_store (key, data, updated_at)')) {
-        const error = new Error('null value in column "owner_id" violates not-null constraint') as Error & { code: string };
-        error.code = '23502';
-        throw error;
-      }
-      return [];
-    });
-    (getDb as jest.Mock).mockReturnValue(db);
-
-    await saveJSON('financial-metrics.json', { ok: true });
-
-    expect(sqlCalls).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining('UPDATE data_store'),
-        expect.stringContaining('INSERT INTO data_store (key, data, updated_at)'),
-        expect.stringContaining('INSERT INTO data_store (key, data, updated_at, owner_id)'),
-      ])
-    );
-  });
-
-  it('saveText updates first, then inserts when no rows were updated', async () => {
+  it('saveText performs one owner-scoped atomic upsert', async () => {
     const sqlCalls: string[] = [];
     const queryValues: unknown[][] = [];
     const db = jest.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
-      const sql = strings.join(' ');
-      sqlCalls.push(sql);
+      sqlCalls.push(strings.join(' '));
       queryValues.push(values);
-      if (sql.includes('UPDATE text_store')) return [];
       return [];
     });
     (getDb as jest.Mock).mockReturnValue(db);
 
-    await saveText('INITIATIVES.md', '# Updated');
+    await saveText(UNIT_TEST_OWNER_ID, 'INITIATIVES.md', '# Updated');
 
-    expect(sqlCalls.some(sql => sql.includes('UPDATE text_store'))).toBe(true);
-    expect(sqlCalls.some(sql => sql.includes('INSERT INTO text_store'))).toBe(true);
-    expect(sqlCalls.some(sql => sql.includes('ON CONFLICT'))).toBe(false);
-    expect(queryValues).toContainEqual([
+    expect(db).toHaveBeenCalledTimes(1);
+    expect(sqlCalls[0]).toContain('INSERT INTO text_store (owner_id, key, content, updated_at)');
+    expect(sqlCalls[0]).toContain('ON CONFLICT (owner_id, key) DO UPDATE');
+    expect(sqlCalls[0]).not.toContain('UPDATE text_store');
+    expect(queryValues[0]).toEqual([
+      UNIT_TEST_OWNER_ID,
+      'INITIATIVES.md',
       '# Updated',
-      'INITIATIVES.md',
-    ]);
-    expect(queryValues).toContainEqual([
-      'INITIATIVES.md',
       '# Updated',
     ]);
   });
 
-  it('saveText retries insert with default owner_id when required by schema', async () => {
+  it('loadJSON scopes reads to owner_id and key', async () => {
     const sqlCalls: string[] = [];
-    const db = jest.fn(async (strings: TemplateStringsArray) => {
-      const sql = strings.join(' ');
-      sqlCalls.push(sql);
-      if (sql.includes('UPDATE text_store')) return [];
-      if (sql.includes('INSERT INTO text_store (key, content, updated_at)')) {
-        const error = new Error('null value in column "owner_id" violates not-null constraint') as Error & { code: string };
-        error.code = '23502';
-        throw error;
-      }
-      return [];
+    const queryValues: unknown[][] = [];
+    const db = jest.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      sqlCalls.push(strings.join(' '));
+      queryValues.push(values);
+      return [{ data: { ok: true } }];
     });
     (getDb as jest.Mock).mockReturnValue(db);
 
-    await saveText('INITIATIVES.md', '# Updated');
+    await expect(loadJSON(UNIT_TEST_OWNER_ID, 'financial-metrics.json', { ok: false })).resolves.toEqual({
+      ok: true,
+    });
 
-    expect(sqlCalls).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining('UPDATE text_store'),
-        expect.stringContaining('INSERT INTO text_store (key, content, updated_at)'),
-        expect.stringContaining('INSERT INTO text_store (key, content, updated_at, owner_id)'),
-      ])
-    );
+    expect(sqlCalls[0]).toContain('SELECT data FROM data_store WHERE owner_id =');
+    expect(queryValues[0]).toEqual([UNIT_TEST_OWNER_ID, 'financial-metrics.json']);
   });
 
-  it('appendAuditLog retries insert with default owner_id when required by schema', async () => {
+  it('loadText scopes reads to owner_id and key', async () => {
     const sqlCalls: string[] = [];
-    const db = jest.fn(async (strings: TemplateStringsArray) => {
-      const sql = strings.join(' ');
-      sqlCalls.push(sql);
-      if (sql.includes('INSERT INTO audit_log (date, entry_type, content)')) {
-        const error = new Error('null value in column "owner_id" violates not-null constraint') as Error & { code: string };
-        error.code = '23502';
-        throw error;
-      }
+    const queryValues: unknown[][] = [];
+    const db = jest.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      sqlCalls.push(strings.join(' '));
+      queryValues.push(values);
+      return [{ content: '# Existing' }];
+    });
+    (getDb as jest.Mock).mockReturnValue(db);
+
+    await expect(loadText(UNIT_TEST_OWNER_ID, 'INITIATIVES.md', '')).resolves.toBe('# Existing');
+
+    expect(sqlCalls[0]).toContain('SELECT content FROM text_store WHERE owner_id =');
+    expect(queryValues[0]).toEqual([UNIT_TEST_OWNER_ID, 'INITIATIVES.md']);
+  });
+
+  it('appendAuditLog writes the explicit owner_id', async () => {
+    const sqlCalls: string[] = [];
+    const queryValues: unknown[][] = [];
+    const db = jest.fn(async (strings: TemplateStringsArray, ...values: unknown[]) => {
+      sqlCalls.push(strings.join(' '));
+      queryValues.push(values);
       return [];
     });
     (getDb as jest.Mock).mockReturnValue(db);
 
-    await appendAuditLog('2026-01-01', 'integration-test', 'content');
+    await appendAuditLog(UNIT_TEST_OWNER_ID, '2026-01-01', 'integration-test', 'content');
 
-    expect(sqlCalls).toEqual(
-      expect.arrayContaining([
-        expect.stringContaining('INSERT INTO audit_log (date, entry_type, content)'),
-        expect.stringContaining('INSERT INTO audit_log (date, entry_type, content, owner_id)'),
-      ])
-    );
+    expect(sqlCalls[0]).toContain('INSERT INTO audit_log (owner_id, date, entry_type, content)');
+    expect(queryValues[0]).toEqual([
+      UNIT_TEST_OWNER_ID,
+      '2026-01-01',
+      'integration-test',
+      'content',
+    ]);
+  });
+
+  it('rejects invalid owner IDs before issuing writes', async () => {
+    const db = jest.fn();
+    (getDb as jest.Mock).mockReturnValue(db);
+
+    await expect(saveJSON('not-a-uuid', 'financial-metrics.json', {})).rejects.toThrow(/ownerId must be a UUID/);
+    await expect(saveText('not-a-uuid', 'INITIATIVES.md', '')).rejects.toThrow(/ownerId must be a UUID/);
+    await expect(appendAuditLog('not-a-uuid', '2026-01-01', 'test', '')).rejects.toThrow(/ownerId must be a UUID/);
+    expect(db).not.toHaveBeenCalled();
   });
 });

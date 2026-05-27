@@ -11,6 +11,10 @@ jest.mock('@/lib/storage', () => ({
   appendAuditLog: jest.fn(),
 }));
 
+jest.mock('@/lib/session', () => ({
+  requireEffectiveUserId: jest.fn(async () => '00000000-0000-0000-0000-000000000001'),
+}));
+
 jest.mock('@/lib/auth', () => ({
   checkAuth: jest.fn((req: NextRequest) => {
     return req.headers.get('x-sync-api-key') === 'test-key';
@@ -46,7 +50,7 @@ describe('/api/health-notes', () => {
 
   describe('GET', () => {
     it('returns notes and templates', async () => {
-      const response = await GET();
+      const response = await GET(new NextRequest('http://localhost/'));
       const data = await response.json();
 
       expect(response.status).toBe(200);

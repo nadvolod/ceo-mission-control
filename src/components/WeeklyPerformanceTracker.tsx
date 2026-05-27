@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import {
   Flame, Plus, TrendingUp, TrendingDown, CheckCircle2, XCircle,
-  AlertTriangle, BarChart3, Activity, ClipboardList, Target
+  AlertTriangle, BarChart3, Activity, ClipboardList, Target, Trash2, Pencil
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -38,6 +38,7 @@ interface WeeklyPerformanceTrackerProps {
   dailyTrend: Array<PerformanceDayEntry & { isEmpty: boolean }>;
   recentReviews: WeeklyReview[];
   onLogDay: (deepWorkHours: number, pipelineActions: number, trained: boolean) => Promise<void>;
+  onAddToDay: (deepWorkDelta: number, pipelineDelta: number, setTrained: boolean) => Promise<void>;
   onSubmitReview: (review: {
     slipAnalysis: string;
     systemAdjustment: string;
@@ -59,6 +60,10 @@ interface WeeklyPerformanceTrackerProps {
     amount: number,
     description: string
   ) => Promise<void>;
+  /** Admin curation: remove a daily entry for the given date. Optional. */
+  onDeleteDay?: (date: string) => Promise<void>;
+  /** Admin curation: remove a weekly review by id. Optional. */
+  onDeleteReview?: (id: string) => Promise<void>;
 }
 
 type TabId = 'daily' | 'weekly' | 'trends' | 'review';
@@ -78,7 +83,7 @@ function getDayStatusLabel(entry: PerformanceDayEntry | null): { label: string; 
   return { label: 'Partial', color: 'text-amber-700', bgColor: 'bg-amber-50' };
 }
 
-const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const DAY_LABELS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
 export function WeeklyPerformanceTracker({
   todaysEntry,
@@ -87,6 +92,7 @@ export function WeeklyPerformanceTracker({
   dailyTrend,
   recentReviews,
   onLogDay,
+  onAddToDay,
   onSubmitReview,
   onAddFocusSession,
   temporalActual = 0,
@@ -98,6 +104,8 @@ export function WeeklyPerformanceTracker({
   previousWeekFinancialTotals,
   dailyFinancialTrend,
   onAddFinancialEntry,
+  onDeleteDay,
+  onDeleteReview,
 }: WeeklyPerformanceTrackerProps) {
   const [activeTab, setActiveTab] = useState<TabId>('daily');
   const [isLogging, setIsLogging] = useState(false);
@@ -180,11 +188,30 @@ export function WeeklyPerformanceTracker({
     }
   };
 
+  const handleQuickAdd = async (
+    deepWorkDelta: number,
+    pipelineDelta: number,
+    setTrained: boolean,
+  ) => {
+    setIsSubmitting(true);
+    try {
+      await onAddToDay(deepWorkDelta, pipelineDelta, setTrained);
+    } catch (error) {
+      console.error('Error adding to day:', error);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const handleQuickGoodDay = async () => {
     setIsSubmitting(true);
     try {
-      await onLogDay(3, 2, true);
-      setIsLogging(false);
+      // Top up to a "good day": fill the gap to 3h deep work and 2 pipeline,
+      // and latch trained. addToDay never overwrites — so if you've already
+      // logged 1.5h + 1 pipeline today, this only adds 1.5h + 1 (not 3 + 2).
+      const dwGap = Math.max(0, 3 - (todaysEntry?.deepWorkHours ?? 0));
+      const plGap = Math.max(0, 2 - (todaysEntry?.pipelineActions ?? 0));
+      await onAddToDay(dwGap, plGap, true);
     } catch (error) {
       console.error('Error logging good day:', error);
     } finally {
@@ -330,27 +357,54 @@ export function WeeklyPerformanceTracker({
             <Flame className="h-6 w-6 text-orange-500" />
             <h3 className="text-lg font-semibold text-gray-900">Weekly Performance Tracker</h3>
           </div>
-          <div className="flex items-center space-x-2">
-            {!isLogging && (
+          <button
+            onClick={() => setIsLogging(!isLogging)}
+            disabled={isSubmitting}
+            className="flex items-center space-x-1 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 border border-gray-200 rounded-lg transition-colors disabled:opacity-50"
+            title="Edit today's totals directly (overwrite mode)"
+            aria-label="Edit today's totals"
+          >
+            <Pencil className="h-4 w-4" />
+            <span>Edit Today</span>
+          </button>
+        </div>
+
+        {/* Quick-add buttons — additive, never overwrite. Use Edit Today to fix mistakes. */}
+        {!isLogging && (
+          <div className="mb-4 flex flex-wrap gap-2" data-testid="weekly-tracker-quick-add">
+            {[
+              { label: '+30m Deep Work', dw: 0.5, pl: 0, tr: false, color: 'blue' },
+              { label: '+1h Deep Work',  dw: 1,   pl: 0, tr: false, color: 'blue' },
+              { label: '+2h Deep Work',  dw: 2,   pl: 0, tr: false, color: 'blue' },
+              { label: '+1 Pipeline',    dw: 0,   pl: 1, tr: false, color: 'purple' },
+              { label: '+2 Pipeline',    dw: 0,   pl: 2, tr: false, color: 'purple' },
+              { label: '✓ Trained',      dw: 0,   pl: 0, tr: true,  color: 'green' },
+            ].map(btn => (
               <button
-                onClick={handleQuickGoodDay}
+                key={btn.label}
+                onClick={() => handleQuickAdd(btn.dw, btn.pl, btn.tr)}
                 disabled={isSubmitting}
-                className="flex items-center space-x-1 px-3 py-2 text-sm bg-green-50 text-green-700 border border-green-200 rounded-lg hover:bg-green-100 transition-colors disabled:opacity-50"
-                title="Log 3h deep work + 2 pipeline + trained"
+                className={`px-3 py-1 text-xs rounded-lg border transition-colors disabled:opacity-50 ${
+                  btn.color === 'blue'
+                    ? 'bg-blue-50 text-blue-700 border-blue-200 hover:bg-blue-100'
+                    : btn.color === 'purple'
+                      ? 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
+                      : 'bg-green-50 text-green-700 border-green-200 hover:bg-green-100'
+                }`}
               >
-                <CheckCircle2 className="h-4 w-4" />
-                <span>Good Day</span>
+                {btn.label}
               </button>
-            )}
+            ))}
             <button
-              onClick={() => setIsLogging(!isLogging)}
-              className="flex items-center space-x-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+              onClick={handleQuickGoodDay}
+              disabled={isSubmitting}
+              className="px-3 py-1 text-xs rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 transition-colors disabled:opacity-50"
+              title="Top up to 3h deep work + 2 pipeline + trained (never lowers values)"
             >
-              <Plus className="h-4 w-4" />
-              <span>Log Today</span>
+              ✓ Good Day
             </button>
           </div>
-        </div>
+        )}
 
         {/* Today's Summary Cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -736,21 +790,23 @@ export function WeeklyPerformanceTracker({
       )}
 
       {/* Tab Navigation */}
-      <div className="flex border-b border-gray-200">
-        {tabs.map(tab => (
-          <button
-            key={tab.id}
-            onClick={() => setActiveTab(tab.id)}
-            className={`flex-1 flex items-center justify-center space-x-2 px-4 py-3 text-sm font-medium transition-colors ${
-              activeTab === tab.id
-                ? 'text-orange-600 border-b-2 border-orange-500 bg-orange-50'
-                : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
-            }`}
-          >
-            {tab.icon}
-            <span>{tab.label}</span>
-          </button>
-        ))}
+      <div className="overflow-x-auto border-b border-gray-200" data-testid="weekly-tracker-tabs-scroll">
+        <div className="flex min-w-max sm:min-w-0 sm:w-full">
+          {tabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => setActiveTab(tab.id)}
+              className={`flex items-center justify-center space-x-2 px-4 py-3 text-sm font-medium transition-colors min-w-[120px] sm:min-w-0 sm:flex-1 ${
+                activeTab === tab.id
+                  ? 'text-orange-600 border-b-2 border-orange-500 bg-orange-50'
+                  : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              {tab.icon}
+              <span>{tab.label}</span>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Tab Content */}
@@ -761,75 +817,98 @@ export function WeeklyPerformanceTracker({
             {/* Current Week Grid */}
             <div>
               <h4 className="text-sm font-medium text-gray-700 mb-3">This Week</h4>
-              <div className="grid grid-cols-7 gap-2">
-                {DAY_LABELS.map((dayLabel, i) => {
-                  const entry = weekEntries[i] || null;
-                  const flags = getDayFlags(entry);
-                  const dwColor = entry
-                    ? entry.deepWorkHours >= 3
-                      ? 'bg-green-500'
-                      : entry.deepWorkHours > 0
-                        ? 'bg-amber-400'
-                        : 'bg-red-400'
-                    : 'bg-gray-200';
-                  const dwPct = entry ? Math.min(100, (entry.deepWorkHours / 8) * 100) : 0;
+              <div className="overflow-x-auto" data-testid="weekly-grid-scroll">
+                <div className="grid grid-cols-7 gap-2 min-w-[560px]">
+                  {DAY_LABELS.map((dayLabel, i) => {
+                    const entry = weekEntries[i] || null;
+                    const flags = getDayFlags(entry);
+                    const dwColor = entry
+                      ? entry.deepWorkHours >= 3
+                        ? 'bg-green-500'
+                        : entry.deepWorkHours > 0
+                          ? 'bg-amber-400'
+                          : 'bg-red-400'
+                      : 'bg-gray-200';
+                    const dwPct = entry ? Math.min(100, (entry.deepWorkHours / 8) * 100) : 0;
 
-                  return (
-                    <div key={dayLabel} className="text-center">
-                      <div className="text-xs font-medium text-gray-500 mb-1">{dayLabel}</div>
-                      {/* Deep work bar */}
-                      <div className="h-16 w-full bg-gray-100 rounded relative flex items-end justify-center overflow-hidden">
-                        <div
-                          className={`w-full rounded-t ${dwColor} transition-all duration-300`}
-                          style={{ height: `${dwPct}%` }}
-                        />
-                        {entry && (
-                          <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-gray-800">
-                            {entry.deepWorkHours}h
+                    return (
+                      <div key={dayLabel} className="text-center">
+                        <div className="text-xs font-medium text-gray-500 mb-1">{dayLabel}</div>
+                        {/* Deep work bar */}
+                        <div className="h-16 w-full bg-gray-100 rounded relative flex items-end justify-center overflow-hidden">
+                          <div
+                            className={`w-full rounded-t ${dwColor} transition-all duration-300`}
+                            style={{ height: `${dwPct}%` }}
+                          />
+                          {entry && (
+                            <div className="absolute inset-0 flex items-center justify-center text-xs font-bold text-gray-800">
+                              {entry.deepWorkHours}h
+                            </div>
+                          )}
+                        </div>
+                        {/* Pipeline count */}
+                        <div className={`text-xs mt-1 ${entry ? 'text-purple-600 font-semibold' : 'text-gray-300'}`}>
+                          {entry ? `${entry.pipelineActions} pl` : '--'}
+                        </div>
+                        {/* Training indicator */}
+                        <div className="mt-0.5">
+                          {entry == null ? (
+                            <span className="text-gray-300 text-xs">--</span>
+                          ) : entry.trained ? (
+                            <CheckCircle2 className="h-3.5 w-3.5 text-green-500 mx-auto" />
+                          ) : (
+                            <XCircle className="h-3.5 w-3.5 text-red-400 mx-auto" />
+                          )}
+                        </div>
+                        {/* Zero day flag */}
+                        {flags.isZeroDay && (
+                          <div className="mt-0.5">
+                            <AlertTriangle className="h-3 w-3 text-red-500 mx-auto" />
                           </div>
                         )}
-                      </div>
-                      {/* Pipeline count */}
-                      <div className={`text-xs mt-1 ${entry ? 'text-purple-600 font-semibold' : 'text-gray-300'}`}>
-                        {entry ? `${entry.pipelineActions} pl` : '--'}
-                      </div>
-                      {/* Training indicator */}
-                      <div className="mt-0.5">
-                        {entry == null ? (
-                          <span className="text-gray-300 text-xs">--</span>
-                        ) : entry.trained ? (
-                          <CheckCircle2 className="h-3.5 w-3.5 text-green-500 mx-auto" />
-                        ) : (
-                          <XCircle className="h-3.5 w-3.5 text-red-400 mx-auto" />
+                        {/* Curation: delete this day's entry. Only shows
+                            when an entry exists AND the parent supplied an
+                            onDeleteDay handler (admin contexts). */}
+                        {entry && onDeleteDay && (
+                          <button
+                            type="button"
+                            aria-label={`Delete entry for ${entry.date}`}
+                            title={`Delete entry for ${entry.date}`}
+                            onClick={async () => {
+                              if (!window.confirm(`Delete the weekly tracker entry for ${entry.date}? This cannot be undone.`)) return;
+                              try {
+                                await onDeleteDay(entry.date);
+                              } catch (err) {
+                                alert((err as Error).message || 'Failed to delete entry');
+                              }
+                            }}
+                            className="mt-1 text-gray-400 hover:text-rose-600 transition-colors"
+                          >
+                            <Trash2 className="h-3 w-3 mx-auto" />
+                          </button>
                         )}
+                        {(() => {
+                          const fin = weekFinancialByDay[i];
+                          const net = fin?.totals.netImpact ?? 0;
+                          const hasData = fin && fin.entries.length > 0;
+                          return (
+                            <MoneyMovePopover entries={fin?.entries ?? []}>
+                              <div
+                                data-testid={`day-money-${i}`}
+                                tabIndex={hasData ? 0 : -1}
+                                className={`mt-1 text-xs font-medium ${
+                                  !hasData ? 'text-gray-300' : net > 0 ? 'text-emerald-600' : net < 0 ? 'text-red-600' : 'text-gray-500'
+                                }`}
+                              >
+                                {hasData ? formatCurrency(net) : '—'}
+                              </div>
+                            </MoneyMovePopover>
+                          );
+                        })()}
                       </div>
-                      {/* Zero day flag */}
-                      {flags.isZeroDay && (
-                        <div className="mt-0.5">
-                          <AlertTriangle className="h-3 w-3 text-red-500 mx-auto" />
-                        </div>
-                      )}
-                      {(() => {
-                        const fin = weekFinancialByDay[i];
-                        const net = fin?.totals.netImpact ?? 0;
-                        const hasData = fin && fin.entries.length > 0;
-                        return (
-                          <MoneyMovePopover entries={fin?.entries ?? []}>
-                            <div
-                              data-testid={`day-money-${i}`}
-                              tabIndex={hasData ? 0 : -1}
-                              className={`mt-1 text-xs font-medium ${
-                                !hasData ? 'text-gray-300' : net > 0 ? 'text-emerald-600' : net < 0 ? 'text-red-600' : 'text-gray-500'
-                              }`}
-                            >
-                              {hasData ? formatCurrency(net) : '—'}
-                            </div>
-                          </MoneyMovePopover>
-                        );
-                      })()}
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
@@ -889,7 +968,7 @@ export function WeeklyPerformanceTracker({
               </div>
               <div className="p-4 bg-blue-50 rounded-lg">
                 <p className="text-sm font-medium text-gray-600">Deep Work Total</p>
-                <p className="text-2xl font-bold text-blue-700">{currentWeekSummary.deepWorkTotal}h</p>
+                <p data-testid="weekly-deep-work-total" className="text-2xl font-bold text-blue-700">{currentWeekSummary.deepWorkTotal}h</p>
                 {previousWeekSummary.deepWorkTotal > 0 && (
                   <DeltaBadge current={currentWeekSummary.deepWorkTotal} previous={previousWeekSummary.deepWorkTotal} suffix="h" />
                 )}
@@ -1176,9 +1255,29 @@ export function WeeklyPerformanceTracker({
                         <span className="text-sm font-medium text-gray-900">
                           Week of {formatDate(review.weekStartDate)}
                         </span>
-                        <span className="text-sm font-bold text-green-600">
-                          ${(review.revenue ?? 0).toLocaleString()}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-bold text-green-600">
+                            ${(review.revenue ?? 0).toLocaleString()}
+                          </span>
+                          {onDeleteReview && (
+                            <button
+                              type="button"
+                              aria-label={`Delete review for week of ${review.weekStartDate}`}
+                              title={`Delete review for week of ${review.weekStartDate}`}
+                              onClick={async () => {
+                                if (!window.confirm(`Delete the weekly review for week of ${review.weekStartDate}? This cannot be undone.`)) return;
+                                try {
+                                  await onDeleteReview(review.id);
+                                } catch (err) {
+                                  alert((err as Error).message || 'Failed to delete review');
+                                }
+                              }}
+                              className="text-gray-400 hover:text-rose-600 transition-colors"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          )}
+                        </div>
                       </div>
                       {review.slipAnalysis && (
                         <div className="text-xs text-gray-600 mb-1">

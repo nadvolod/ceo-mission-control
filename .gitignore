@@ -9,6 +9,7 @@
 # testing
 /coverage
 /test-results
+/tests/.auth/
 
 # runtime workspace data (filesystem storage fallback)
 /data/workspace
@@ -34,6 +35,11 @@ yarn-error.log*
 
 # vercel
 .vercel
+
+# DB backups (contain real prod data — never commit)
+/backups/
+/pre.tsv
+/post.tsv
 
 # typescript
 *.tsbuildinfo

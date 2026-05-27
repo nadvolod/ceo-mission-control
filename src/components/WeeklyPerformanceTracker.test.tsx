@@ -46,6 +46,7 @@ const baseProps = {
   dailyTrend: [],
   recentReviews: [],
   onLogDay: jest.fn().mockResolvedValue(undefined),
+  onAddToDay: jest.fn().mockResolvedValue(undefined),
   onSubmitReview: jest.fn().mockResolvedValue(undefined),
   onAddFocusSession: jest.fn().mockResolvedValue(undefined),
   temporalActual: 0,
@@ -160,11 +161,11 @@ describe('WeeklyPerformanceTracker - Quick-Add Focus Buttons', () => {
     const user = userEvent.setup({ advanceTimers: jest.advanceTimersByTime });
     render(<WeeklyPerformanceTracker {...baseProps} onAddFocusSession={slowAdd} />);
 
-    const buttons = screen.getAllByRole('button', { name: /^\+\d/ });
+    const buttons = screen.getAllByRole('button', { name: /^\+\d+(?:\.\d+)?h\s+(Temporal|Finance|Revenue|Housing|Tax|Personal|Health|Admin|Learning|Other)/ });
     await user.click(buttons[0]);
 
     // All quick-add buttons should be disabled while adding
-    const quickAddButtons = screen.getAllByRole('button', { name: /^\+\d/ });
+    const quickAddButtons = screen.getAllByRole('button', { name: /^\+\d+(?:\.\d+)?h\s+(Temporal|Finance|Revenue|Housing|Tax|Personal|Health|Admin|Learning|Other)/ });
     quickAddButtons.forEach(btn => {
       expect(btn).toBeDisabled();
     });
@@ -231,6 +232,18 @@ describe('WeeklyPerformanceTracker - Net Today card', () => {
     expect(screen.getByTestId('net-today-breakdown')).toHaveTextContent('mv $100');
     expect(screen.getByTestId('net-today-breakdown')).toHaveTextContent('gen $250');
     expect(screen.getByTestId('net-today-breakdown')).toHaveTextContent('cut $50');
+  });
+});
+
+describe('WeeklyPerformanceTracker - Mobile layout', () => {
+  it('renders scroll containers for tab strip and weekly day grid', async () => {
+    const user = userEvent.setup();
+    render(<WeeklyPerformanceTracker {...baseProps} />);
+
+    await user.click(screen.getByRole('button', { name: /^Daily$/i }));
+
+    expect(screen.getByTestId('weekly-tracker-tabs-scroll').className).toMatch(/overflow-x-auto/);
+    expect(screen.getByTestId('weekly-grid-scroll').className).toMatch(/overflow-x-auto/);
   });
 });
 

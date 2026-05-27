@@ -6,8 +6,8 @@
 jest.mock('./storage', () => {
   let store: Record<string, any> = {};
   return {
-    loadJSON: jest.fn(async (key: string, defaultValue: any) => store[key] ?? defaultValue),
-    saveJSON: jest.fn(async (key: string, data: any) => { store[key] = data; }),
+    loadJSON: jest.fn(async (_ownerId: string, key: string, defaultValue: any) => store[key] ?? defaultValue),
+    saveJSON: jest.fn(async (_ownerId: string, key: string, data: any) => { store[key] = data; }),
     loadText: jest.fn(async () => ''),
     saveText: jest.fn(async () => {}),
     appendAuditLog: jest.fn(async () => {}),
@@ -19,6 +19,7 @@ jest.mock('./storage', () => {
 const storage = require('./storage');
 
 import { FocusTracker } from './focus-tracker';
+import { UNIT_TEST_OWNER_ID } from '@/__tests__/utils/owner-id';
 
 const TODAY = new Date().toISOString().split('T')[0];
 
@@ -30,7 +31,7 @@ describe('FocusTracker', () => {
 
   describe('addSession', () => {
     it('should add a session and update daily metrics', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       const session = await tracker.addSession('Temporal', 2.5, 'Client sprint', TODAY);
 
       expect(session.category).toBe('Temporal');
@@ -43,7 +44,7 @@ describe('FocusTracker', () => {
     });
 
     it('should accumulate hours across multiple sessions', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.addSession('Temporal', 2, 'Morning block', TODAY);
       await tracker.addSession('Temporal', 1.5, 'Afternoon block', TODAY);
 
@@ -53,7 +54,7 @@ describe('FocusTracker', () => {
     });
 
     it('should track multiple categories separately', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.addSession('Temporal', 2, 'Client work', TODAY);
       await tracker.addSession('Finance', 1, 'Payment review', TODAY);
 
@@ -64,33 +65,33 @@ describe('FocusTracker', () => {
     });
 
     it('should reject invalid hours (negative)', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       await expect(tracker.addSession('Temporal', -1, 'test')).rejects.toThrow('Hours must be a number greater than 0 and at most 24');
     });
 
     it('should reject invalid hours (zero)', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       await expect(tracker.addSession('Temporal', 0, 'test')).rejects.toThrow('Hours must be a number greater than 0 and at most 24');
     });
 
     it('should reject invalid hours (> 24)', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       await expect(tracker.addSession('Temporal', 25, 'test')).rejects.toThrow('Hours must be a number greater than 0 and at most 24');
     });
 
     it('should reject NaN hours', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       await expect(tracker.addSession('Temporal', NaN, 'test')).rejects.toThrow('Hours must be a number greater than 0 and at most 24');
     });
 
     it('should default unknown category to Other', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       const session = await tracker.addSession('InvalidCategory' as any, 1, 'test');
       expect(session.category).toBe('Other');
     });
 
     it('should default to today if no date provided', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       const session = await tracker.addSession('Temporal', 1, 'test');
       expect(session.date).toBe(TODAY);
     });
@@ -98,7 +99,7 @@ describe('FocusTracker', () => {
 
   describe('processConversationalUpdate', () => {
     it('should detect "logged 2h on Temporal"', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       const result = await tracker.processConversationalUpdate('logged 2h on Temporal');
       expect(result.added.length).toBe(1);
       expect(result.added[0].hours).toBe(2);
@@ -106,7 +107,7 @@ describe('FocusTracker', () => {
     });
 
     it('should detect "focused 3 hours on finance tasks"', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       const result = await tracker.processConversationalUpdate('focused 3 hours on finance tasks');
       expect(result.added.length).toBe(1);
       expect(result.added[0].hours).toBe(3);
@@ -114,7 +115,7 @@ describe('FocusTracker', () => {
     });
 
     it('should detect "spent 1.5h on taxes"', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       const result = await tracker.processConversationalUpdate('spent 1.5h on taxes');
       expect(result.added.length).toBe(1);
       expect(result.added[0].hours).toBe(1.5);
@@ -122,7 +123,7 @@ describe('FocusTracker', () => {
     });
 
     it('should detect "worked 2 hours on revenue"', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       const result = await tracker.processConversationalUpdate('worked 2 hours on revenue');
       expect(result.added.length).toBe(1);
       expect(result.added[0].hours).toBe(2);
@@ -130,7 +131,7 @@ describe('FocusTracker', () => {
     });
 
     it('should detect "deep work 3h: Temporal sprint"', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       const result = await tracker.processConversationalUpdate('deep work 3h: Temporal sprint');
       expect(result.added.length).toBe(1);
       expect(result.added[0].hours).toBe(3);
@@ -138,7 +139,7 @@ describe('FocusTracker', () => {
     });
 
     it('should detect "45 min on taxes" and convert to hours', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       const result = await tracker.processConversationalUpdate('45 min on taxes');
       expect(result.added.length).toBe(1);
       expect(result.added[0].hours).toBe(0.75);
@@ -146,7 +147,7 @@ describe('FocusTracker', () => {
     });
 
     it('should detect "blocked 2h for housing tasks"', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       const result = await tracker.processConversationalUpdate('blocked 2h for housing tasks');
       expect(result.added.length).toBe(1);
       expect(result.added[0].hours).toBe(2);
@@ -154,7 +155,7 @@ describe('FocusTracker', () => {
     });
 
     it('should handle multiple patterns in one message', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       const result = await tracker.processConversationalUpdate(
         'logged 2h on Temporal. spent 1h on taxes.'
       );
@@ -162,21 +163,21 @@ describe('FocusTracker', () => {
     });
 
     it('should return empty array when no patterns match', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       const result = await tracker.processConversationalUpdate('Just had a meeting about the project');
       expect(result.added.length).toBe(0);
       expect(result.message).toContain('No focus hour patterns detected');
     });
 
     it('should default to Other for unknown categories', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       const result = await tracker.processConversationalUpdate('logged 1h on random stuff');
       expect(result.added.length).toBe(1);
       expect(result.added[0].category).toBe('Other');
     });
 
     it('should mark sessions as conversational source', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       const result = await tracker.processConversationalUpdate('logged 2h on Temporal');
       expect(result.added[0].source).toBe('conversational');
     });
@@ -184,7 +185,7 @@ describe('FocusTracker', () => {
 
   describe('getWeekOverWeekGrowth', () => {
     it('should calculate positive growth correctly', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.addSession('Temporal', 5, 'This week', TODAY);
 
       const growth = tracker.getWeekOverWeekGrowth();
@@ -193,7 +194,7 @@ describe('FocusTracker', () => {
     });
 
     it('should handle zero previous week (avoid division by zero)', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.addSession('Temporal', 3, 'test', TODAY);
 
       const growth = tracker.getWeekOverWeekGrowth();
@@ -201,7 +202,7 @@ describe('FocusTracker', () => {
     });
 
     it('should return 0% when both weeks are empty', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       const growth = tracker.getWeekOverWeekGrowth();
       expect(growth.currentTotal).toBe(0);
       expect(growth.previousTotal).toBe(0);
@@ -211,13 +212,13 @@ describe('FocusTracker', () => {
 
   describe('getDailyTrend', () => {
     it('should return correct number of days', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       const trend = tracker.getDailyTrend(7);
       expect(trend.length).toBe(7);
     });
 
     it('should fill in zeros for days with no sessions', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       const trend = tracker.getDailyTrend(7);
       trend.forEach(day => {
         expect(day.totalHours).toBe(0);
@@ -226,7 +227,7 @@ describe('FocusTracker', () => {
     });
 
     it('should include today\'s data', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.addSession('Temporal', 2, 'test', TODAY);
 
       const trend = tracker.getDailyTrend(7);
@@ -238,7 +239,7 @@ describe('FocusTracker', () => {
 
   describe('getRollingAverage', () => {
     it('should compute rolling average', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.addSession('Temporal', 7, 'test', TODAY);
 
       const averages = tracker.getRollingAverage(7);
@@ -247,7 +248,7 @@ describe('FocusTracker', () => {
     });
 
     it('should handle empty data gracefully', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       const averages = tracker.getRollingAverage(7);
       averages.forEach(a => {
         expect(a.average).toBe(0);
@@ -257,7 +258,7 @@ describe('FocusTracker', () => {
 
   describe('getCategoryDistribution', () => {
     it('should sum hours by category', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.addSession('Temporal', 3, 'test', TODAY);
       await tracker.addSession('Finance', 1, 'test', TODAY);
 
@@ -272,7 +273,7 @@ describe('FocusTracker', () => {
 
   describe('getRecentSessions', () => {
     it('should return sessions in reverse order', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.addSession('Temporal', 1, 'First');
       await tracker.addSession('Finance', 2, 'Second');
 
@@ -284,7 +285,7 @@ describe('FocusTracker', () => {
     });
 
     it('should respect limit', async () => {
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       await tracker.addSession('Temporal', 1, 'One');
       await tracker.addSession('Finance', 1, 'Two');
       await tracker.addSession('Revenue', 1, 'Three');
@@ -318,7 +319,7 @@ describe('FocusTracker', () => {
 
       storage.loadJSON.mockResolvedValueOnce(existingData);
 
-      const tracker = await FocusTracker.create();
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
       const metrics = tracker.getTodaysMetrics();
       expect(metrics.totalHours).toBe(2);
       expect(metrics.sessions.length).toBe(1);

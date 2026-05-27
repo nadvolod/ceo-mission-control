@@ -14,10 +14,14 @@ export class RevenueProjectionService {
     lastUpdated: new Date().toISOString(),
   };
 
-  private constructor() {}
+  private readonly ownerId: string;
 
-  static async create(): Promise<RevenueProjectionService> {
-    const svc = new RevenueProjectionService();
+  private constructor(ownerId: string) {
+    this.ownerId = ownerId;
+  }
+
+  static async create(ownerId: string): Promise<RevenueProjectionService> {
+    const svc = new RevenueProjectionService(ownerId);
     await svc.loadData();
     return svc;
   }
@@ -29,12 +33,12 @@ export class RevenueProjectionService {
       adjustments: [],
       lastUpdated: new Date().toISOString(),
     };
-    this.data = await loadJSON('revenue-projections.json', defaultData);
+    this.data = await loadJSON(this.ownerId, 'revenue-projections.json', defaultData);
   }
 
   private async saveData(): Promise<void> {
     this.data.lastUpdated = new Date().toISOString();
-    await saveJSON('revenue-projections.json', this.data);
+    await saveJSON(this.ownerId, 'revenue-projections.json', this.data);
   }
 
   async addAdjustment(

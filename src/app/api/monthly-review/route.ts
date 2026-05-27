@@ -1,10 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { MonthlyReviewTracker } from '@/lib/monthly-review-tracker';
 import { checkAuth } from '@/lib/auth';
+import { requireEffectiveUserId } from '@/lib/session';
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const tracker = await MonthlyReviewTracker.create();
+    const ownerId = await requireEffectiveUserId(request);
+    const tracker = await MonthlyReviewTracker.create(ownerId);
 
     return NextResponse.json({
       success: true,
@@ -30,7 +32,8 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
     const { action, ...data } = body;
-    const tracker = await MonthlyReviewTracker.create();
+    const ownerId = await requireEffectiveUserId(request);
+    const tracker = await MonthlyReviewTracker.create(ownerId);
 
     switch (action) {
       case 'submitReview': {
