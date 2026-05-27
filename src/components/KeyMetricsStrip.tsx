@@ -26,20 +26,14 @@ export function KeyMetricsStrip({
 }: KeyMetricsStripProps) {
   const cashGrowthPct = monarchData
     ? computeCashGrowthMoM(
+        monarchData.cashPosition ?? 0,
         monarchData.monthlyIncome ?? 0,
         monarchData.monthlyExpenses ?? 0,
-        monarchData.previousMonthIncome ?? 0,
-        monarchData.previousMonthExpenses ?? 0,
       )
     : null;
 
   const cashGrowthDelta = monarchData
-    ? computeCashMoMDelta(
-        monarchData.monthlyIncome ?? 0,
-        monarchData.monthlyExpenses ?? 0,
-        monarchData.previousMonthIncome ?? 0,
-        monarchData.previousMonthExpenses ?? 0,
-      )
+    ? computeCashMoMDelta(monarchData.monthlyIncome ?? 0, monarchData.monthlyExpenses ?? 0)
     : null;
 
   const momColor =
@@ -82,8 +76,8 @@ export function KeyMetricsStrip({
         }
         subLabel={
           cashGrowthDelta === null
-            ? 'no prior data'
-            : `${cashGrowthDelta >= 0 ? '+' : ''}${formatCurrencyCompact(cashGrowthDelta)} vs last mo`
+            ? 'no data'
+            : `${cashGrowthDelta >= 0 ? '+' : ''}${formatCurrencyCompact(cashGrowthDelta)} this month`
         }
       />
       <MetricCard

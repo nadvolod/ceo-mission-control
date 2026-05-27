@@ -175,6 +175,7 @@ export interface MonarchFinancialSnapshot {
   runwayMonths: number;
   savingsRate: number;
   lastSynced: string;
+  stale?: boolean; // true when API served a cached snapshot past its freshness window
 }
 
 // Revenue Projection types

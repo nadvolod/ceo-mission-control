@@ -24,33 +24,33 @@ export function formatRunway(months: number | null | undefined): string {
   return `${n.toFixed(1)}mo runway`;
 }
 
+// % change in account balance over the current month — matches Monarch's
+// "1 month" view. previousCashPosition is derived as `cashPosition - currentNet`
+// (the balance at the start of the current month, assuming the only delta is
+// this month's income/expenses). Returns null when the prior balance is 0 and
+// the current month has movement, since percentage change from zero is
+// undefined.
 export function computeCashGrowthMoM(
-  currentMonthIncome: number,
-  currentMonthExpenses: number,
-  previousMonthIncome: number,
-  previousMonthExpenses: number,
+  cashPosition: number,
+  monthlyIncome: number,
+  monthlyExpenses: number,
 ): number | null {
-  const currentNet = currentMonthIncome - currentMonthExpenses;
-  const previousNet = previousMonthIncome - previousMonthExpenses;
-  if (previousNet === 0) {
+  const currentNet = monthlyIncome - monthlyExpenses;
+  const previousCashPosition = cashPosition - currentNet;
+  if (previousCashPosition === 0) {
     if (currentNet === 0) return 0;
     console.warn(
-      `[dashboard-metrics] cash growth MoM is undefined: previousNet=0, currentNet=${currentNet}. Rendering as "—".`,
+      `[dashboard-metrics] cash growth MoM is undefined: previousCashPosition=0, currentNet=${currentNet}. Rendering as "—".`,
     );
     return null;
   }
-  return ((currentNet - previousNet) / Math.abs(previousNet)) * 100;
+  return (currentNet / Math.abs(previousCashPosition)) * 100;
 }
 
-export function computeCashMoMDelta(
-  currentMonthIncome: number,
-  currentMonthExpenses: number,
-  previousMonthIncome: number,
-  previousMonthExpenses: number,
-): number {
-  const currentNet = currentMonthIncome - currentMonthExpenses;
-  const previousNet = previousMonthIncome - previousMonthExpenses;
-  return currentNet - previousNet;
+// Dollar change in cash position over the current month. Equal to
+// monthlyIncome − monthlyExpenses by construction (see computeCashGrowthMoM).
+export function computeCashMoMDelta(monthlyIncome: number, monthlyExpenses: number): number {
+  return monthlyIncome - monthlyExpenses;
 }
 
 // Total focused work for the week = every focus-session category (Temporal,

@@ -260,36 +260,34 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
         totalAssets: 200000,
         totalLiabilities: 50000,
         runwayMonths: 18,
+        // currentNet = +2000 → previousCashPosition = 8000 → growth = +25.0%
         monthlyIncome: 5000,
         monthlyExpenses: 3000,
-        previousMonthIncome: 4000,
-        previousMonthExpenses: 3000,
       },
     } as any);
     render(<HomePage />);
-    // Compact formatting: $10K, $150K, $50K, +100.0%, 6.5h, $1.2K
+    // Compact formatting: $10K, $150K, $50K, +25.0%, 6.5h, $1.2K
     expect(screen.getByTestId('metric-cash')).toHaveTextContent('$10.0K');
-    expect(screen.getByTestId('metric-cash-mom')).toHaveTextContent('+100.0%');
+    expect(screen.getByTestId('metric-cash-mom')).toHaveTextContent('+25.0%');
     expect(screen.getByTestId('metric-net-worth')).toHaveTextContent('$150.0K');
     expect(screen.getByTestId('metric-total-debt')).toHaveTextContent('$50.0K');
     expect(screen.getByTestId('metric-temporal')).toHaveTextContent('6.5h');
     expect(screen.getByTestId('metric-money-moved')).toHaveTextContent('$1.2K');
   });
 
-  it('renders cash growth dash when previous net is zero and current net is non-zero', () => {
+  it('renders cash growth dash when previous cash balance was 0 and current net is non-zero', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
     mockUseDashboardData.mockReturnValue({
       ...baseDashboardData,
       monarchData: {
-        cashPosition: 10000,
+        // currentNet = -500 → previousCashPosition = -500 - (-500) = 0 → null
+        cashPosition: -500,
         netWorth: 0,
         totalAssets: 10000,
         totalLiabilities: 10000,
         runwayMonths: 0,
         monthlyIncome: 0,
         monthlyExpenses: 500,
-        previousMonthIncome: 1000,
-        previousMonthExpenses: 1000,
       },
     } as any);
     render(<HomePage />);
