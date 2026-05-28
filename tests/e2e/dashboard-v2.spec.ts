@@ -269,3 +269,42 @@ test.describe('Mission Control v2', () => {
     await expect(page.getByText('Tasks', { exact: true })).toHaveCount(0);
   });
 });
+
+// Mobile-viewport coverage. The desktop tree is gated by `hidden md:flex`;
+// at viewports below the md breakpoint the MobileLayout shell renders
+// instead (hero card · snapshot strip · quick-log grid · bottom nav).
+test.describe('Mission Control v2 — mobile viewport', () => {
+  test.use({ viewport: { width: 390, height: 844 } }); // iPhone 14-ish
+
+  test('renders the mobile shell with hero, snapshot strip, quick log, bottom nav', async ({ page }) => {
+    const response = await page.goto('/dashboard/v2');
+    expect(response?.status()).toBeLessThan(400);
+
+    await expect(page.getByTestId('mobile-layout')).toBeVisible();
+    await expect(page.getByTestId('mobile-hero-temporal')).toBeVisible();
+    await expect(page.getByTestId('mobile-snapshot-strip')).toBeVisible();
+    await expect(page.getByTestId('mobile-quick-log')).toBeVisible();
+    await expect(page.getByTestId('mobile-bottom-nav')).toBeVisible();
+
+    // The desktop tabs in the header are hidden at this viewport.
+    await expect(page.getByTestId('tab-overview')).toBeHidden();
+  });
+
+  test('tapping a hero preset logs Temporal hours via /api/focus-hours', async ({ page }) => {
+    await page.goto('/dashboard/v2');
+    const focusPost = page.waitForRequest((req) =>
+      req.url().includes('/api/focus-hours') && req.method() === 'POST',
+    );
+    await page.getByTestId('mobile-hero-preset-0-5h').click();
+    const body = (await focusPost).postDataJSON();
+    expect(body.category).toBe('Temporal');
+    expect(body.hours).toBe(0.5);
+    expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  test('bottom-nav Reflect tap opens the reflection drawer', async ({ page }) => {
+    await page.goto('/dashboard/v2');
+    await page.getByTestId('mobile-nav-reflect').click();
+    await expect(page.getByTestId('reflection-drawer')).toBeVisible();
+  });
+});

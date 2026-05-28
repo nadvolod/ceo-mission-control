@@ -16,6 +16,7 @@ import { deriveActivity, deriveChips, consecutiveStreak } from '@/components/das
 import { TrendsPanel, buildOverviewTrendSeries } from '@/components/dashboard/v2/TrendsPanel';
 import { InsightsTab } from '@/components/dashboard/v2/InsightsTab';
 import { ReviewTab } from '@/components/dashboard/v2/ReviewTab';
+import { MobileLayout } from '@/components/dashboard/v2/MobileLayout';
 
 type Tab = 'overview' | 'insights' | 'review';
 
@@ -105,8 +106,22 @@ export default function MissionControlV2Page() {
   }, [weeklyTrackerData, monarchData]);
 
   return (
+    <>
+    {/* Mobile layout — hidden at md+ */}
+    <div className="md:hidden">
+      <MobileLayout
+        metrics={store.metrics}
+        activity={activity}
+        tab={tab}
+        onTab={setTab}
+        onOpenReflection={() => setReflectOpen(true)}
+        onLog={store.log}
+      />
+    </div>
+
+    {/* Desktop layout — hidden below md */}
     <div
-      className="mc-root relative flex min-h-screen flex-col overflow-hidden"
+      className="mc-root relative hidden md:flex min-h-screen flex-col overflow-hidden"
       style={{
         background: 'var(--color-mc-bg)',
         color: 'var(--color-mc-fg)',
@@ -398,22 +413,24 @@ export default function MissionControlV2Page() {
           </div>
         )}
       </div>
-
-      <CmdK
-        open={cmdOpen}
-        onOpenChange={setCmdOpen}
-        onLog={store.log}
-        onOpenReflection={() => setReflectOpen(true)}
-        onSwitchTab={setTab}
-      />
-
-      <ReflectionDrawer
-        open={reflectOpen}
-        onOpenChange={setReflectOpen}
-        data={store.threeToThrive}
-        onSave={store.saveThreeToThriveAnswer}
-      />
     </div>
+
+    {/* Modal overlays — Radix portals to document.body, shared by both layouts */}
+    <CmdK
+      open={cmdOpen}
+      onOpenChange={setCmdOpen}
+      onLog={store.log}
+      onOpenReflection={() => setReflectOpen(true)}
+      onSwitchTab={setTab}
+    />
+
+    <ReflectionDrawer
+      open={reflectOpen}
+      onOpenChange={setReflectOpen}
+      data={store.threeToThrive}
+      onSave={store.saveThreeToThriveAnswer}
+    />
+    </>
   );
 }
 
