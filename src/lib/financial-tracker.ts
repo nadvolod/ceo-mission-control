@@ -197,6 +197,10 @@ export class FinancialTracker {
     };
   }
 
+  private anchorDate(todayKey?: string): Date {
+    return todayKey ? new Date(`${todayKey}T12:00:00`) : new Date();
+  }
+
   /**
    * Returns a length-7 array of DailyFinancialMetrics, one per day from
    * `weekStartDate` (Sunday, YYYY-MM-DD) through the following Saturday inclusive.
@@ -237,9 +241,9 @@ export class FinancialTracker {
    * Returns totals across the previous Sun-Sat week (relative to today).
    * Uses cent-based arithmetic via centSum for precision.
    */
-  getPreviousWeekTotals(): { moved: number; generated: number; cut: number; netImpact: number } {
-    const now = new Date();
-    const prevWeekStart = addDays(startOfWeek(now, { weekStartsOn: 0 }), -7);
+  getPreviousWeekTotals(todayKey?: string): { moved: number; generated: number; cut: number; netImpact: number } {
+    const anchor = this.anchorDate(todayKey);
+    const prevWeekStart = addDays(startOfWeek(anchor, { weekStartsOn: 0 }), -7);
     const prevWeekStartStr = format(prevWeekStart, 'yyyy-MM-dd');
     const days = this.getDailyMetricsForWeek(prevWeekStartStr);
     return {
@@ -250,26 +254,27 @@ export class FinancialTracker {
     };
   }
 
-  getWeeklyTotals(): { moved: number; generated: number; cut: number; netImpact: number } {
-    const now = new Date();
-    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  getWeeklyTotals(todayKey?: string): { moved: number; generated: number; cut: number; netImpact: number } {
+    const anchor = this.anchorDate(todayKey);
+    const weekAgo = new Date(anchor.getTime() - 7 * 24 * 60 * 60 * 1000);
     
-    return this.getTotalsForPeriod(weekAgo, now);
+    return this.getTotalsForPeriod(weekAgo, anchor);
   }
 
-  getMonthlyTotals(): { moved: number; generated: number; cut: number; netImpact: number } {
-    const now = new Date();
-    const monthAgo = new Date(now.getFullYear(), now.getMonth(), 1);
+  getMonthlyTotals(todayKey?: string): { moved: number; generated: number; cut: number; netImpact: number } {
+    const anchor = this.anchorDate(todayKey);
+    const monthAgo = new Date(anchor.getFullYear(), anchor.getMonth(), 1);
     
-    return this.getTotalsForPeriod(monthAgo, now);
+    return this.getTotalsForPeriod(monthAgo, anchor);
   }
 
   private getTotalsForPeriod(startDate: Date, endDate: Date): { moved: number; generated: number; cut: number; netImpact: number } {
     const totals = { moved: 0, generated: 0, cut: 0, netImpact: 0 };
+    const startKey = format(startDate, 'yyyy-MM-dd');
+    const endKey = format(endDate, 'yyyy-MM-dd');
 
     Object.values(this.data.dailyMetrics).forEach(dayMetrics => {
-      const metricDate = new Date(dayMetrics.date);
-      if (metricDate >= startDate && metricDate <= endDate) {
+      if (dayMetrics.date >= startKey && dayMetrics.date <= endKey) {
         totals.moved += dayMetrics.totals.moved;
         totals.generated += dayMetrics.totals.generated;
         totals.cut += dayMetrics.totals.cut;

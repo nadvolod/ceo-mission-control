@@ -70,6 +70,45 @@ describe('/api/focus-hours', () => {
       const data = await response.json();
       expect(data.todaysMetrics.totalHours).toBe(3);
     });
+
+    it('anchors all today/week/trend snapshots to the client date param', async () => {
+      const existingData = {
+        dailyMetrics: {
+          '2026-05-23': {
+            date: '2026-05-23',
+            sessions: [{
+              id: 'sat', category: 'Temporal', hours: 2,
+              description: 'local Saturday', date: '2026-05-23',
+              timestamp: '2026-05-23T20:00:00.000Z', source: 'manual'
+            }],
+            totalHours: 2,
+            byCategory: { Temporal: 2 }
+          },
+          '2026-05-24': {
+            date: '2026-05-24',
+            sessions: [{
+              id: 'sun', category: 'Temporal', hours: 3,
+              description: 'future local day', date: '2026-05-24',
+              timestamp: '2026-05-24T01:00:00.000Z', source: 'manual'
+            }],
+            totalHours: 3,
+            byCategory: { Temporal: 3 }
+          },
+        },
+        lastUpdated: new Date().toISOString()
+      };
+      storage.loadJSON.mockResolvedValueOnce(existingData);
+
+      const response = await GET(new NextRequest('http://localhost/?date=2026-05-23'));
+      const data = await response.json();
+
+      expect(data.todaysMetrics.date).toBe('2026-05-23');
+      expect(data.todaysMetrics.totalHours).toBe(2);
+      expect(data.weeklyTotals.Temporal).toBe(2);
+      expect(data.dailyTrend.at(-1).date).toBe('2026-05-23');
+      expect(data.rollingAverage.at(-1).date).toBe('2026-05-23');
+      expect(data.categoryDistribution.Temporal).toBe(2);
+    });
   });
 
   describe('POST addSession', () => {

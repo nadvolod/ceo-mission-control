@@ -56,6 +56,23 @@ describe('FocusTracker', () => {
     });
   });
 
+  describe('date-anchored aggregates', () => {
+    it('uses the caller-provided local day for weekly totals and trends', async () => {
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
+      await tracker.addSession('Temporal', 2, 'local Saturday', '2026-05-23');
+      await tracker.addSession('Temporal', 3, 'UTC Sunday but local future', '2026-05-24');
+
+      expect(tracker.getWeeklyTotals('2026-05-23').Temporal).toBe(2);
+      expect(tracker.getDailyTrend(2, '2026-05-23').map((d) => d.date)).toEqual([
+        '2026-05-22',
+        '2026-05-23',
+      ]);
+      expect(tracker.getRollingAverage(1, 1, '2026-05-23')).toEqual([
+        { date: '2026-05-23', average: 2 },
+      ]);
+    });
+  });
+
   describe('addSession', () => {
     it('should add a session and update daily metrics', async () => {
       const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);

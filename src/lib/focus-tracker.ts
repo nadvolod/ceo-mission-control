@@ -151,15 +151,19 @@ export class FocusTracker {
     };
   }
 
-  getWeeklyTotals(): Record<string, number> {
-    const now = new Date();
-    const weekStart = startOfWeek(now, { weekStartsOn: 0 }); // Sunday (US convention)
-    return this.getTotalsForPeriod(weekStart, now);
+  private anchorDate(todayKey?: string): Date {
+    return todayKey ? new Date(`${todayKey}T12:00:00`) : new Date();
   }
 
-  getPreviousWeekTotals(): Record<string, number> {
-    const now = new Date();
-    const thisWeekStart = startOfWeek(now, { weekStartsOn: 0 });
+  getWeeklyTotals(todayKey?: string): Record<string, number> {
+    const anchor = this.anchorDate(todayKey);
+    const weekStart = startOfWeek(anchor, { weekStartsOn: 0 }); // Sunday (US convention)
+    return this.getTotalsForPeriod(weekStart, anchor);
+  }
+
+  getPreviousWeekTotals(todayKey?: string): Record<string, number> {
+    const anchor = this.anchorDate(todayKey);
+    const thisWeekStart = startOfWeek(anchor, { weekStartsOn: 0 });
     const prevWeekStart = subWeeks(thisWeekStart, 1);
     return this.getTotalsForPeriod(prevWeekStart, subDays(thisWeekStart, 1));
   }
@@ -180,15 +184,15 @@ export class FocusTracker {
     return totals;
   }
 
-  getWeekOverWeekGrowth(): {
+  getWeekOverWeekGrowth(todayKey?: string): {
     currentTotal: number;
     previousTotal: number;
     absoluteChange: number;
     percentageChange: number;
     byCategoryChange: Record<string, { current: number; previous: number; change: number }>;
   } {
-    const current = this.getWeeklyTotals();
-    const previous = this.getPreviousWeekTotals();
+    const current = this.getWeeklyTotals(todayKey);
+    const previous = this.getPreviousWeekTotals(todayKey);
 
     const currentTotal = Object.values(current).reduce((sum, h) => sum + h, 0);
     const previousTotal = Object.values(previous).reduce((sum, h) => sum + h, 0);
@@ -209,12 +213,12 @@ export class FocusTracker {
     return { currentTotal, previousTotal, absoluteChange, percentageChange, byCategoryChange };
   }
 
-  getDailyTrend(days: number = 30): Array<{ date: string; totalHours: number; byCategory: Record<string, number> }> {
+  getDailyTrend(days: number = 30, todayKey?: string): Array<{ date: string; totalHours: number; byCategory: Record<string, number> }> {
     const trend: Array<{ date: string; totalHours: number; byCategory: Record<string, number> }> = [];
-    const now = new Date();
+    const anchor = this.anchorDate(todayKey);
 
     for (let i = days - 1; i >= 0; i--) {
-      const date = format(subDays(now, i), 'yyyy-MM-dd');
+      const date = format(subDays(anchor, i), 'yyyy-MM-dd');
       const day = this.data.dailyMetrics[date];
 
       trend.push({
@@ -227,8 +231,8 @@ export class FocusTracker {
     return trend;
   }
 
-  getRollingAverage(days: number = 30, windowSize: number = 7): Array<{ date: string; average: number }> {
-    const trend = this.getDailyTrend(days + windowSize - 1);
+  getRollingAverage(days: number = 30, windowSize: number = 7, todayKey?: string): Array<{ date: string; average: number }> {
+    const trend = this.getDailyTrend(days + windowSize - 1, todayKey);
     const result: Array<{ date: string; average: number }> = [];
 
     for (let i = windowSize - 1; i < trend.length; i++) {

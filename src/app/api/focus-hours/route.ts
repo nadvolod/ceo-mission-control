@@ -32,22 +32,22 @@ export async function GET(request: NextRequest) {
     const ownerId = await requireEffectiveUserId(request);
     const tracker = await FocusTracker.create(ownerId);
 
-    const now = new Date();
-    const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
     // Client passes its local YYYY-MM-DD so "today" matches the user's wall
     // clock, not UTC. Anonymous calls (no `?date=…`) fall back to server-local.
     const dateParam = request.nextUrl.searchParams.get('date');
     const todayKey = isLocalDateKey(dateParam) ? dateParam : undefined;
+    const anchor = todayKey ? new Date(`${todayKey}T12:00:00`) : new Date();
+    const weekAgo = new Date(anchor.getTime() - 7 * 24 * 60 * 60 * 1000);
 
     return NextResponse.json({
       success: true,
       todaysMetrics: tracker.getTodaysMetrics(todayKey),
-      weeklyTotals: tracker.getWeeklyTotals(),
-      previousWeekTotals: tracker.getPreviousWeekTotals(),
-      weekOverWeek: tracker.getWeekOverWeekGrowth(),
-      dailyTrend: tracker.getDailyTrend(30),
-      rollingAverage: tracker.getRollingAverage(30),
-      categoryDistribution: tracker.getCategoryDistribution(weekAgo, now),
+      weeklyTotals: tracker.getWeeklyTotals(todayKey),
+      previousWeekTotals: tracker.getPreviousWeekTotals(todayKey),
+      weekOverWeek: tracker.getWeekOverWeekGrowth(todayKey),
+      dailyTrend: tracker.getDailyTrend(30, todayKey),
+      rollingAverage: tracker.getRollingAverage(30, 7, todayKey),
+      categoryDistribution: tracker.getCategoryDistribution(weekAgo, anchor),
       recentSessions: tracker.getRecentSessions(15),
       timestamp: new Date().toISOString()
     });

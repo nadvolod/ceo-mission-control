@@ -13,18 +13,18 @@ export async function GET(request: NextRequest) {
     // clock, not UTC. See src/lib/dates.ts for context.
     const dateParam = request.nextUrl.searchParams.get('date');
     const todayKey = isLocalDateKey(dateParam) ? dateParam : undefined;
+    const anchor = todayKey ? new Date(`${todayKey}T12:00:00`) : new Date();
     const todaysMetrics = financialTracker.getTodaysMetrics(todayKey);
-    const weeklyTotals = financialTracker.getWeeklyTotals();
-    const monthlyTotals = financialTracker.getMonthlyTotals();
-    const previousWeekTotals = financialTracker.getPreviousWeekTotals();
+    const weeklyTotals = financialTracker.getWeeklyTotals(todayKey);
+    const monthlyTotals = financialTracker.getMonthlyTotals(todayKey);
+    const previousWeekTotals = financialTracker.getPreviousWeekTotals(todayKey);
     const recentEntries = financialTracker.getRecentEntries(10);
 
-    const now = new Date();
-    const weekStart = format(startOfWeek(now, { weekStartsOn: 0 }), 'yyyy-MM-dd');
+    const weekStart = format(startOfWeek(anchor, { weekStartsOn: 0 }), 'yyyy-MM-dd');
     const weekFinancialByDay = financialTracker.getDailyMetricsForWeek(weekStart);
 
-    const rangeEnd = format(now, 'yyyy-MM-dd');
-    const rangeStart = format(subDays(now, 29), 'yyyy-MM-dd');
+    const rangeEnd = format(anchor, 'yyyy-MM-dd');
+    const rangeStart = format(subDays(anchor, 29), 'yyyy-MM-dd');
     const dailyFinancialTrend = financialTracker.getDailyMetricsForRange(rangeStart, rangeEnd);
 
     return NextResponse.json({

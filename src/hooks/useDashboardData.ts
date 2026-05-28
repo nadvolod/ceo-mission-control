@@ -188,7 +188,7 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
       },
       async () => {
         try {
-          const res = await fetch('/api/three-to-thrive');
+          const res = await fetch(`/api/three-to-thrive?date=${today}`);
           if (res.ok) {
             const data = await res.json();
             setThreeToThriveData(data);

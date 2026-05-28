@@ -88,6 +88,17 @@ describe('FinancialTracker.recalculateTotals (cent-based accumulation)', () => {
     expect(may28.totals.netImpact).toBe(250);
   });
 
+  it('getWeeklyTotals(todayKey) does not include entries after the caller local day', async () => {
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
+    await tracker.addEntry('generated', 100, 'local Saturday', '2026-05-23');
+    await tracker.addEntry('generated', 250, 'UTC Sunday but local future', '2026-05-24');
+
+    expect(tracker.getWeeklyTotals('2026-05-23')).toMatchObject({
+      generated: 100,
+      netImpact: 100,
+    });
+  });
+
   it('three categories on the same day produce netImpact = moved + generated + cut exactly', async () => {
     const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     await tracker.addEntry('moved', 0.1, 'm1', DATE);
