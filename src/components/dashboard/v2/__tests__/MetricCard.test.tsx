@@ -97,7 +97,10 @@ describe('MetricCard', () => {
       await user.keyboard('{Enter}');
 
       expect(onLog).toHaveBeenCalledTimes(1);
-      expect(onLog).toHaveBeenCalledWith('moneyMoved', 1234.5, '+ Generated');
+      // When no note is typed, `description: undefined` flows through so
+      // the store can fall back to the auto-generated string. (See the
+      // note-typing test below for the populated case.)
+      expect(onLog).toHaveBeenCalledWith('moneyMoved', 1234.5, '+ Generated', { description: undefined });
     });
 
     it('strips $ and commas from the typed amount', async () => {
@@ -110,7 +113,44 @@ describe('MetricCard', () => {
       await user.type(screen.getByTestId('moneyMoved-amount-input'), '$1,500');
       await user.click(screen.getByTestId('moneyMoved-amount-submit'));
 
-      expect(onLog).toHaveBeenCalledWith('moneyMoved', 1500, '+ Cut');
+      expect(onLog).toHaveBeenCalledWith('moneyMoved', 1500, '+ Cut', { description: undefined });
+    });
+
+    it('passes the typed note through to onLog as options.description', async () => {
+      const user = userEvent.setup();
+      const onLog = jest.fn();
+      render(<MetricCard metric={SEED_METRICS.moneyMoved} onLog={onLog} />);
+
+      fireEvent.focus(screen.getByTestId('metric-card-moneyMoved'));
+      await user.click(screen.getByTestId('preset-moneyMoved-moved'));
+      await user.type(screen.getByTestId('moneyMoved-amount-input'), '500');
+      // The Money Moved card renders a note input alongside the amount.
+      const note = screen.getByTestId('moneyMoved-amount-note');
+      await user.type(note, 'Benepass');
+      await user.keyboard('{Enter}');
+
+      expect(onLog).toHaveBeenCalledWith('moneyMoved', 500, '+ Moved', { description: 'Benepass' });
+    });
+
+    it('whitespace-only note submits as undefined (server falls back to default)', async () => {
+      const user = userEvent.setup();
+      const onLog = jest.fn();
+      render(<MetricCard metric={SEED_METRICS.moneyMoved} onLog={onLog} />);
+
+      fireEvent.focus(screen.getByTestId('metric-card-moneyMoved'));
+      await user.click(screen.getByTestId('preset-moneyMoved-moved'));
+      await user.type(screen.getByTestId('moneyMoved-amount-input'), '100');
+      await user.type(screen.getByTestId('moneyMoved-amount-note'), '   ');
+      await user.keyboard('{Enter}');
+
+      expect(onLog).toHaveBeenCalledWith('moneyMoved', 100, '+ Moved', { description: undefined });
+    });
+
+    it('the note input is NOT present on hour-based metrics', () => {
+      const onLog = jest.fn();
+      render(<MetricCard metric={SEED_METRICS.temporal} onLog={onLog} />);
+      // Temporal logs hardcoded deltas, so the editor + note never appear.
+      expect(screen.queryByTestId('temporal-amount-note')).not.toBeInTheDocument();
     });
 
     it('rejects zero / non-numeric input and does not log', async () => {

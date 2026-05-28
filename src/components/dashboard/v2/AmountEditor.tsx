@@ -9,16 +9,25 @@ type AmountEditorProps = {
   label: string;
   // Accent color used for the tag, input border, and submit button.
   accent: string;
-  // Called with the parsed positive number on Enter or ✓ click.
-  onSubmit: (amount: number) => void;
+  // Called with the parsed positive number on Enter or ✓ click. If a
+  // note field is shown and the user typed into it, the trimmed string
+  // is passed as the second arg (otherwise undefined).
+  onSubmit: (amount: number, note?: string) => void;
   // Called on Escape or × click.
   onCancel: () => void;
   // Optional testid prefix. Defaults to "amount" so the submit button is
   // `${idPrefix}-submit` etc. The desktop MetricCard passes `${metricId}`.
   idPrefix?: string;
+  // When true, an additional free-form text input ("Note") is rendered
+  // alongside the amount. Used by money entries so the user can attach
+  // a description like "Benepass" instead of the auto-generated
+  // "+ Moved via Mission Control".
+  withNote?: boolean;
+  // Placeholder shown in the note input. Defaults to "Note".
+  notePlaceholder?: string;
 };
 
-// Inline category + amount + save/cancel form. Used by:
+// Inline category + amount [+ optional note] + save/cancel form. Used by:
 //   - MetricCard money-category presets (desktop)
 //   - MobileLayout quick-log money entries (mobile)
 // The user types the actual amount instead of accepting a hardcoded
@@ -30,12 +39,15 @@ export function AmountEditor({
   onSubmit,
   onCancel,
   idPrefix = 'amount',
+  withNote = false,
+  notePlaceholder = 'Note (e.g. Benepass)',
 }: AmountEditorProps) {
   const [value, setValue] = useState('');
-  const inputRef = useRef<HTMLInputElement>(null);
+  const [note, setNote] = useState('');
+  const amountRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    const id = requestAnimationFrame(() => inputRef.current?.focus());
+    const id = requestAnimationFrame(() => amountRef.current?.focus());
     return () => cancelAnimationFrame(id);
   }, []);
 
@@ -44,23 +56,19 @@ export function AmountEditor({
     // Rejects "-5" (negative sign stripped → would silently log +5),
     // "1e3" / "1E3" (exponent stripped → silently logs 13), and any
     // malformed decimal like "12..3" or "1.2.3" that parseFloat would
-    // silently truncate. The two-step shape:
-    //   1. Strip only the documented formatting characters ($, commas,
-    //      whitespace) — anything else (letters, +/-, multiple dots)
-    //      makes the input invalid.
-    //   2. Match strict /^\d+(\.\d+)?$/ — at least one integer digit,
-    //      optional single decimal part. parseFloat is then safe.
+    // silently truncate.
     const cleaned = value.replace(/[$,\s]/g, '');
     if (!/^\d+(\.\d+)?$/.test(cleaned)) {
-      inputRef.current?.focus();
+      amountRef.current?.focus();
       return;
     }
     const amount = parseFloat(cleaned);
     if (!Number.isFinite(amount) || amount <= 0) {
-      inputRef.current?.focus();
+      amountRef.current?.focus();
       return;
     }
-    onSubmit(amount);
+    const trimmedNote = note.trim();
+    onSubmit(amount, trimmedNote.length > 0 ? trimmedNote : undefined);
   };
 
   const disabled = value.trim().length === 0;
@@ -86,7 +94,7 @@ export function AmountEditor({
         {label}
       </span>
       <input
-        ref={inputRef}
+        ref={amountRef}
         type="text"
         inputMode="decimal"
         value={value}
@@ -104,7 +112,9 @@ export function AmountEditor({
         aria-label={`${label} amount`}
         className="font-numerics rounded-md"
         style={{
-          flex: 1,
+          // The amount input is narrower when a note input shares the row,
+          // wider when it's the only one.
+          flex: withNote ? '0 0 90px' : 1,
           minWidth: 0,
           padding: '6px 8px',
           fontSize: 12,
@@ -115,6 +125,38 @@ export function AmountEditor({
         }}
         data-testid={`${idPrefix}-input`}
       />
+      {withNote && (
+        <input
+          type="text"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              submit();
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              onCancel();
+            }
+          }}
+          placeholder={notePlaceholder}
+          aria-label={`${label} note`}
+          className="rounded-md"
+          maxLength={120}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            padding: '6px 8px',
+            fontSize: 12,
+            fontFamily: 'inherit',
+            background: 'rgba(0,0,0,0.25)',
+            color: 'var(--color-mc-ink)',
+            border: '1px solid rgba(255,255,255,0.12)',
+            outline: 'none',
+          }}
+          data-testid={`${idPrefix}-note`}
+        />
+      )}
       <button
         type="button"
         onClick={submit}

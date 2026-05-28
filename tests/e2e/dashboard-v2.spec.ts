@@ -297,6 +297,39 @@ test.describe('Mission Control v2', () => {
     await expect(page.getByText('Tasks', { exact: true })).toHaveCount(0);
   });
 
+  test('Money Moved with a note: typed description lands on the entry + shows in Activity', async ({ page }) => {
+    // The user reported two related issues: (a) wanted to attach a note
+    // like "Benepass" to a money entry, (b) money entries not visible
+    // in the Activity feed. This test pins both.
+    await page.goto('/dashboard/v2');
+
+    const note = `Benepass-${Date.now()}`;
+
+    const card = page.getByTestId('metric-card-moneyMoved');
+    await card.hover();
+
+    const financialPost = page.waitForRequest((req) =>
+      req.url().includes('/api/financial') && req.method() === 'POST',
+    );
+
+    await page.getByTestId('preset-moneyMoved-generated').click();
+    await page.getByTestId('moneyMoved-amount-input').fill('500');
+    await page.getByTestId('moneyMoved-amount-note').fill(note);
+    await page.keyboard.press('Enter');
+
+    // The POST body has the typed description, not the auto string.
+    const body = (await financialPost).postDataJSON();
+    expect(body.category).toBe('generated');
+    expect(body.amount).toBe(500);
+    expect(body.description).toBe(note);
+
+    // The activity feed shows the new entry. Optimistic + server-side
+    // entries both flow through deriveActivity; the note ends up in the
+    // row's meta line. We use the unique note string as the locator so
+    // the assertion is unambiguous even if other entries exist.
+    await expect(page.getByText(note)).toBeVisible({ timeout: 5_000 });
+  });
+
   test('Money Moved card: click preset → type amount → log custom value', async ({ page }) => {
     // The user complaint: money entries were logging hardcoded amounts
     // ($250 / $500 / $100). Now the preset just selects the CATEGORY and

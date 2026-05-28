@@ -29,10 +29,22 @@ const METRIC_LABELS: Record<MetricId, string> = {
 
 type LogResult = { ok: true } | { ok: false; error: string };
 
-async function postLog(metricId: MetricId, delta: number, label: string): Promise<LogResult> {
+type LogOptions = {
+  // Optional user-supplied description (e.g. "Benepass" for a money entry).
+  // When omitted we fall back to the auto-generated string per metric.
+  description?: string;
+};
+
+async function postLog(
+  metricId: MetricId,
+  delta: number,
+  label: string,
+  options: LogOptions = {},
+): Promise<LogResult> {
   // Pin the row to the user's local day. Every POST body carries this
   // so an evening log in EST doesn't land on tomorrow per UTC clocks.
   const today = localDate();
+  const userDescription = options.description?.trim();
   try {
     if (metricId === 'temporal') {
       const res = await fetch('/api/focus-hours', {
@@ -64,7 +76,11 @@ async function postLog(metricId: MetricId, delta: number, label: string): Promis
           action: 'addEntry',
           category,
           amount: delta,
-          description: `${label.trim()} via Mission Control`,
+          // Prefer the user-typed note ("Benepass"); fall back to the
+          // auto-generated string if they didn't supply one. The server
+          // requires a non-empty description, so an empty `userDescription`
+          // would 400.
+          description: userDescription || `${label.trim()} via Mission Control`,
           date: today,
         }),
       });
@@ -311,18 +327,35 @@ export function useMissionStore() {
   }, [baseMetrics, local.overlay]);
 
   const log = useCallback(
-    async (metricId: MetricId, delta: number, label: string) => {
+    async (
+      metricId: MetricId,
+      delta: number,
+      label: string,
+      options: LogOptions = {},
+    ) => {
+      // For money entries, the optimistic row should show the $amount and
+      // the user's note — otherwise it reads "+ Moved Money moved | Quick
+      // log" and the user can't tell anything happened. (The server-side
+      // entry shows "+ Moved $500 | Benepass" once the refresh resolves;
+      // we mirror that shape on the optimistic row so there's no flash.)
+      const isMoney = metricId === 'moneyMoved';
+      const userDescription = options.description?.trim();
+      const optimisticLabel = isMoney
+        ? `$${delta.toLocaleString()}`
+        : METRIC_LABELS[metricId];
+      const optimisticMeta = userDescription || (isMoney ? `${label.trim()} via Mission Control` : 'Quick log');
+
       const entry: ActivityEntry = {
         id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
         t: hhmm(),
         kind: metricId,
         delta: label,
-        label: METRIC_LABELS[metricId],
-        meta: 'Quick log',
+        label: optimisticLabel,
+        meta: optimisticMeta,
       };
       dispatch({ type: 'optimistic', metricId, delta, entry });
 
-      const result = await postLog(metricId, delta, label);
+      const result = await postLog(metricId, delta, label, options);
       if (!result.ok) {
         dispatch({
           type: 'rollback',

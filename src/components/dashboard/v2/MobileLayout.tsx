@@ -18,7 +18,12 @@ type Props = {
   tab: Tab;
   onTab: (t: Tab) => void;
   onOpenReflection: () => void;
-  onLog: (metricId: MetricId, delta: number, label: string) => void;
+  onLog: (
+    metricId: MetricId,
+    delta: number,
+    label: string,
+    options?: { description?: string },
+  ) => void;
 };
 
 function slugifyLabel(label: string): string {
@@ -156,7 +161,12 @@ function HeroTemporal({
   onLog,
 }: {
   metric: MetricSnapshot;
-  onLog: (metricId: MetricId, delta: number, label: string) => void;
+  onLog: (
+    metricId: MetricId,
+    delta: number,
+    label: string,
+    options?: { description?: string },
+  ) => void;
 }) {
   const week = metric.week ?? 0;
   const goal = metric.goal ?? 5;
@@ -381,7 +391,12 @@ const QUICK_ACTIONS: QuickAction[] = [
 function QuickLogGrid({
   onLog,
 }: {
-  onLog: (metricId: MetricId, delta: number, label: string) => void;
+  onLog: (
+    metricId: MetricId,
+    delta: number,
+    label: string,
+    options?: { description?: string },
+  ) => void;
 }) {
   // Track an open amount editor for money entries. When `editing` is set,
   // we render an inline AmountEditor row above the grid instead of
@@ -408,8 +423,12 @@ function QuickLogGrid({
             label={editing.label}
             accent={editing.color}
             idPrefix="mobile-quick-amount"
-            onSubmit={(amount) => {
-              onLog(editing.metricId, amount, editing.label.trim());
+            // All current mobile editor uses are for money, so the note
+            // field is always on. If a future non-money metric needs the
+            // editor, gate on metricId.
+            withNote={editing.metricId === 'moneyMoved'}
+            onSubmit={(amount, note) => {
+              onLog(editing.metricId, amount, editing.label.trim(), { description: note });
               setEditing(null);
             }}
             onCancel={() => setEditing(null)}

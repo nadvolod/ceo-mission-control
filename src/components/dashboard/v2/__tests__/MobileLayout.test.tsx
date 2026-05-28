@@ -61,7 +61,21 @@ describe('<MobileLayout />', () => {
     await user.click(screen.getByTestId('mobile-quick-moved'));
     await user.type(screen.getByTestId('mobile-quick-amount-input'), '$2,000');
     await user.keyboard('{Enter}');
-    expect(onLog).toHaveBeenCalledWith('moneyMoved', 2000, '+ Moved');
+    // The 4th arg is the options bag; when no note is typed it's
+    // { description: undefined } so the store falls back to its
+    // auto-generated string.
+    expect(onLog).toHaveBeenCalledWith('moneyMoved', 2000, '+ Moved', { description: undefined });
+  });
+
+  it('mobile money editor: typing a note threads it through onLog as options.description', async () => {
+    const user = userEvent.setup();
+    const onLog = jest.fn();
+    render(<MobileLayout {...defaultProps({ onLog })} />);
+    await user.click(screen.getByTestId('mobile-quick-generated'));
+    await user.type(screen.getByTestId('mobile-quick-amount-input'), '750');
+    await user.type(screen.getByTestId('mobile-quick-amount-note'), 'Benepass');
+    await user.keyboard('{Enter}');
+    expect(onLog).toHaveBeenCalledWith('moneyMoved', 750, '+ Generated', { description: 'Benepass' });
   });
 
   it('mobile non-money quick log (+Call) still logs the hardcoded delta directly', async () => {
