@@ -13,6 +13,9 @@ import { CmdK } from '@/components/dashboard/v2/CmdK';
 import { ReflectionDrawer } from '@/components/dashboard/v2/ReflectionDrawer';
 import { useMissionStore } from '@/components/dashboard/v2/useMissionStore';
 import { deriveActivity, deriveChips, consecutiveStreak } from '@/components/dashboard/v2/derive';
+import { TrendsPanel, buildOverviewTrendSeries } from '@/components/dashboard/v2/TrendsPanel';
+import { InsightsTab } from '@/components/dashboard/v2/InsightsTab';
+import { ReviewTab } from '@/components/dashboard/v2/ReviewTab';
 
 type Tab = 'overview' | 'insights' | 'review';
 
@@ -27,7 +30,7 @@ function fmtHeaderDate(d: Date): string {
 
 export default function MissionControlV2Page() {
   const store = useMissionStore();
-  const { focusData, financialData, weeklyTrackerData, monarchData } = store;
+  const { focusData, financialData, weeklyTrackerData, monarchData, monthlyReviewData } = store;
 
   const [tab, setTab] = useState<Tab>('overview');
   const [cmdOpen, setCmdOpen] = useState(false);
@@ -267,6 +270,7 @@ export default function MissionControlV2Page() {
           <MetricCard metric={store.metrics.moneyMoved} onLog={store.log} />
         </div>
 
+        {tab === 'overview' && (
         <div className="grid flex-1 gap-3.5 lg:grid-cols-[1fr_320px] min-h-0">
           <div className="flex flex-col gap-2.5 min-h-0">
             <CollapsiblePanel
@@ -346,16 +350,35 @@ export default function MissionControlV2Page() {
                 </span>
               }
             >
-              <PanelPlaceholder copy="Sparkline grid (Temporal · Deep Work · Pipeline) lands with the trends pass. Metric-card sparklines above already use the same 14-day series." />
-            </CollapsiblePanel>
-
-            <CollapsiblePanel title="Tasks" count="—">
-              <PanelPlaceholder copy="Task list lands when Tasks gets its compact rewrite." />
+              <TrendsPanel
+                series={buildOverviewTrendSeries(
+                  focusData?.dailyTrend,
+                  weeklyTrackerData?.dailyTrend,
+                  { temporalWeekly: 5, deepWorkWeekly: 10, pipelineWeekly: 3 },
+                )}
+              />
             </CollapsiblePanel>
           </div>
 
           <ActivityFeed entries={activity} />
         </div>
+        )}
+
+        {tab === 'insights' && (
+          <InsightsTab
+            focusDailyTrend={focusData?.dailyTrend}
+            financialDailyTrend={financialData?.dailyFinancialTrend}
+            weeklyDailyTrend={weeklyTrackerData?.dailyTrend}
+          />
+        )}
+
+        {tab === 'review' && (
+          <ReviewTab
+            currentMonthReview={monthlyReviewData?.currentMonthReview ?? null}
+            recentReviews={monthlyReviewData?.recentReviews ?? []}
+            ratingsTrend={monthlyReviewData?.ratingsTrend ?? []}
+          />
+        )}
 
         {store.toast && (
           <div
@@ -390,21 +413,6 @@ export default function MissionControlV2Page() {
         data={store.threeToThrive}
         onSave={store.saveThreeToThriveAnswer}
       />
-    </div>
-  );
-}
-
-function PanelPlaceholder({ copy }: { copy: string }) {
-  return (
-    <div
-      style={{
-        padding: '14px 18px',
-        fontSize: 12.5,
-        lineHeight: 1.55,
-        color: 'var(--color-mc-fg-dim)',
-      }}
-    >
-      {copy}
     </div>
   );
 }

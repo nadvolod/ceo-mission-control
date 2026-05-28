@@ -212,7 +212,7 @@ function hhmm(d: Date = new Date()): string {
 
 export function useMissionStore() {
   const dashboard = useDashboardData();
-  const { monarchData, focusData, financialData, threeToThriveData } = dashboard;
+  const { monarchData, focusData, financialData, threeToThriveData, monthlyReviewData } = dashboard;
 
   const [local, dispatch] = useReducer(localReducer, initialLocal);
   const refreshRef = useRef(dashboard.loadAllData);
@@ -346,6 +346,7 @@ export function useMissionStore() {
     weeklyTrackerData: dashboard.weeklyTrackerData,
     monarchData,
     threeToThrive: threeToThriveData,
+    monthlyReviewData,
     saveThreeToThriveAnswer: dashboard.handleSaveThreeToThriveAnswer,
     isLoading: dashboard.isLoading,
     log,
