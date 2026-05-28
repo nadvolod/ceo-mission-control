@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Plus, Search } from 'lucide-react';
+import { localDate } from '@/lib/dates';
 import { Aurora } from '@/components/dashboard/v2/primitives/Aurora';
 import { OrbitStar } from '@/components/dashboard/v2/primitives/OrbitStar';
 import { MetricCard } from '@/components/dashboard/v2/MetricCard';
@@ -477,6 +478,8 @@ function T3TPanelInline({
   );
 }
 
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
 function T3TPanelRow({
   index,
   question,
@@ -489,26 +492,66 @@ function T3TPanelRow({
   onSave: (date: string, question: string, answer: string) => Promise<void>;
 }) {
   const [value, setValue] = useState(initial);
-  const [timer, setTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const [status, setStatus] = useState<SaveStatus>(initial.trim() ? 'saved' : 'idle');
+
+  // Refs hold debounce state so we don't trigger re-renders on every
+  // keystroke. The pending value is the latest typed string that hasn't
+  // been persisted yet; the timer is the 600ms debounce handle.
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingRef = useRef<string | null>(null);
+
+  // Flush whatever is pending right now. Used by:
+  //   - the 600ms debounce timeout
+  //   - onBlur (user tabs/clicks away — old code lost this)
+  //   - unmount (user navigates away — old code lost this)
+  const flushNow = useCallback(async () => {
+    const pending = pendingRef.current;
+    if (pending === null) return;
+    pendingRef.current = null;
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    setStatus(pending.trim() ? 'saving' : 'idle');
+    try {
+      await onSave(localDate(), question, pending);
+      setStatus(pending.trim() ? 'saved' : 'idle');
+    } catch (err) {
+      console.error('T3T inline save failed', err);
+      setStatus('error');
+    }
+  }, [onSave, question]);
+
   // Sync local draft when the server-supplied initial answer changes.
-  // Deferred via rAF for the React 19 lint rule.
+  // Deferred via rAF for the React 19 lint rule. Only sync from the
+  // server when nothing is pending locally — otherwise we'd clobber the
+  // user's in-progress keystrokes.
   useEffect(() => {
-    const id = requestAnimationFrame(() => setValue(initial));
+    const id = requestAnimationFrame(() => {
+      if (pendingRef.current === null) {
+        setValue(initial);
+        setStatus(initial.trim() ? 'saved' : 'idle');
+      }
+    });
     return () => cancelAnimationFrame(id);
   }, [initial]);
-  const done = !!value.trim();
 
+  // Flush on unmount. Fire-and-forget; we can't await in cleanup.
+  useEffect(() => {
+    return () => {
+      void flushNow();
+    };
+  }, [flushNow]);
+
+  const done = !!value.trim();
   const onChange = (next: string) => {
     setValue(next);
-    if (timer) clearTimeout(timer);
-    const id = setTimeout(() => {
-      const d = new Date();
-      const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      void onSave(date, question, next).catch((err) =>
-        console.error('T3T inline save failed', err),
-      );
+    pendingRef.current = next;
+    setStatus(next.trim() ? 'saving' : 'idle');
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      void flushNow();
     }, 600);
-    setTimer(id);
   };
 
   return (
@@ -550,6 +593,9 @@ function T3TPanelRow({
         <textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onBlur={() => {
+            void flushNow();
+          }}
           placeholder="Type your answer · auto-saves"
           rows={1}
           style={{
@@ -565,7 +611,50 @@ function T3TPanelRow({
             color: 'var(--color-mc-ink)',
             outline: 'none',
           }}
+          data-testid={`t3t-inline-input-${index}`}
         />
+        {status === 'saving' && (
+          <div
+            className="font-numerics"
+            style={{
+              marginTop: 4,
+              fontSize: 10,
+              color: 'var(--color-mc-fg-dim)',
+              letterSpacing: '0.06em',
+            }}
+            data-testid={`t3t-inline-status-${index}`}
+          >
+            ● SAVING…
+          </div>
+        )}
+        {status === 'saved' && value.trim() && (
+          <div
+            className="font-numerics"
+            style={{
+              marginTop: 4,
+              fontSize: 10,
+              color: 'var(--color-mc-green)',
+              letterSpacing: '0.06em',
+            }}
+            data-testid={`t3t-inline-status-${index}`}
+          >
+            ● SAVED · {value.length} CHARS
+          </div>
+        )}
+        {status === 'error' && (
+          <div
+            className="font-numerics"
+            style={{
+              marginTop: 4,
+              fontSize: 10,
+              color: 'var(--color-mc-red)',
+              letterSpacing: '0.06em',
+            }}
+            data-testid={`t3t-inline-status-${index}`}
+          >
+            ● SAVE FAILED · WILL RETRY ON NEXT KEYSTROKE
+          </div>
+        )}
       </div>
     </div>
   );

@@ -268,9 +268,21 @@ export function useMissionStore() {
     base.temporal.week = weeklyByCat.Temporal;
     base.pipeline.today = todayByCat.Revenue ?? 0;
     base.pipeline.week = weeklyByCat.Revenue;
-    // Deep work uses focus-hours "Other" by convention (no dedicated category).
-    base.deepWork.today = todayByCat.Other ?? 0;
-    base.deepWork.week = weeklyByCat.Other;
+    // Deep work = focus-hours category "Other" + Temporal. The user's working
+    // model: Temporal hours ARE deep work (just additionally tagged as the
+    // strategic project). Without this, logging +1h Temporal would not
+    // contribute to the Deep Work goal — but it should.
+    //
+    // When neither category has data we leave `week` undefined so the empty-
+    // state guarantee in the snapshot still holds (the page renders 0 today
+    // and shows the goal-progress bar, not a fake "0 this week" subtitle).
+    base.deepWork.today = (todayByCat.Other ?? 0) + (todayByCat.Temporal ?? 0);
+    const otherWeek = weeklyByCat.Other;
+    const temporalWeek = weeklyByCat.Temporal;
+    base.deepWork.week =
+      otherWeek === undefined && temporalWeek === undefined
+        ? undefined
+        : (otherWeek ?? 0) + (temporalWeek ?? 0);
 
     const finToday = financialData?.todaysMetrics?.totals;
     if (finToday) {

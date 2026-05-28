@@ -17,7 +17,11 @@
   --color-mc-ink: #F5F1FF;
   --color-mc-fg: #D7D2E8;
   --color-mc-fg-dim: #9890B5;
-  --color-mc-fg-muted: #5E5774;
+  /* Brightened from #5E5774 (~2.5:1 contrast on bg, fails WCAG AA) to ~4.5:1
+     so uppercase label rows like DISCIPLINE / FOCUS / NUTRITION on the
+     ratings trend, metric-card "TODAY" suffix, and CmdK hint chips read
+     clearly. Still dimmer than fg-dim so the visual hierarchy holds. */
+  --color-mc-fg-muted: #857F9C;
   --color-mc-uv: #7C7CFF;
   --color-mc-uv-hi: #9D9CFF;
   --color-mc-pink: #FF7AD8;

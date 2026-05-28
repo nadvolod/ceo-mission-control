@@ -233,9 +233,13 @@ function buildInsightCards(
 
   const temporal = focus.map((d) => d.byCategory?.Temporal ?? 0);
   const pipeline = focus.map((d) => d.byCategory?.Revenue ?? 0);
-  // v2 logs Deep Work to focus-hours category "Other"; keep the insight card
-  // on that same canonical source so the chart matches the MetricCard.
-  const deepWork = focus.map((d) => d.byCategory?.Other ?? 0);
+  // Deep Work = "Other" + Temporal. Temporal hours ARE deep work, just
+  // additionally tagged as the strategic project — without this addition,
+  // +1h Temporal wouldn't contribute to the Deep Work card. The same
+  // accumulation runs in useMissionStore.baseMetrics and TrendsPanel.
+  const deepWork = focus.map((d) =>
+    (d.byCategory?.Other ?? 0) + (d.byCategory?.Temporal ?? 0),
+  );
   const moneyMoved = fin.map((d) =>
     (d.totals?.moved ?? 0) + (d.totals?.generated ?? 0) + (d.totals?.cut ?? 0),
   );
@@ -246,7 +250,9 @@ function buildInsightCards(
   const fin14 = (financialDailyTrend ?? []).slice(-14);
   const temporal14 = focus14.map((d) => d.byCategory?.Temporal ?? 0);
   const pipeline14 = focus14.map((d) => d.byCategory?.Revenue ?? 0);
-  const deepWork14 = focus14.map((d) => d.byCategory?.Other ?? 0);
+  const deepWork14 = focus14.map((d) =>
+    (d.byCategory?.Other ?? 0) + (d.byCategory?.Temporal ?? 0),
+  );
   const moneyMoved14 = fin14.map((d) =>
     (d.totals?.moved ?? 0) + (d.totals?.generated ?? 0) + (d.totals?.cut ?? 0),
   );

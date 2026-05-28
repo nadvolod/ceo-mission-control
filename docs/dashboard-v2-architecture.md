@@ -150,6 +150,28 @@ If a UI surface has no data, it must render an **empty state**, not a fallback t
 
 - The legacy landing page has a global `input, select, textarea { color: #171717 }` rule. The v2 dashboard sets a darker background, so we scope the dark-on-light override to `.mc-root` — every v2 surface (page, drawer, palette dialog) carries that class.
 
+### R5 · `derive.ts` filters e2e-authored rows from the activity feed
+
+- Rows whose `description` matches `/^e2e-/i`, `/^\[test\]/i`, or `/^playwright[-_]/i` are dropped before they reach `<ActivityFeed>`.
+- This is **defense-in-depth**, not the primary fix. The right fix is e2e tests cleaning up their own writes (afterEach hooks). But until every test is hardened, the filter keeps stale rows out of the user-facing UI.
+- Tests in `src/components/dashboard/v2/__tests__/derive.test.ts::e2e-residue filter` cover the three patterns plus a negative case (e2e mid-string is **not** dropped — only prefix matches).
+
+### R6 · Deep Work includes Temporal hours
+
+- `useMissionStore.baseMetrics`, `TrendsPanel.buildOverviewTrendSeries`, and `InsightsTab.buildInsightCards` all compute Deep Work as `Other + Temporal` from focus-hours categories.
+- The user's mental model: Temporal hours **are** deep work — just additionally tagged as the strategic project. Without the addition, logging `+1h Temporal` would leave the Deep Work card at 0 even though real deep work happened.
+- When neither category has weekly data, `deepWork.week` stays `undefined` so the empty-state UI doesn't render a fake "0 this week" subtitle.
+
+### R7 · T3T inline autosave: debounce + flush-on-blur + flush-on-unmount
+
+- 600ms debounce on every keystroke so typing isn't latency-bound on the network.
+- Blur fires an immediate flush so tabbing to the next prompt or clicking elsewhere doesn't lose pending content. (Old code only debounced — blur before 600ms meant the save never fired.)
+- Unmount fires a fire-and-forget flush so navigating away doesn't lose pending content.
+- Pending value is held in a `useRef` (not state) so it doesn't trigger re-renders during typing.
+- Server-supplied `initial` only resyncs into local state when `pendingRef.current === null` — otherwise an in-flight `useDashboardData` refresh could clobber the user's keystrokes.
+- Status badge: `SAVING…` → `SAVED · N CHARS` → `SAVE FAILED · WILL RETRY ON NEXT KEYSTROKE`.
+- Comprehensive coverage in `tests/e2e/t3t-autosave.spec.ts` — positive (short/numbers/bullets/Enter), boundary (empty, single char, 5000 chars, whitespace), negative (blur-flush, tab-flush, rapid typing, reload survival, independent save lanes).
+
 ---
 
 ## 4 · Verification
