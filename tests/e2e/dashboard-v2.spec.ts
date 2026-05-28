@@ -61,6 +61,13 @@ test.describe('Mission Control v2', () => {
   // the first run with the truthful error than to silently pass-on-retry.
   test.describe.configure({ mode: 'serial', retries: 0 });
 
+  test('old /dashboard/v2 route redirects to the new default dashboard', async ({ page }) => {
+    const response = await page.goto('/dashboard/v2');
+    expect(response?.status()).toBeLessThan(400);
+    await expect(page).toHaveURL(/\/dashboard$/);
+    await expect(page.getByTestId('desktop-layout')).toBeVisible();
+  });
+
   test('renders the new shell and opens the log command palette', async ({ page }) => {
     const response = await page.goto('/dashboard');
     expect(response?.status()).toBeLessThan(400);
@@ -292,8 +299,8 @@ test.describe('Mission Control v2', () => {
 
   test('Tasks panel was removed from the Overview body', async ({ page }) => {
     // The handoff dropped Tasks from the new dashboard ("we no longer need it").
-    // The legacy /dashboard still has its own task list — this PR removes the
-    // panel from the new dashboard only.
+    // The legacy /dashboard/legacy route still has its own task list — this
+    // PR removes the panel from the new dashboard only.
     await page.goto('/dashboard');
     // No CollapsiblePanel titled "Tasks" should render on the Overview body.
     await expect(page.getByText('Tasks', { exact: true })).toHaveCount(0);

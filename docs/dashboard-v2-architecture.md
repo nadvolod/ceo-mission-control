@@ -210,7 +210,7 @@ Done in PR #67 (this PR):
 
 - **`/dashboard`** — v2 dashboard (the new default). Source: `src/app/dashboard/page.tsx`.
 - **`/dashboard/legacy`** — old dashboard. Source: `src/app/dashboard/legacy/page.tsx`. Linked from the v2 header via a "Legacy" pill (data-testid `legacy-dashboard-link`). Still imported by impersonation (`src/app/as/[role]/dashboard/page.tsx`) and the older `src/components/__tests__/DashboardPage.test.tsx` jest suite.
-- **`/dashboard/v2`** — permanent redirect to `/dashboard` (server-side `redirect()` from `next/navigation`). Kept so old bookmarks and external links resolve. Remove the redirect file once we're confident no external references point at the v2 path.
+- **`/dashboard/v2`** — permanent redirect to `/dashboard` (server-side `permanentRedirect()` from `next/navigation`). Kept so old bookmarks and external links resolve. Remove the redirect file once we're confident no external references point at the v2 path.
 
 The Playwright `parity` test in `dashboard-v2.spec.ts` is the canary — it asserts that `/dashboard` shows the same Temporal hours as `/api/focus-hours` returns. As long as that test passes, the dashboard and the API are observing the same data.
 

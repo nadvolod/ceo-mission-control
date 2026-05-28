@@ -1,4 +1,4 @@
-import { redirect } from 'next/navigation';
+import { permanentRedirect } from 'next/navigation';
 
 // /dashboard/v2 was the staging route while the new console lived alongside
 // the legacy one. The new console is now the default at /dashboard, but
@@ -7,5 +7,5 @@ import { redirect } from 'next/navigation';
 // resolve. Remove this file when we're confident no external links
 // reference it (probably ~one release cycle from now).
 export default function DashboardV2Redirect() {
-  redirect('/dashboard');
+  permanentRedirect('/dashboard');
 }
