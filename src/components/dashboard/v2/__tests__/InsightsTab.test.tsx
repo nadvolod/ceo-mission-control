@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { InsightsTab, __insightsInternals } from '../InsightsTab';
 
-const { buildInsightCards, periodDelta, meanOf, sumOf } = __insightsInternals;
+const { buildInsightCards, weekOverWeekDelta, meanOf, sumOf } = __insightsInternals;
 
 describe('Insights internals', () => {
   it('meanOf empty array = 0', () => {
@@ -11,15 +11,37 @@ describe('Insights internals', () => {
   it('sumOf adds the values', () => {
     expect(sumOf([1, 2, 3])).toBe(6);
   });
-  it('periodDelta is 0 when prior and recent are both 0', () => {
-    expect(periodDelta([0, 0, 0, 0])).toBe(0);
-  });
-  it('periodDelta is undefined when prior is 0 and recent isn\'t', () => {
-    expect(periodDelta([0, 0, 1, 2])).toBeUndefined();
-  });
-  it('periodDelta computes percentage change between halves', () => {
-    // first half mean 1, second half mean 2 → +100%
-    expect(periodDelta([1, 1, 2, 2])).toBe(100);
+
+  describe('weekOverWeekDelta', () => {
+    it('returns undefined when the series has fewer than 14 days', () => {
+      expect(weekOverWeekDelta(new Array(13).fill(1))).toBeUndefined();
+      expect(weekOverWeekDelta([])).toBeUndefined();
+    });
+
+    it('is 0 when both 7-day windows are 0', () => {
+      expect(weekOverWeekDelta(new Array(14).fill(0))).toBe(0);
+    });
+
+    it('is undefined when prior 7 are 0 and recent 7 are non-zero (cant divide)', () => {
+      const series = [...new Array(7).fill(0), ...new Array(7).fill(1)];
+      expect(weekOverWeekDelta(series)).toBeUndefined();
+    });
+
+    it('computes percentage change between the last 7 and prior 7 days', () => {
+      // prior 7 mean = 1, recent 7 mean = 2 → +100%
+      const series = [...new Array(7).fill(1), ...new Array(7).fill(2)];
+      expect(weekOverWeekDelta(series)).toBe(100);
+    });
+
+    it('always uses the last 14 days even when given a longer series (30-day case)', () => {
+      // The first 16 entries should be ignored. Last 14: prior 7 = 1, recent 7 = 2 → +100%.
+      const series = [
+        ...new Array(16).fill(999),
+        ...new Array(7).fill(1),
+        ...new Array(7).fill(2),
+      ];
+      expect(weekOverWeekDelta(series)).toBe(100);
+    });
   });
 });
 

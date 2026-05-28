@@ -205,12 +205,18 @@ function sumOf(arr: number[]): number {
   return arr.reduce((a, b) => a + b, 0);
 }
 
-function periodDelta(series: number[]): number | undefined {
-  // Compare the last half-period to the prior half-period.
-  if (series.length < 2) return undefined;
-  const half = Math.floor(series.length / 2);
-  const recent = meanOf(series.slice(-half));
-  const prior = meanOf(series.slice(0, half));
+// Always-week-over-week: compare the last 7 days against the 7 days before
+// that, regardless of the selected display period. The card labels the
+// number "WoW" — that promise has to hold for every period (Copilot caught
+// the half-vs-half implementation didn't actually compute WoW for 7d/30d).
+//
+// Caller passes the FULL recent series (we slice the last 14 here); if the
+// series is shorter than 14, we return undefined so the UI shows "—".
+function weekOverWeekDelta(seriesUpTo14d: number[]): number | undefined {
+  const tail = seriesUpTo14d.slice(-14);
+  if (tail.length < 14) return undefined;
+  const recent = meanOf(tail.slice(-7));
+  const prior = meanOf(tail.slice(0, 7));
   if (prior === 0) {
     if (recent === 0) return 0;
     return undefined;
@@ -224,6 +230,7 @@ function buildInsightCards(
   financialDailyTrend: DailyFinancialEntry[] | undefined,
   weeklyDailyTrend: Array<PerformanceDayEntry | (PerformanceDayEntry & { isEmpty: boolean })> | undefined,
 ): InsightCard[] {
+  // Period-scoped series — used for the sparkline + total.
   const focus = (focusDailyTrend ?? []).slice(-period);
   const fin = (financialDailyTrend ?? []).slice(-period);
   const weekly = (weeklyDailyTrend ?? []).slice(-period);
@@ -237,6 +244,20 @@ function buildInsightCards(
     (d.totals?.moved ?? 0) + (d.totals?.generated ?? 0) + (d.totals?.cut ?? 0),
   );
 
+  // Fixed 14-day series — used only for the WoW delta so the label is
+  // accurate regardless of the selected display period.
+  const focus14 = (focusDailyTrend ?? []).slice(-14);
+  const fin14 = (financialDailyTrend ?? []).slice(-14);
+  const weekly14 = (weeklyDailyTrend ?? []).slice(-14);
+  const temporal14 = focus14.map((d) => d.byCategory?.Temporal ?? 0);
+  const pipeline14 = focus14.map((d) => d.byCategory?.Revenue ?? 0);
+  const deepWorkFromFocus14 = focus14.map((d) => d.byCategory?.Other ?? 0);
+  const deepWorkFromWeekly14 = weekly14.map((d) => d?.deepWorkHours ?? 0);
+  const deepWork14 = deepWorkFromWeekly14.some((v) => v > 0) ? deepWorkFromWeekly14 : deepWorkFromFocus14;
+  const moneyMoved14 = fin14.map((d) =>
+    (d.totals?.moved ?? 0) + (d.totals?.generated ?? 0) + (d.totals?.cut ?? 0),
+  );
+
   return [
     {
       label: 'Temporal',
@@ -244,7 +265,7 @@ function buildInsightCards(
       color: MC_COLORS.pink,
       total: sumOf(temporal),
       fmt: 'hours',
-      deltaPct: periodDelta(temporal),
+      deltaPct: weekOverWeekDelta(temporal14),
     },
     {
       label: 'Deep work',
@@ -252,7 +273,7 @@ function buildInsightCards(
       color: MC_COLORS.cyan,
       total: sumOf(deepWork),
       fmt: 'hours',
-      deltaPct: periodDelta(deepWork),
+      deltaPct: weekOverWeekDelta(deepWork14),
     },
     {
       label: 'Pipeline',
@@ -260,7 +281,7 @@ function buildInsightCards(
       color: MC_COLORS.amber,
       total: sumOf(pipeline),
       fmt: 'hours',
-      deltaPct: periodDelta(pipeline),
+      deltaPct: weekOverWeekDelta(pipeline14),
     },
     {
       label: 'Money moved',
@@ -268,10 +289,10 @@ function buildInsightCards(
       color: MC_COLORS.green,
       total: sumOf(moneyMoved),
       fmt: 'money',
-      deltaPct: periodDelta(moneyMoved),
+      deltaPct: weekOverWeekDelta(moneyMoved14),
     },
   ];
 }
 
 // Exported for tests.
-export const __insightsInternals = { buildInsightCards, periodDelta, meanOf, sumOf };
+export const __insightsInternals = { buildInsightCards, weekOverWeekDelta, meanOf, sumOf };
