@@ -44,3 +44,8 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Keep real env files out of git while allowing checked-in templates.
+.env*
+!.env.example
+!.env.*.example

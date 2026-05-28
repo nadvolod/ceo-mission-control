@@ -17,6 +17,9 @@ const eslintConfig = defineConfig([
     "jest.setup.js",
     // Stale worktrees are not part of the active codebase.
     ".claude/worktrees/**",
+    // Design handoff prototypes are browser-openable reference artifacts, not
+    // production Next/React modules.
+    "design_handoff_mission_control/prototype/**",
   ]),
   {
     rules: {
