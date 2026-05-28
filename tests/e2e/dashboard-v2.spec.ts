@@ -1,13 +1,24 @@
 import { test, expect, type Page } from '@playwright/test';
 
+async function browserLocalDate(page: Page) {
+  return page.evaluate(() => {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${dd}`;
+  });
+}
+
 async function readFocusHoursFromPage(page: Page) {
-  return page.evaluate(async () => {
-    const res = await fetch('/api/focus-hours');
+  const date = await browserLocalDate(page);
+  return page.evaluate(async (today) => {
+    const res = await fetch(`/api/focus-hours?date=${today}`);
     if (!res.ok) {
       throw new Error(`GET /api/focus-hours failed: ${res.status}`);
     }
     return res.json();
-  });
+  }, date);
 }
 
 async function readThreeToThriveFromPage(page: Page) {
@@ -201,13 +212,7 @@ test.describe('Mission Control v2', () => {
     // crosses between the POST and the assertion, both sides see the same
     // day. (CodeRabbit caught this: reading the local clock after `await`
     // would race the wall clock and flake at midnight.)
-    const expectedLocal = await page.evaluate(() => {
-      const d = new Date();
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      return `${y}-${m}-${dd}`;
-    });
+    const expectedLocal = await browserLocalDate(page);
 
     const focusPost = page.waitForRequest((req) =>
       req.url().includes('/api/focus-hours') && req.method() === 'POST',
