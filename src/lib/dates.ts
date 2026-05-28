@@ -49,10 +49,22 @@ export function localDateInTz(d: Date, tz: string): string {
 
 /**
  * Validate a YYYY-MM-DD string. Defensive guard for any code path that
- * accepts a date string from a request body or query param.
+ * accepts a date string from a request body or query param. Rejects
+ * syntactically-correct but impossible dates like "2026-13-40" — the
+ * regex check alone is not enough, since these strings flow into object
+ * keys for daily-metric maps and shouldn't be silently accepted.
  */
 export function isLocalDateKey(value: unknown): value is string {
-  return typeof value === 'string' && DATE_KEY_RE.test(value);
+  if (typeof value !== 'string' || !DATE_KEY_RE.test(value)) return false;
+  const [y, m, d] = value.split('-').map(Number);
+  // Round-trip via Date: if the constructor "normalizes" (e.g., month=13
+  // becomes year+1/month=1), the parts won't match and we reject.
+  const dt = new Date(y, m - 1, d);
+  return (
+    dt.getFullYear() === y &&
+    dt.getMonth() === m - 1 &&
+    dt.getDate() === d
+  );
 }
 
 /**

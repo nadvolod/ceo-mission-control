@@ -63,6 +63,40 @@ test.describe('Mission Control v2', () => {
     await expect(page.getByTestId('cmdk-action-0')).toContainText(/log/i);
   });
 
+  // Hard-rule test for the fixtures leak. Runs as the SECOND test in this
+  // serial describe (immediately after the render test) because
+  // global-setup.ts wipes the test user's rows once per run, but any later
+  // test that logs activity would invalidate the "empty" precondition.
+  //
+  // Belt-and-suspenders: before asserting on the rendered DOM we read the
+  // server snapshot via the same browser session and fail fast if it isn't
+  // empty — that turns "this test passed for the wrong reason because
+  // someone ran it after a logging test" into a loud failure instead of a
+  // silent pass.
+  test('empty test user sees no fake activity rows (no SEED_ACTIVITY leak)', async ({ page }) => {
+    await page.goto('/dashboard/v2');
+
+    const focus = await readFocusHoursFromPage(page);
+    const serverIsEmpty =
+      (focus?.todaysMetrics?.totalHours ?? 0) === 0 &&
+      (focus?.recentSessions?.length ?? 0) === 0;
+    expect(serverIsEmpty).toBe(true);
+
+    await expect(page.getByText('Activity', { exact: true })).toBeVisible();
+    const body = await page.locator('body').textContent();
+    // Strings from the old SEED_ACTIVITY fixture rows — none of these may
+    // ever appear in front of a real user.
+    expect(body || '').not.toMatch(/Annual contract · Vega/);
+    expect(body || '').not.toMatch(/Outbound · Northway/);
+    expect(body || '').not.toMatch(/Architecture doc/);
+    // Numeric metrics must read 0 (or empty) before any logs land — not the
+    // SEED_METRICS values like "$35.3K cash" or "$982K net worth".
+    const cashText = (await page.getByTestId('metric-card-cash').textContent()) || '';
+    expect(cashText).not.toMatch(/\$35\.3K/);
+    const netWorthText = (await page.getByTestId('metric-card-netWorth').textContent()) || '';
+    expect(netWorthText).not.toMatch(/\$982K/);
+  });
+
   test('⌘K opens the palette, filters by keyword, and Esc closes it', async ({ page }) => {
     await page.goto('/dashboard/v2');
     await page.getByTestId('cmdk-trigger').click();
@@ -155,23 +189,6 @@ test.describe('Mission Control v2', () => {
     expect(Math.abs(shownTemporal - expectedTemporalToday)).toBeLessThan(0.05);
   });
 
-  test('empty test user sees no fake activity rows (no SEED_ACTIVITY leak)', async ({ page }) => {
-    // global-setup.ts wipes the test user's rows before each run. Before
-    // anything is logged, the activity feed must be empty — the SEED_ACTIVITY
-    // fallback was the prod data leak this PR fixes. Specifically: no
-    // mention of fixture meta strings like "Annual contract · Vega" or
-    // "Outbound · Northway" should ever reach a real user.
-    await page.goto('/dashboard/v2');
-    await expect(page.getByText('Activity', { exact: true })).toBeVisible();
-    const body = await page.locator('body').textContent();
-    expect(body || '').not.toMatch(/Annual contract · Vega/);
-    expect(body || '').not.toMatch(/Outbound · Northway/);
-    // The numeric metrics must read 0 until the user logs real data —
-    // not the seed values ($35.3K cash, 6.5h temporal).
-    const cashText = (await page.getByTestId('metric-card-cash').textContent()) || '';
-    expect(cashText).not.toMatch(/\$35\.3K/);
-  });
-
   test('timezone: client local date is what the server records', async ({ page }) => {
     // The bug class we're guarding against: at 9pm EST the UTC date is
     // already tomorrow, so a UTC-based server would file the log on the
@@ -179,6 +196,18 @@ test.describe('Mission Control v2', () => {
     // body. We intercept the call and assert the date matches the
     // browser's local computation, not UTC.
     await page.goto('/dashboard/v2');
+
+    // Capture expectedLocal BEFORE issuing the request so that if midnight
+    // crosses between the POST and the assertion, both sides see the same
+    // day. (CodeRabbit caught this: reading the local clock after `await`
+    // would race the wall clock and flake at midnight.)
+    const expectedLocal = await page.evaluate(() => {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${dd}`;
+    });
 
     const focusPost = page.waitForRequest((req) =>
       req.url().includes('/api/focus-hours') && req.method() === 'POST',
@@ -189,13 +218,6 @@ test.describe('Mission Control v2', () => {
     await page.keyboard.press('Enter');
 
     const sentDate = (await focusPost).postDataJSON().date;
-    const expectedLocal = await page.evaluate(() => {
-      const d = new Date();
-      const y = d.getFullYear();
-      const m = String(d.getMonth() + 1).padStart(2, '0');
-      const dd = String(d.getDate()).padStart(2, '0');
-      return `${y}-${m}-${dd}`;
-    });
     expect(sentDate).toBe(expectedLocal);
   });
 });

@@ -27,9 +27,8 @@ function walk(dir: string, acc: string[] = []): string[] {
 }
 
 function isTestPath(p: string): boolean {
-  // jest test files, __tests__/, __fixtures__, storybook, e2e
-  if (p.endsWith('.test.ts') || p.endsWith('.test.tsx')) return true;
-  if (p.endsWith('.spec.ts') || p.endsWith('.spec.tsx')) return true;
+  // jest test files (.ts/.tsx/.js/.jsx), __tests__/, __fixtures__, storybook
+  if (/\.(test|spec)\.(tsx?|jsx?)$/.test(p)) return true;
   if (p.includes(`${sep}__tests__${sep}`)) return true;
   if (p.includes(`${sep}__fixtures__${sep}`)) return true;
   if (p.includes(`${sep}.storybook${sep}`)) return true;

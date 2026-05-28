@@ -1,7 +1,7 @@
 import { startOfWeek, subWeeks, format, subDays } from 'date-fns';
 import type { FocusCategory, FocusSession, DailyFocusMetrics, FocusData } from './types';
 import { loadJSON, saveJSON } from './storage';
-import { localDate } from './dates';
+import { isLocalDateKey, localDate } from './dates';
 
 const VALID_CATEGORIES: FocusCategory[] = [
   'Temporal', 'Finance', 'Revenue', 'Housing',
@@ -91,7 +91,16 @@ export class FocusTracker {
     // Prefer the caller-provided date (the v2 client sends its local
     // YYYY-MM-DD); fall back to the server's local zone. UTC was the old
     // default and caused evening logs in EST to land on the next day.
-    const sessionDate = date || localDate();
+    //
+    // Validate before using as an object key — `dailyMetrics` is a plain
+    // object so a malformed key like "__proto__" would mutate the
+    // prototype chain. isLocalDateKey rejects anything that isn't a real
+    // calendar date in YYYY-MM-DD form.
+    const candidate = date ?? localDate();
+    if (!isLocalDateKey(candidate)) {
+      throw new Error(`Invalid date: expected YYYY-MM-DD (received ${candidate})`);
+    }
+    const sessionDate = candidate;
     const now = new Date().toISOString();
 
     const session: FocusSession = {

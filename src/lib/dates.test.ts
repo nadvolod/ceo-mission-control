@@ -36,6 +36,7 @@ describe('isLocalDateKey', () => {
   it('accepts YYYY-MM-DD strings', () => {
     expect(isLocalDateKey('2026-05-27')).toBe(true);
     expect(isLocalDateKey('2024-12-31')).toBe(true);
+    expect(isLocalDateKey('2024-02-29')).toBe(true); // leap year
   });
   it('rejects malformed strings + non-strings', () => {
     expect(isLocalDateKey('2026-5-27')).toBe(false);
@@ -45,6 +46,14 @@ describe('isLocalDateKey', () => {
     expect(isLocalDateKey(undefined)).toBe(false);
     expect(isLocalDateKey(123)).toBe(false);
     expect(isLocalDateKey(null)).toBe(false);
+  });
+  it('rejects syntactically-correct but impossible dates', () => {
+    expect(isLocalDateKey('2026-13-40')).toBe(false); // month 13
+    expect(isLocalDateKey('2026-02-30')).toBe(false); // Feb 30
+    expect(isLocalDateKey('2026-04-31')).toBe(false); // April has 30 days
+    expect(isLocalDateKey('2025-02-29')).toBe(false); // not a leap year
+    expect(isLocalDateKey('2026-00-15')).toBe(false); // month 0
+    expect(isLocalDateKey('2026-05-00')).toBe(false); // day 0
   });
 });
 

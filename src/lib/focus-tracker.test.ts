@@ -19,9 +19,14 @@ jest.mock('./storage', () => {
 const storage = require('./storage');
 
 import { FocusTracker } from './focus-tracker';
+import { localDate } from './dates';
 import { UNIT_TEST_OWNER_ID } from '@/__tests__/utils/owner-id';
 
-const TODAY = new Date().toISOString().split('T')[0];
+// Use the same local-day helper production code uses. The old form
+// (`new Date().toISOString().split('T')[0]`) was UTC and the source of
+// the timezone bug this PR fixes — keeping it here would mean the test
+// passes for the wrong reason near a UTC midnight boundary.
+const TODAY = localDate();
 
 describe('FocusTracker', () => {
   beforeEach(() => {

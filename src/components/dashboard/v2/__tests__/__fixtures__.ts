@@ -18,9 +18,14 @@ import { MC_COLORS } from '../palette';
 
 // Hard guard. Production builds set NODE_ENV='production'; jest sets 'test';
 // `next dev` sets 'development'. Allow test + development, reject production.
-// `globalThis` indirection avoids being tree-shaken out by Next's bundler.
-const env = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV;
-if (env === 'production') {
+//
+// Read process.env.NODE_ENV directly (not via globalThis indirection) so the
+// check works in client bundles too — Next replaces `process.env.NODE_ENV`
+// with a literal string at build time, so the conditional becomes
+// `'production' === 'production'` in prod and dead-code in test/dev.
+// The earlier globalThis form returned undefined in browser bundles
+// (window.process isn't polyfilled) and the throw silently went away.
+if (process.env.NODE_ENV === 'production') {
   throw new Error(
     '[mission-control] __FIXTURE_* values are test-only and must never be ' +
       'imported in a production build. If you see this, audit the call site ' +
