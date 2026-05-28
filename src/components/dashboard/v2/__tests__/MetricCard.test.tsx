@@ -139,6 +139,30 @@ describe('MetricCard', () => {
       expect(onLog).not.toHaveBeenCalled();
     });
 
+    // Edge cases the old permissive parser silently mis-handled.
+    // Both Copilot and CodeRabbit flagged these on PR #65 — pinning them
+    // here so a future regression to the lax parser surfaces in CI.
+    it.each([
+      ['negative numbers (sign would be stripped, falsely logging +5)', '-5'],
+      ['scientific notation (would log 13 instead of 1000)',            '1e3'],
+      ['uppercase scientific notation',                                 '1E3'],
+      ['double-decimal (parseFloat truncates to 12)',                  '12..3'],
+      ['multi-segment decimal (parseFloat truncates to 1.2)',          '1.2.3'],
+      ['decimal-only with no integer',                                  '.50'],
+      ['trailing dot only',                                             '12.'],
+      ['letters mixed in',                                              '12abc'],
+    ])('rejects malformed numeric input — %s', async (_label, bad) => {
+      const user = userEvent.setup();
+      const onLog = jest.fn();
+      render(<MetricCard metric={SEED_METRICS.moneyMoved} onLog={onLog} />);
+      fireEvent.focus(screen.getByTestId('metric-card-moneyMoved'));
+      await user.click(screen.getByTestId('preset-moneyMoved-moved'));
+      await user.type(screen.getByTestId('moneyMoved-amount-input'), bad);
+      await user.keyboard('{Enter}');
+      expect(onLog).not.toHaveBeenCalled();
+      expect(screen.getByTestId('moneyMoved-amount-editor')).toBeInTheDocument();
+    });
+
     it('Escape cancels and reverts to the preset row', async () => {
       const user = userEvent.setup();
       const onLog = jest.fn();

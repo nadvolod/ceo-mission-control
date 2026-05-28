@@ -40,11 +40,23 @@ export function AmountEditor({
   }, []);
 
   const submit = () => {
-    // Accept "$1,234.50" / "1234" / "1.5" — strip $, commas, spaces.
-    const cleaned = value.replace(/[^0-9.]/g, '');
+    // Strict positive-decimal parse. Accepts "$1,234.50" / "1234" / "1.5".
+    // Rejects "-5" (negative sign stripped → would silently log +5),
+    // "1e3" / "1E3" (exponent stripped → silently logs 13), and any
+    // malformed decimal like "12..3" or "1.2.3" that parseFloat would
+    // silently truncate. The two-step shape:
+    //   1. Strip only the documented formatting characters ($, commas,
+    //      whitespace) — anything else (letters, +/-, multiple dots)
+    //      makes the input invalid.
+    //   2. Match strict /^\d+(\.\d+)?$/ — at least one integer digit,
+    //      optional single decimal part. parseFloat is then safe.
+    const cleaned = value.replace(/[$,\s]/g, '');
+    if (!/^\d+(\.\d+)?$/.test(cleaned)) {
+      inputRef.current?.focus();
+      return;
+    }
     const amount = parseFloat(cleaned);
     if (!Number.isFinite(amount) || amount <= 0) {
-      // Invalid; leave the field open with focus so the user can correct.
       inputRef.current?.focus();
       return;
     }
