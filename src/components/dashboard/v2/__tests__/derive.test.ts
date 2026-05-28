@@ -108,6 +108,44 @@ describe('deriveActivity', () => {
     }));
     expect(deriveActivity({ focus, limit: 5 })).toHaveLength(5);
   });
+
+  // Defense-in-depth filter for stale e2e residue. The proper fix is to
+  // clean up the test user's data, but until then this filter keeps test-
+  // authored rows out of the user-facing activity feed.
+  describe('e2e-residue filter', () => {
+    it('drops financial entries whose description matches /^e2e-/i', () => {
+      const result = deriveActivity({
+        financial: [
+          { id: 'real',  category: 'moved', amount: 200, description: 'wire to brokerage', timestamp: '2026-05-27T09:00:00' },
+          { id: 'leak1', category: 'cut',   amount: 150, description: 'e2e-storage-1778723003152', timestamp: '2026-05-27T09:01:00' },
+          { id: 'leak2', category: 'cut',   amount: 150, description: 'E2E-cleanup-test',          timestamp: '2026-05-27T09:02:00' },
+        ],
+      });
+      expect(result.map((e) => e.id)).toEqual(['real']);
+    });
+
+    it('drops focus sessions whose description matches /^\\[test\\]/i or /^playwright[-_]/i', () => {
+      const result = deriveActivity({
+        focus: [
+          { id: 'real',  category: 'Temporal', hours: 1,   description: 'investor deck',             timestamp: '2026-05-27T09:00:00' },
+          { id: 'leak1', category: 'Temporal', hours: 0.5, description: '[TEST] flake debug',         timestamp: '2026-05-27T09:01:00' },
+          { id: 'leak2', category: 'Other',    hours: 2,   description: 'playwright-fixture-foo',     timestamp: '2026-05-27T09:02:00' },
+          { id: 'leak3', category: 'Other',    hours: 1,   description: 'playwright_e2e_setup',       timestamp: '2026-05-27T09:03:00' },
+        ],
+      });
+      expect(result.map((e) => e.id)).toEqual(['real']);
+    });
+
+    it('does NOT drop entries whose description merely mentions "e2e" mid-string', () => {
+      const result = deriveActivity({
+        financial: [
+          { id: 'real', category: 'generated', amount: 500, description: 'gen for e2e dashboard review', timestamp: '2026-05-27T09:00:00' },
+        ],
+      });
+      // "e2e" appears mid-string, not as a prefix — keep it.
+      expect(result.map((e) => e.id)).toEqual(['real']);
+    });
+  });
 });
 
 describe('deriveChips', () => {

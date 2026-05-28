@@ -131,8 +131,13 @@ export function buildOverviewTrendSeries(
   const focus14 = lastNDays(focusDailyTrend ?? [], 14);
   const temporal = focus14.map((d) => d.byCategory?.Temporal ?? 0);
   const pipelineHours = focus14.map((d) => d.byCategory?.Revenue ?? 0);
-  // Deep work uses focus-hours "Other" by convention in v2.
-  const deepWork = focus14.map((d) => d.byCategory?.Other ?? 0);
+  // Deep work = "Other" + Temporal. Temporal IS deep work, just additionally
+  // tagged as the strategic project. Without this, +1h Temporal wouldn't
+  // contribute to the Deep Work goal — see useMissionStore for the snapshot
+  // and architecture doc for the rule.
+  const deepWork = focus14.map((d) =>
+    (d.byCategory?.Other ?? 0) + (d.byCategory?.Temporal ?? 0),
+  );
 
   const fmtHours = (mean: number) => `${(mean * 7).toFixed(1)}h this week`;
 

@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { Plus, Search } from 'lucide-react';
+import { localDate } from '@/lib/dates';
 import { Aurora } from '@/components/dashboard/v2/primitives/Aurora';
 import { OrbitStar } from '@/components/dashboard/v2/primitives/OrbitStar';
 import { MetricCard } from '@/components/dashboard/v2/MetricCard';
@@ -339,6 +340,7 @@ export default function MissionControlV2Page() {
               }
             >
               <T3TPanelInline
+                entryDate={store.threeToThrive?.todaysEntry?.date ?? localDate()}
                 questions={store.threeToThrive?.todaysEntry?.questions ?? []}
                 answers={store.threeToThrive?.todaysEntry?.answers ?? []}
                 onSave={store.saveThreeToThriveAnswer}
@@ -437,10 +439,16 @@ export default function MissionControlV2Page() {
 // drawer but a single line per question. Updates the same store as the
 // drawer so toggling between them is consistent.
 function T3TPanelInline({
+  entryDate,
   questions,
   answers,
   onSave,
 }: {
+  // The DATE the rendered entry belongs to — threaded down to T3TPanelRow
+  // so saves anchor to the day the row was loaded for, not whatever
+  // `localDate()` returns at flush time. Important when a tab is left
+  // open across midnight: a late save must not land on tomorrow's row.
+  entryDate: string;
   questions: string[];
   answers: Array<{ question: string; answer: string }>;
   onSave: (date: string, question: string, answer: string) => Promise<void>;
@@ -468,6 +476,7 @@ function T3TPanelInline({
         <T3TPanelRow
           key={q}
           index={i}
+          entryDate={entryDate}
           question={q}
           initial={initialMap.get(q) ?? ''}
           onSave={onSave}
@@ -477,38 +486,110 @@ function T3TPanelInline({
   );
 }
 
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
 function T3TPanelRow({
   index,
+  entryDate,
   question,
   initial,
   onSave,
 }: {
   index: number;
+  // Date the parent rendered for. Saves anchor to this even if the wall
+  // clock crosses midnight while the user types — see T3TPanelInline.
+  entryDate: string;
   question: string;
   initial: string;
   onSave: (date: string, question: string, answer: string) => Promise<void>;
 }) {
   const [value, setValue] = useState(initial);
-  const [timer, setTimer] = useState<ReturnType<typeof setTimeout> | null>(null);
+  const [status, setStatus] = useState<SaveStatus>(initial.trim() ? 'saved' : 'idle');
+
+  // Refs hold debounce state so we don't trigger re-renders on every
+  // keystroke. The pending value is the latest typed string that hasn't
+  // been persisted yet; the timer is the 600ms debounce handle.
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingRef = useRef<string | null>(null);
+  // Serialization guard. While a save is in flight, additional calls to
+  // flushNow just update pendingRef and return — the in-flight handler
+  // will drain the latest pending value in a loop once it resolves.
+  // Without this, two concurrent saves race on the (date, question)
+  // upsert and an older response can overwrite newer text (data loss).
+  const inFlightRef = useRef(false);
+
+  // Drain pending writes one-at-a-time. The loop body snapshots the
+  // current pendingRef, clears it, awaits the save, then re-checks: if
+  // the user typed more during the await, the loop runs again with the
+  // latest value. On error we KEEP the pending value so the next
+  // keystroke / debounce tick gets another shot.
+  const flushNow = useCallback(async () => {
+    if (inFlightRef.current) return; // another loop already draining
+    if (pendingRef.current === null) return;
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    inFlightRef.current = true;
+    try {
+      while (pendingRef.current !== null) {
+        const snapshot = pendingRef.current;
+        pendingRef.current = null;
+        setStatus(snapshot.trim() ? 'saving' : 'idle');
+        try {
+          await onSave(entryDate, question, snapshot);
+        } catch (err) {
+          console.error('T3T inline save failed', err);
+          setStatus('error');
+          // Re-queue the unsaved value so the next debounce / blur picks
+          // it up. If the user has already typed more, prefer their
+          // newer value over the failed snapshot.
+          if (pendingRef.current === null) {
+            pendingRef.current = snapshot;
+          }
+          return;
+        }
+        // After a successful save, only stop and show SAVED when there
+        // is nothing newer waiting. Otherwise the loop runs again.
+        if (pendingRef.current === null) {
+          setStatus(snapshot.trim() ? 'saved' : 'idle');
+        }
+      }
+    } finally {
+      inFlightRef.current = false;
+    }
+  }, [onSave, question, entryDate]);
+
   // Sync local draft when the server-supplied initial answer changes.
-  // Deferred via rAF for the React 19 lint rule.
+  // Deferred via rAF for the React 19 lint rule. Only sync from the
+  // server when nothing is pending locally — otherwise we'd clobber the
+  // user's in-progress keystrokes.
   useEffect(() => {
-    const id = requestAnimationFrame(() => setValue(initial));
+    const id = requestAnimationFrame(() => {
+      if (pendingRef.current === null) {
+        setValue(initial);
+        setStatus(initial.trim() ? 'saved' : 'idle');
+      }
+    });
     return () => cancelAnimationFrame(id);
   }, [initial]);
-  const done = !!value.trim();
 
+  // Flush on unmount. Fire-and-forget; we can't await in cleanup.
+  useEffect(() => {
+    return () => {
+      void flushNow();
+    };
+  }, [flushNow]);
+
+  const done = !!value.trim();
   const onChange = (next: string) => {
     setValue(next);
-    if (timer) clearTimeout(timer);
-    const id = setTimeout(() => {
-      const d = new Date();
-      const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-      void onSave(date, question, next).catch((err) =>
-        console.error('T3T inline save failed', err),
-      );
+    pendingRef.current = next;
+    setStatus(next.trim() ? 'saving' : 'idle');
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      void flushNow();
     }, 600);
-    setTimer(id);
   };
 
   return (
@@ -550,6 +631,9 @@ function T3TPanelRow({
         <textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onBlur={() => {
+            void flushNow();
+          }}
           placeholder="Type your answer · auto-saves"
           rows={1}
           style={{
@@ -565,7 +649,50 @@ function T3TPanelRow({
             color: 'var(--color-mc-ink)',
             outline: 'none',
           }}
+          data-testid={`t3t-inline-input-${index}`}
         />
+        {status === 'saving' && (
+          <div
+            className="font-numerics"
+            style={{
+              marginTop: 4,
+              fontSize: 10,
+              color: 'var(--color-mc-fg-dim)',
+              letterSpacing: '0.06em',
+            }}
+            data-testid={`t3t-inline-status-${index}`}
+          >
+            ● SAVING…
+          </div>
+        )}
+        {status === 'saved' && value.trim() && (
+          <div
+            className="font-numerics"
+            style={{
+              marginTop: 4,
+              fontSize: 10,
+              color: 'var(--color-mc-green)',
+              letterSpacing: '0.06em',
+            }}
+            data-testid={`t3t-inline-status-${index}`}
+          >
+            ● SAVED · {value.length} CHARS
+          </div>
+        )}
+        {status === 'error' && (
+          <div
+            className="font-numerics"
+            style={{
+              marginTop: 4,
+              fontSize: 10,
+              color: 'var(--color-mc-red)',
+              letterSpacing: '0.06em',
+            }}
+            data-testid={`t3t-inline-status-${index}`}
+          >
+            ● SAVE FAILED · WILL RETRY ON NEXT KEYSTROKE
+          </div>
+        )}
       </div>
     </div>
   );

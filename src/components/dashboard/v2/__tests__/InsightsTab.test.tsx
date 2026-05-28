@@ -78,7 +78,19 @@ describe('buildInsightCards', () => {
     expect(money.total).toBe(850);
   });
 
-  it('uses focus-hours Other as the v2 Deep work source', () => {
+  it('sums Other + Temporal into Deep work (Temporal IS deep work)', () => {
+    const focus = Array.from({ length: 14 }, () => ({
+      date: 'd',
+      byCategory: { Other: 2, Temporal: 1 },
+    }));
+    const cards = buildInsightCards(14, focus, undefined);
+    const deepWork = cards.find((c) => c.label === 'Deep work')!;
+    // Each day = Other (2) + Temporal (1) = 3. Over 14 days = 42.
+    expect(deepWork.total).toBe(42);
+    expect(deepWork.data.every((v) => v === 3)).toBe(true);
+  });
+
+  it('falls back to Other alone when no Temporal hours are present', () => {
     const focus = Array.from({ length: 14 }, () => ({
       date: 'd',
       byCategory: { Other: 2 },
@@ -86,7 +98,16 @@ describe('buildInsightCards', () => {
     const cards = buildInsightCards(14, focus, undefined);
     const deepWork = cards.find((c) => c.label === 'Deep work')!;
     expect(deepWork.total).toBe(28);
-    expect(deepWork.data.every((v) => v === 2)).toBe(true);
+  });
+
+  it('falls back to Temporal alone when no Other hours are present', () => {
+    const focus = Array.from({ length: 14 }, () => ({
+      date: 'd',
+      byCategory: { Temporal: 1.5 },
+    }));
+    const cards = buildInsightCards(14, focus, undefined);
+    const deepWork = cards.find((c) => c.label === 'Deep work')!;
+    expect(deepWork.total).toBe(21);
   });
 });
 

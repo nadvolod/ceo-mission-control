@@ -12,7 +12,10 @@ describe('buildOverviewTrendSeries', () => {
     expect(series[0].deltaPct).toBeUndefined(); // can't compute delta with no data
   });
 
-  it('uses focus byCategory.Temporal/Revenue/Other for the 3 series', () => {
+  it('Deep Work series sums Other + Temporal point-wise', () => {
+    // Temporal hours ARE deep work — the v2 model is that Temporal is the
+    // strategic project tag, not a separate category of work. So each day's
+    // Deep Work data point should equal Other + Temporal.
     const focus = Array.from({ length: 14 }, (_, i) => ({
       date: `2026-05-${String(i + 1).padStart(2, '0')}`,
       totalHours: 0,
@@ -20,18 +23,27 @@ describe('buildOverviewTrendSeries', () => {
     }));
     const series = buildOverviewTrendSeries(focus, goals);
     expect(series[0].data.every((v) => v === 1)).toBe(true);   // Temporal
-    expect(series[1].data.every((v) => v === 2)).toBe(true);   // Deep work via Other
+    expect(series[1].data.every((v) => v === 3)).toBe(true);   // Deep work = Other (2) + Temporal (1)
     expect(series[2].data.every((v) => v === 0.5)).toBe(true); // Pipeline via Revenue
   });
 
-  it('uses focus-hours Other for Deep Work so trends match the v2 metric source', () => {
+  it('Deep Work falls back to Temporal alone when there are no Other hours', () => {
     const focus = Array.from({ length: 14 }, () => ({
       date: '2026-05-27',
-      byCategory: { Other: 2 },
+      byCategory: { Temporal: 2 },
     }));
     const series = buildOverviewTrendSeries(focus, goals);
     expect(series[1].label).toBe('DEEP WORK');
     expect(series[1].data.every((v) => v === 2)).toBe(true);
+  });
+
+  it('Deep Work falls back to Other alone when there are no Temporal hours', () => {
+    const focus = Array.from({ length: 14 }, () => ({
+      date: '2026-05-27',
+      byCategory: { Other: 1.5 },
+    }));
+    const series = buildOverviewTrendSeries(focus, goals);
+    expect(series[1].data.every((v) => v === 1.5)).toBe(true);
   });
 
   it('computes week-over-week delta correctly', () => {

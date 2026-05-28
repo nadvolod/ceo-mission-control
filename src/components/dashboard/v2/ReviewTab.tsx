@@ -172,24 +172,65 @@ function RatingsTrend({ trend }: { trend: RatingsTrendEntry[] }) {
       >
         Ratings trend ({trend.length} {trend.length === 1 ? 'month' : 'months'})
       </div>
-      <div className="grid gap-3" style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}>
+      {/*
+        Each rating gets its own card with the label and value stacked
+        vertically. Old layout was label-left / value-far-right inside a
+        wide column, which visually disconnected the two. The big colored
+        N/10 numeral now sits right under the label so the association is
+        unambiguous; the sparkline runs full-width below.
+
+        Min column width is 140px so the 140px-wide Sparkline doesn't clip
+        when the grid fits multiple columns at narrow viewports.
+      */}
+      <div
+        className="grid gap-2.5"
+        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}
+      >
         {RATING_KEYS.map(({ key, label, color }) => {
           const data = trend.map((t) => t[key]);
           const latest = data[data.length - 1];
           return (
-            <div key={key} className="flex flex-col gap-1.5" data-testid={`rating-${key}`}>
-              <div className="flex items-baseline justify-between">
-                <span
-                  className="font-numerics uppercase"
-                  style={{ fontSize: 10, letterSpacing: '0.08em', color: 'var(--color-mc-fg-muted)' }}
-                >
-                  {label}
+            <div
+              key={key}
+              className="flex flex-col gap-2 rounded-lg overflow-hidden"
+              style={{
+                padding: '12px 14px',
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.06)',
+              }}
+              data-testid={`rating-${key}`}
+            >
+              <span
+                className="font-numerics uppercase"
+                style={{
+                  fontSize: 10,
+                  letterSpacing: '0.08em',
+                  // fg-dim (not fg-muted) so the label pops on the dark surface.
+                  color: 'var(--color-mc-fg-dim)',
+                }}
+              >
+                {label}
+              </span>
+              <span className="font-numerics" style={{ fontSize: 22, color, lineHeight: 1 }}>
+                {latest}
+                <span style={{ fontSize: 12, color: 'var(--color-mc-fg-muted)', marginLeft: 2 }}>
+                  /10
                 </span>
-                <span className="font-numerics" style={{ fontSize: 12, color }}>
-                  {latest}/10
-                </span>
+              </span>
+              {/* Sparkline uses preserveAspectRatio='none' so the fixed
+                  140-wide viewBox stretches/shrinks to the available cell
+                  width. width:100% in CSS overrides the SVG width attr. */}
+              <div style={{ width: '100%' }}>
+                <Sparkline
+                  data={data}
+                  color={color}
+                  fill={color}
+                  height={24}
+                  width={140}
+                  strokeWidth={1.5}
+                  dots
+                />
               </div>
-              <Sparkline data={data} color={color} fill={color} height={28} width={160} strokeWidth={1.5} dots />
             </div>
           );
         })}

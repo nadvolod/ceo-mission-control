@@ -33,6 +33,18 @@ function metricForCategory(category?: string): MetricId {
   return 'deepWork';
 }
 
+// Descriptions matching these patterns are written by e2e tests. They
+// must never reach a real user's activity feed even if the test row
+// somehow survived in the DB. The right cleanup happens in the test
+// teardown / global-setup, but this is the last-line filter so a stale
+// row from a long-ago test run can't pollute the UI.
+const E2E_DESCRIPTION_RE = /^(e2e-|\[test\]|playwright[-_])/i;
+
+function isE2EDescription(description?: string | null): boolean {
+  if (!description) return false;
+  return E2E_DESCRIPTION_RE.test(description.trim());
+}
+
 function focusToActivity(s: FocusSessionLike): ActivityEntry {
   const m = metricForCategory(s.category);
   const hours = s.hours ?? 0;
@@ -71,10 +83,16 @@ export function deriveActivity(opts: {
   limit?: number;
 }): ActivityEntry[] {
   const { focus = [], financial = [], optimistic = [], limit = 25 } = opts;
+  // Drop e2e-test-authored rows before mapping. Belt-and-suspenders for
+  // when stale rows survive in the DB despite global-setup wiping the
+  // test user; the rule is documented in docs/dashboard-v2-architecture.md
+  // under R5 ("derive.ts filters e2e-authored rows from the activity feed").
+  const liveFocus = focus.filter((s) => !isE2EDescription(s.description));
+  const liveFinancial = financial.filter((e) => !isE2EDescription(e.description));
   const merged: ActivityEntry[] = [
     ...optimistic,
-    ...focus.map(focusToActivity),
-    ...financial.map(financialToActivity),
+    ...liveFocus.map(focusToActivity),
+    ...liveFinancial.map(financialToActivity),
   ];
   // Stable de-dup by id (optimistic entries land first and win).
   const seen = new Set<string>();
