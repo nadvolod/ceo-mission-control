@@ -106,10 +106,9 @@ export default function MissionControlV2Page() {
     });
   }, [weeklyTrackerData, monarchData]);
 
-  // Update the weekly Temporal target via the Temporal Focus card pencil.
-  // /api/weekly-tracker `submitReview` preserves prior review fields when
-  // called with just `temporalTarget` (verified in weekly-tracker.ts), so
-  // we can do a partial update without sending the full review body.
+  // Inline Temporal target edit (pencil on the Temporal Focus card). Partial
+  // POST: only `temporalTarget` is sent. submitWeeklyReview merges with the
+  // prior week's stored review and preserves text fields the caller omits.
   const onUpdateTemporalGoal = useCallback(
     async (newGoal: number) => {
       try {

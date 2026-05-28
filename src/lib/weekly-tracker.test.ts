@@ -202,9 +202,95 @@ describe('WeeklyTracker', () => {
         nextWeekTargets: 'z',
         bottleneck: 'b',
         temporalTarget: 5,
-      } as never);
+      });
       const reviews = tracker.getWeeklyReviews(1);
       expect(reviews[0].revenue ?? 0).toBe(0);
+    });
+
+    describe('partial update preserves prior fields (regression for Copilot PR-68 catch)', () => {
+      // Inline Temporal target edits only send `{ temporalTarget }`. Before
+      // the fix, omitted text fields were coerced to '' and overwrote the
+      // user's saved review notes.
+      it('partial { temporalTarget } preserves prior slipAnalysis/systemAdjustment/nextWeekTargets/bottleneck/revenue', async () => {
+        const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
+        await tracker.submitWeeklyReview({
+          revenue: 7500,
+          slipAnalysis: 'Skipped Mon mornings',
+          systemAdjustment: 'Block 6-8am',
+          nextWeekTargets: '4h deep work',
+          bottleneck: 'Email triage',
+          temporalTarget: 5,
+        });
+
+        await tracker.submitWeeklyReview({ temporalTarget: 8 });
+
+        const reviews = tracker.getWeeklyReviews(1);
+        expect(reviews[0].temporalTarget).toBe(8);
+        expect(reviews[0].revenue).toBe(7500);
+        expect(reviews[0].slipAnalysis).toBe('Skipped Mon mornings');
+        expect(reviews[0].systemAdjustment).toBe('Block 6-8am');
+        expect(reviews[0].nextWeekTargets).toBe('4h deep work');
+        expect(reviews[0].bottleneck).toBe('Email triage');
+      });
+
+      it('partial update without prior review for the week stores defaults', async () => {
+        const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
+        await tracker.submitWeeklyReview({ temporalTarget: 10 });
+        const reviews = tracker.getWeeklyReviews(1);
+        expect(reviews[0].temporalTarget).toBe(10);
+        expect(reviews[0].revenue).toBe(0);
+        expect(reviews[0].slipAnalysis).toBe('');
+        expect(reviews[0].systemAdjustment).toBe('');
+        expect(reviews[0].nextWeekTargets).toBe('');
+        expect(reviews[0].bottleneck).toBe('');
+      });
+
+      it('explicit empty string clears a field intentionally (not treated as omitted)', async () => {
+        const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
+        await tracker.submitWeeklyReview({
+          revenue: 1000,
+          slipAnalysis: 'old slip',
+          systemAdjustment: 'old adj',
+          nextWeekTargets: 'old targets',
+          bottleneck: 'old bottleneck',
+          temporalTarget: 5,
+        });
+
+        await tracker.submitWeeklyReview({
+          slipAnalysis: '',
+          systemAdjustment: 'old adj',
+          nextWeekTargets: 'old targets',
+          bottleneck: 'old bottleneck',
+          temporalTarget: 5,
+        });
+
+        const reviews = tracker.getWeeklyReviews(1);
+        expect(reviews[0].slipAnalysis).toBe('');
+        expect(reviews[0].systemAdjustment).toBe('old adj');
+        expect(reviews[0].revenue).toBe(1000);
+      });
+
+      it('omitted temporalTarget preserves prior target instead of resetting to 5', async () => {
+        const tracker = await WeeklyTracker.create(UNIT_TEST_OWNER_ID);
+        await tracker.submitWeeklyReview({
+          revenue: 0,
+          slipAnalysis: '',
+          systemAdjustment: '',
+          nextWeekTargets: '',
+          bottleneck: '',
+          temporalTarget: 12,
+        });
+
+        await tracker.submitWeeklyReview({
+          revenue: 2000,
+          slipAnalysis: 'new slip',
+        });
+
+        const reviews = tracker.getWeeklyReviews(1);
+        expect(reviews[0].temporalTarget).toBe(12);
+        expect(reviews[0].revenue).toBe(2000);
+        expect(reviews[0].slipAnalysis).toBe('new slip');
+      });
     });
   });
 

@@ -144,13 +144,17 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        // Forward undefined for omitted fields so submitWeeklyReview can
+        // preserve prior values (partial-update support). Coercing missing
+        // fields to '' / 5 here would silently wipe the user's saved review
+        // notes when callers (e.g. inline target edit) only send temporalTarget.
         const review = await tracker.submitWeeklyReview({
           revenue,
-          slipAnalysis: slipAnalysis || '',
-          systemAdjustment: systemAdjustment || '',
-          nextWeekTargets: nextWeekTargets || '',
-          bottleneck: bottleneck || '',
-          temporalTarget: temporalTarget ?? 5,
+          slipAnalysis,
+          systemAdjustment,
+          nextWeekTargets,
+          bottleneck,
+          temporalTarget,
           weekStartDate,
           weekEndDate,
         });

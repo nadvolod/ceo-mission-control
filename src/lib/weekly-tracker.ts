@@ -139,10 +139,10 @@ export class WeeklyTracker {
   }
 
   async submitWeeklyReview(review: {
-    slipAnalysis: string;
-    systemAdjustment: string;
-    nextWeekTargets: string;
-    bottleneck: string;
+    slipAnalysis?: string;
+    systemAdjustment?: string;
+    nextWeekTargets?: string;
+    bottleneck?: string;
     temporalTarget?: number;
     revenue?: number;
     weekStartDate?: string;
@@ -155,20 +155,29 @@ export class WeeklyTracker {
     const now = new Date();
     const weekStart = review.weekStartDate || format(startOfWeek(now, { weekStartsOn: 0 }), 'yyyy-MM-dd');
     const weekEnd = review.weekEndDate || format(endOfWeek(now, { weekStartsOn: 0 }), 'yyyy-MM-dd');
-    // Preserve any prior revenue for this week if the caller omitted it (e.g. inline target edit)
+    // Partial-update support: when a caller omits a field, preserve the prior
+    // value stored for this week. Without this, inline target edits would wipe
+    // the user's saved review notes (slipAnalysis/systemAdjustment/etc.) with
+    // empty strings. `??` (not `||`) so an explicit '' from the caller still
+    // clears a field intentionally.
     const existingForWeek = this.data.weeklyReviews.find(r => r.weekStartDate === weekStart);
     const revenue = review.revenue ?? existingForWeek?.revenue ?? 0;
+    const temporalTargetValid =
+      typeof review.temporalTarget === 'number' && isFinite(review.temporalTarget) && review.temporalTarget >= 0;
+    const temporalTarget = temporalTargetValid
+      ? (review.temporalTarget as number)
+      : existingForWeek?.temporalTarget ?? 5;
 
     const fullReview: WeeklyReview = {
       id: `review_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`,
       weekStartDate: weekStart,
       weekEndDate: weekEnd,
       revenue,
-      slipAnalysis: review.slipAnalysis || '',
-      systemAdjustment: review.systemAdjustment || '',
-      nextWeekTargets: review.nextWeekTargets || '',
-      bottleneck: review.bottleneck || '',
-      temporalTarget: typeof review.temporalTarget === 'number' && isFinite(review.temporalTarget) && review.temporalTarget >= 0 ? review.temporalTarget : 5,
+      slipAnalysis: review.slipAnalysis ?? existingForWeek?.slipAnalysis ?? '',
+      systemAdjustment: review.systemAdjustment ?? existingForWeek?.systemAdjustment ?? '',
+      nextWeekTargets: review.nextWeekTargets ?? existingForWeek?.nextWeekTargets ?? '',
+      bottleneck: review.bottleneck ?? existingForWeek?.bottleneck ?? '',
+      temporalTarget,
       createdAt: now.toISOString(),
     };
 
