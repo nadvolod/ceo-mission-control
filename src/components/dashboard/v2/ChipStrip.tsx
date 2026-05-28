@@ -1,7 +1,7 @@
 'use client';
 
 import { ArrowUp, Flame, Zap } from 'lucide-react';
-import type { Chip } from './seed';
+import type { Chip } from './palette';
 
 export function ChipStrip({ chips }: { chips: Chip[] }) {
   return (

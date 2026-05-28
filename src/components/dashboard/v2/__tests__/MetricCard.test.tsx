@@ -1,6 +1,7 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { MetricCard } from '../MetricCard';
-import { SEED_METRICS, SEED_SPARKS, MC_COLORS } from '../seed';
+import { __FIXTURE_METRICS as SEED_METRICS, __FIXTURE_SPARKS as SEED_SPARKS } from './__fixtures__';
+import { MC_COLORS } from '../palette';
 
 describe('MetricCard', () => {
   it('renders label, formatted value, and goal badge for a goal-bearing metric', () => {

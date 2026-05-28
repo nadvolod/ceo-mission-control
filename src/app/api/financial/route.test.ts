@@ -61,4 +61,31 @@ describe('/api/financial GET', () => {
     expect(Array.isArray(body.dailyFinancialTrend)).toBe(true);
     expect(body.dailyFinancialTrend).toHaveLength(30);
   });
+
+  it('anchors all today/week/trend snapshots to the client date param', async () => {
+    storage.loadJSON.mockResolvedValueOnce({
+      dailyMetrics: {
+        '2026-05-23': {
+          date: '2026-05-23',
+          entries: [{ id: 'sat', amount: 100, description: 'local Saturday', timestamp: '2026-05-23T20:00:00.000Z', category: 'generated' }],
+          totals: { moved: 0, generated: 100, cut: 0, netImpact: 100 },
+        },
+        '2026-05-24': {
+          date: '2026-05-24',
+          entries: [{ id: 'sun', amount: 250, description: 'future local day', timestamp: '2026-05-24T01:00:00.000Z', category: 'generated' }],
+          totals: { moved: 0, generated: 250, cut: 0, netImpact: 250 },
+        },
+      },
+      lastUpdated: new Date().toISOString(),
+    });
+
+    const response = await GET(new NextRequest('http://localhost/?date=2026-05-23'));
+    const body = await response.json();
+
+    expect(body.todaysMetrics.date).toBe('2026-05-23');
+    expect(body.todaysMetrics.totals.generated).toBe(100);
+    expect(body.weeklyTotals.generated).toBe(100);
+    expect(body.weekFinancialByDay.at(-1).date).toBe('2026-05-23');
+    expect(body.dailyFinancialTrend.at(-1).date).toBe('2026-05-23');
+  });
 });

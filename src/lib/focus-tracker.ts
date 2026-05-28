@@ -1,6 +1,7 @@
 import { startOfWeek, subWeeks, format, subDays } from 'date-fns';
 import type { FocusCategory, FocusSession, DailyFocusMetrics, FocusData } from './types';
 import { loadJSON, saveJSON } from './storage';
+import { isLocalDateKey, localDate } from './dates';
 
 const VALID_CATEGORIES: FocusCategory[] = [
   'Temporal', 'Finance', 'Revenue', 'Housing',
@@ -87,7 +88,19 @@ export class FocusTracker {
       category = 'Other';
     }
 
-    const sessionDate = date || new Date().toISOString().split('T')[0];
+    // Prefer the caller-provided date (the v2 client sends its local
+    // YYYY-MM-DD); fall back to the server's local zone. UTC was the old
+    // default and caused evening logs in EST to land on the next day.
+    //
+    // Validate before using as an object key — `dailyMetrics` is a plain
+    // object so a malformed key like "__proto__" would mutate the
+    // prototype chain. isLocalDateKey rejects anything that isn't a real
+    // calendar date in YYYY-MM-DD form.
+    const candidate = date ?? localDate();
+    if (!isLocalDateKey(candidate)) {
+      throw new Error(`Invalid date: expected YYYY-MM-DD (received ${candidate})`);
+    }
+    const sessionDate = candidate;
     const now = new Date().toISOString();
 
     const session: FocusSession = {
@@ -134,8 +147,11 @@ export class FocusTracker {
     day.byCategory = byCategory;
   }
 
-  getTodaysMetrics(): DailyFocusMetrics {
-    const today = new Date().toISOString().split('T')[0];
+  // `todayKey` is optional so callers (route handlers, tests) can pin
+  // today to the user's local day. When omitted we fall back to the
+  // server runtime's local zone — never UTC.
+  getTodaysMetrics(todayKey?: string): DailyFocusMetrics {
+    const today = todayKey || localDate();
     return this.data.dailyMetrics[today] || {
       date: today,
       sessions: [],
@@ -144,15 +160,19 @@ export class FocusTracker {
     };
   }
 
-  getWeeklyTotals(): Record<string, number> {
-    const now = new Date();
-    const weekStart = startOfWeek(now, { weekStartsOn: 0 }); // Sunday (US convention)
-    return this.getTotalsForPeriod(weekStart, now);
+  private anchorDate(todayKey?: string): Date {
+    return todayKey ? new Date(`${todayKey}T12:00:00`) : new Date();
   }
 
-  getPreviousWeekTotals(): Record<string, number> {
-    const now = new Date();
-    const thisWeekStart = startOfWeek(now, { weekStartsOn: 0 });
+  getWeeklyTotals(todayKey?: string): Record<string, number> {
+    const anchor = this.anchorDate(todayKey);
+    const weekStart = startOfWeek(anchor, { weekStartsOn: 0 }); // Sunday (US convention)
+    return this.getTotalsForPeriod(weekStart, anchor);
+  }
+
+  getPreviousWeekTotals(todayKey?: string): Record<string, number> {
+    const anchor = this.anchorDate(todayKey);
+    const thisWeekStart = startOfWeek(anchor, { weekStartsOn: 0 });
     const prevWeekStart = subWeeks(thisWeekStart, 1);
     return this.getTotalsForPeriod(prevWeekStart, subDays(thisWeekStart, 1));
   }
@@ -173,15 +193,15 @@ export class FocusTracker {
     return totals;
   }
 
-  getWeekOverWeekGrowth(): {
+  getWeekOverWeekGrowth(todayKey?: string): {
     currentTotal: number;
     previousTotal: number;
     absoluteChange: number;
     percentageChange: number;
     byCategoryChange: Record<string, { current: number; previous: number; change: number }>;
   } {
-    const current = this.getWeeklyTotals();
-    const previous = this.getPreviousWeekTotals();
+    const current = this.getWeeklyTotals(todayKey);
+    const previous = this.getPreviousWeekTotals(todayKey);
 
     const currentTotal = Object.values(current).reduce((sum, h) => sum + h, 0);
     const previousTotal = Object.values(previous).reduce((sum, h) => sum + h, 0);
@@ -202,12 +222,12 @@ export class FocusTracker {
     return { currentTotal, previousTotal, absoluteChange, percentageChange, byCategoryChange };
   }
 
-  getDailyTrend(days: number = 30): Array<{ date: string; totalHours: number; byCategory: Record<string, number> }> {
+  getDailyTrend(days: number = 30, todayKey?: string): Array<{ date: string; totalHours: number; byCategory: Record<string, number> }> {
     const trend: Array<{ date: string; totalHours: number; byCategory: Record<string, number> }> = [];
-    const now = new Date();
+    const anchor = this.anchorDate(todayKey);
 
     for (let i = days - 1; i >= 0; i--) {
-      const date = format(subDays(now, i), 'yyyy-MM-dd');
+      const date = format(subDays(anchor, i), 'yyyy-MM-dd');
       const day = this.data.dailyMetrics[date];
 
       trend.push({
@@ -220,8 +240,8 @@ export class FocusTracker {
     return trend;
   }
 
-  getRollingAverage(days: number = 30, windowSize: number = 7): Array<{ date: string; average: number }> {
-    const trend = this.getDailyTrend(days + windowSize - 1);
+  getRollingAverage(days: number = 30, windowSize: number = 7, todayKey?: string): Array<{ date: string; average: number }> {
+    const trend = this.getDailyTrend(days + windowSize - 1, todayKey);
     const result: Array<{ date: string; average: number }> = [];
 
     for (let i = windowSize - 1; i < trend.length; i++) {

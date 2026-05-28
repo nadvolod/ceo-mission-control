@@ -70,6 +70,35 @@ describe('FinancialTracker.recalculateTotals (cent-based accumulation)', () => {
     expect(today.totals).toEqual({ moved: 0, generated: 0, cut: 0, netImpact: 0 });
   });
 
+  it('getTodaysMetrics(todayKey) returns the requested local day, not UTC', async () => {
+    // Regression for the EST timezone bug: a v2 client at 9pm EST sees
+    // local date 2026-05-27 but UTC's date is already 2026-05-28. The
+    // tracker must honor the caller's date so the snapshot matches the
+    // user's wall clock.
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
+    await tracker.addEntry('moved', 100, 'wire to brokerage', '2026-05-27');
+    await tracker.addEntry('generated', 250, 'contract', '2026-05-28');
+
+    const may27 = tracker.getTodaysMetrics('2026-05-27');
+    expect(may27.totals.moved).toBe(100);
+    expect(may27.totals.netImpact).toBe(100);
+
+    const may28 = tracker.getTodaysMetrics('2026-05-28');
+    expect(may28.totals.generated).toBe(250);
+    expect(may28.totals.netImpact).toBe(250);
+  });
+
+  it('getWeeklyTotals(todayKey) does not include entries after the caller local day', async () => {
+    const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
+    await tracker.addEntry('generated', 100, 'local Saturday', '2026-05-23');
+    await tracker.addEntry('generated', 250, 'UTC Sunday but local future', '2026-05-24');
+
+    expect(tracker.getWeeklyTotals('2026-05-23')).toMatchObject({
+      generated: 100,
+      netImpact: 100,
+    });
+  });
+
   it('three categories on the same day produce netImpact = moved + generated + cut exactly', async () => {
     const tracker = await FinancialTracker.create(UNIT_TEST_OWNER_ID);
     await tracker.addEntry('moved', 0.1, 'm1', DATE);

@@ -2,8 +2,24 @@
 
 import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { useDashboardData } from '@/hooks/useDashboardData';
-import { SEED_METRICS, SEED_SPARKS } from './seed';
+import { localDate } from '@/lib/dates';
+import { METRIC_ACCENTS } from './palette';
 import type { ActivityEntry, MetricId, MetricSnapshot } from './types';
+
+// Display labels for the activity feed. These are presentational and
+// don't carry any user data, so they're safe to hard-code.
+const METRIC_LABELS: Record<MetricId, string> = {
+  cash:       'Cash',
+  cashMoM:    'Cash MoM',
+  netWorth:   'Net worth',
+  debt:       'Total debt',
+  temporal:   'Temporal',
+  focus:      'Focus hours',
+  moneyMoved: 'Money moved',
+  pipeline:   'Pipeline',
+  deepWork:   'Deep work',
+  trained:    'Trained',
+};
 
 // ----- Action mapping -----------------------------------------------------
 //
@@ -14,6 +30,9 @@ import type { ActivityEntry, MetricId, MetricSnapshot } from './types';
 type LogResult = { ok: true } | { ok: false; error: string };
 
 async function postLog(metricId: MetricId, delta: number, label: string): Promise<LogResult> {
+  // Pin the row to the user's local day. Every POST body carries this
+  // so an evening log in EST doesn't land on tomorrow per UTC clocks.
+  const today = localDate();
   try {
     if (metricId === 'temporal') {
       const res = await fetch('/api/focus-hours', {
@@ -24,6 +43,7 @@ async function postLog(metricId: MetricId, delta: number, label: string): Promis
           category: 'Temporal',
           hours: delta,
           description: `${label.trim()} Temporal · Mission Control`,
+          date: today,
         }),
       });
       if (!res.ok) {
@@ -45,6 +65,7 @@ async function postLog(metricId: MetricId, delta: number, label: string): Promis
           category,
           amount: delta,
           description: `${label.trim()} via Mission Control`,
+          date: today,
         }),
       });
       if (!res.ok) {
@@ -63,6 +84,7 @@ async function postLog(metricId: MetricId, delta: number, label: string): Promis
           category: 'Other',
           hours: delta,
           description: `${label.trim()} Deep work · Mission Control`,
+          date: today,
         }),
       });
       if (!res.ok) {
@@ -81,6 +103,7 @@ async function postLog(metricId: MetricId, delta: number, label: string): Promis
           category: 'Revenue',
           hours: delta,
           description: `${label.trim()} Pipeline · Mission Control`,
+          date: today,
         }),
       });
       if (!res.ok) {
@@ -99,7 +122,7 @@ async function postLog(metricId: MetricId, delta: number, label: string): Promis
           deepWorkDelta: 0,
           pipelineDelta: 0,
           setTrained: true,
-          date: localDateKey(),
+          date: today,
         }),
       });
       if (!res.ok) {
@@ -185,10 +208,6 @@ function hhmm(d: Date = new Date()): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
-function localDateKey(d: Date = new Date()): string {
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-}
-
 // ----- Public hook -------------------------------------------------------
 
 export function useMissionStore() {
@@ -202,17 +221,36 @@ export function useMissionStore() {
   }, [dashboard.loadAllData]);
 
   const baseMetrics: Record<MetricId, MetricSnapshot> = useMemo(() => {
+    // Empty defaults. No fake user values, no fake spark series. The UI
+    // renders an empty/loading state until real data arrives. (Previously
+    // this seeded with the design-handoff sample numbers — $35.3K cash,
+    // 6.5h temporal — which leaked into real users' screens.)
+    const make = (
+      id: MetricId,
+      unit: MetricSnapshot['unit'],
+      fmt: MetricSnapshot['fmt'],
+      extras: Partial<MetricSnapshot> = {},
+    ): MetricSnapshot => ({
+      id,
+      label: METRIC_LABELS[id],
+      unit,
+      fmt,
+      today: 0,
+      color: METRIC_ACCENTS[id],
+      ...extras,
+    });
+
     const base: Record<MetricId, MetricSnapshot> = {
-      cash:       { ...SEED_METRICS.cash,       spark: [...SEED_SPARKS.cash] },
-      cashMoM:    { ...SEED_METRICS.cashMoM },
-      netWorth:   { ...SEED_METRICS.netWorth,   spark: [...SEED_SPARKS.netWorth] },
-      debt:       { ...SEED_METRICS.debt },
-      temporal:   { ...SEED_METRICS.temporal,   spark: [...SEED_SPARKS.temporal] },
-      focus:      { ...SEED_METRICS.focus },
-      moneyMoved: { ...SEED_METRICS.moneyMoved, spark: [...SEED_SPARKS.moneyMoved] },
-      pipeline:   { ...SEED_METRICS.pipeline,   spark: [...SEED_SPARKS.pipeline] },
-      deepWork:   { ...SEED_METRICS.deepWork,   spark: [...SEED_SPARKS.deepWork] },
-      trained:    { ...SEED_METRICS.trained },
+      cash:       make('cash',       '$', 'money'),
+      cashMoM:    make('cashMoM',    '%', 'pct'),
+      netWorth:   make('netWorth',   '$', 'money'),
+      debt:       make('debt',       '$', 'money'),
+      temporal:   make('temporal',   'h', 'hours', { goal: 5,  note: 'this week' }),
+      focus:      make('focus',      'h', 'hours', { goal: 15, note: 'this week' }),
+      moneyMoved: make('moneyMoved', '$', 'money', { note: 'this week' }),
+      pipeline:   make('pipeline',   'h', 'hours', { goal: 3,  note: 'this week' }),
+      deepWork:   make('deepWork',   'h', 'hours', { goal: 10, note: 'this week' }),
+      trained:    make('trained',    '×', 'count', { goal: 4,  note: 'this week' }),
     };
 
     if (monarchData) {
@@ -224,16 +262,15 @@ export function useMissionStore() {
       base.debt.today = monarchData.totalLiabilities;
     }
 
-    const todayFocus = focusData?.todaysMetrics;
-    const todayByCat = todayFocus?.byCategory ?? {};
+    const todayByCat = focusData?.todaysMetrics?.byCategory ?? {};
     const weeklyByCat = focusData?.weeklyTotals ?? {};
-    base.temporal.today = todayByCat.Temporal ?? base.temporal.today;
-    base.temporal.week = weeklyByCat.Temporal ?? base.temporal.week;
-    base.pipeline.today = todayByCat.Revenue ?? base.pipeline.today;
-    base.pipeline.week = weeklyByCat.Revenue ?? base.pipeline.week;
+    base.temporal.today = todayByCat.Temporal ?? 0;
+    base.temporal.week = weeklyByCat.Temporal;
+    base.pipeline.today = todayByCat.Revenue ?? 0;
+    base.pipeline.week = weeklyByCat.Revenue;
     // Deep work uses focus-hours "Other" by convention (no dedicated category).
-    base.deepWork.today = todayByCat.Other ?? base.deepWork.today;
-    base.deepWork.week = weeklyByCat.Other ?? base.deepWork.week;
+    base.deepWork.today = todayByCat.Other ?? 0;
+    base.deepWork.week = weeklyByCat.Other;
 
     const finToday = financialData?.todaysMetrics?.totals;
     if (finToday) {
@@ -268,7 +305,7 @@ export function useMissionStore() {
         t: hhmm(),
         kind: metricId,
         delta: label,
-        label: SEED_METRICS[metricId]?.label || metricId,
+        label: METRIC_LABELS[metricId],
         meta: 'Quick log',
       };
       dispatch({ type: 'optimistic', metricId, delta, entry });

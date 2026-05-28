@@ -19,14 +19,63 @@ jest.mock('./storage', () => {
 const storage = require('./storage');
 
 import { FocusTracker } from './focus-tracker';
+import { localDate } from './dates';
 import { UNIT_TEST_OWNER_ID } from '@/__tests__/utils/owner-id';
 
-const TODAY = new Date().toISOString().split('T')[0];
+// Use the same local-day helper production code uses. The old form
+// (`new Date().toISOString().split('T')[0]`) was UTC and the source of
+// the timezone bug this PR fixes — keeping it here would mean the test
+// passes for the wrong reason near a UTC midnight boundary.
+const TODAY = localDate();
 
 describe('FocusTracker', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     storage._reset();
+  });
+
+  // Regression for the timezone bug: at 9pm EST the local day differs from
+  // UTC's day. The tracker must let the caller (route handler) pin "today"
+  // to the user's local date instead of falling back to UTC.
+  describe('getTodaysMetrics(todayKey) honors the caller-provided local day', () => {
+    it('returns the requested day even when it differs from UTC today', async () => {
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
+      await tracker.addSession('Temporal', 1, 'evening block', '2026-05-27');
+      await tracker.addSession('Temporal', 2, 'morning block', '2026-05-28');
+
+      const may27 = tracker.getTodaysMetrics('2026-05-27');
+      expect(may27.totalHours).toBe(1);
+      expect(may27.byCategory.Temporal).toBe(1);
+
+      const may28 = tracker.getTodaysMetrics('2026-05-28');
+      expect(may28.totalHours).toBe(2);
+      expect(may28.byCategory.Temporal).toBe(2);
+    });
+
+    it('returns an empty day shape when the requested day has no sessions', async () => {
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
+      const empty = tracker.getTodaysMetrics('2026-05-27');
+      expect(empty.totalHours).toBe(0);
+      expect(empty.byCategory).toEqual({});
+      expect(empty.date).toBe('2026-05-27');
+    });
+  });
+
+  describe('date-anchored aggregates', () => {
+    it('uses the caller-provided local day for weekly totals and trends', async () => {
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
+      await tracker.addSession('Temporal', 2, 'local Saturday', '2026-05-23');
+      await tracker.addSession('Temporal', 3, 'UTC Sunday but local future', '2026-05-24');
+
+      expect(tracker.getWeeklyTotals('2026-05-23').Temporal).toBe(2);
+      expect(tracker.getDailyTrend(2, '2026-05-23').map((d) => d.date)).toEqual([
+        '2026-05-22',
+        '2026-05-23',
+      ]);
+      expect(tracker.getRollingAverage(1, 1, '2026-05-23')).toEqual([
+        { date: '2026-05-23', average: 2 },
+      ]);
+    });
   });
 
   describe('addSession', () => {

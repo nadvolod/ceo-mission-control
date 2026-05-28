@@ -40,6 +40,43 @@ describe('useMissionStore.log', () => {
     expect(mockLoadAllData).toHaveBeenCalled();
   });
 
+  // Every log POST must carry the client's local YYYY-MM-DD so the server
+  // doesn't fall back to UTC and put the row on the wrong day. If any of
+  // the four log paths regresses this guarantee, the matching assertion
+  // below will fail.
+  describe('every log path includes the client-local date', () => {
+    const cases = [
+      ['temporal',   '/api/focus-hours',  1,    '+1h']        as const,
+      ['deepWork',   '/api/focus-hours',  0.5,  '+0.5h']      as const,
+      ['pipeline',   '/api/focus-hours',  0.5,  '+ Call']     as const,
+      ['moneyMoved', '/api/financial',    500,  '+ Moved']    as const,
+      ['trained',    '/api/weekly-tracker', 1,  '+ Session']  as const,
+    ];
+    it.each(cases)('%s → %s POST body has date YYYY-MM-DD', async (metricId, endpoint, delta, label) => {
+      const { result } = renderHook(() => useMissionStore());
+      await act(async () => {
+        await result.current.log(metricId, delta, label);
+      });
+      const call = (global.fetch as jest.Mock).mock.calls.find(([url]) => url === endpoint);
+      expect(call).toBeDefined();
+      const body = JSON.parse(call![1].body);
+      expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+  });
+
+  // Hard rule: with all data sources empty (no Monarch, no focus, no
+  // financial), no metric value should be non-zero. This is the regression
+  // test for the fake-data leak that put $35.3K cash on every screen.
+  it('initial metric snapshots are zero/empty when no data has loaded', () => {
+    const { result } = renderHook(() => useMissionStore());
+    for (const m of Object.values(result.current.metrics)) {
+      expect(m.today).toBe(0);
+      expect(m.week).toBeUndefined();
+      expect(m.spark).toBeUndefined();
+    }
+    expect(result.current.activity).toEqual([]);
+  });
+
   it('posts to /api/financial with the right category from the label', async () => {
     const { result } = renderHook(() => useMissionStore());
     await act(async () => {

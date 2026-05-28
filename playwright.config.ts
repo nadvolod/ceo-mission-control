@@ -26,7 +26,11 @@ export default defineConfig({
   testDir: './tests/e2e',
   timeout: 30_000,
   expect: { timeout: 10_000 },
-  fullyParallel: true,
+  // E2E runs authenticate as one real DB-backed test user. Keep the suite
+  // single-worker so specs that mutate that user's rows cannot race each other
+  // or invalidate another spec's empty-state precondition.
+  fullyParallel: false,
+  workers: 1,
   retries: 1,
   reporter: 'list',
   globalSetup: './tests/e2e/global-setup.ts',
