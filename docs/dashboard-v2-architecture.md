@@ -1,9 +1,10 @@
 # Mission Control v2 — Architecture Reference
 
-The v2 dashboard at `/dashboard/v2` is a redesign of `/dashboard` that lives
-alongside the legacy page. Both routes share the same data layer; v2 only
-changes the UI shell, the optimistic logging path, and the dark-skin
-primitives. This doc is the map.
+The v2 dashboard is now the default at `/dashboard`. The legacy dashboard
+lives at `/dashboard/legacy` (still served from the same data layer; v2
+only changes the UI shell, the optimistic logging path, and the dark-skin
+primitives). `/dashboard/v2` redirects to `/dashboard` for backwards
+compatibility with bookmarks and external links. This doc is the map.
 
 ---
 
@@ -12,8 +13,9 @@ primitives. This doc is the map.
 ```
 src/
 ├── app/dashboard/
-│   ├── page.tsx                       # legacy /dashboard (untouched)
-│   └── v2/page.tsx                    # new /dashboard/v2 shell
+│   ├── page.tsx                       # v2 default /dashboard shell
+│   ├── legacy/page.tsx                # old legacy /dashboard/legacy
+│   └── v2/page.tsx                    # permanent redirect → /dashboard
 ├── components/dashboard/v2/
 │   ├── primitives/
 │   │   ├── Aurora.tsx                 # page backdrop (radial gradient)
@@ -76,9 +78,9 @@ src/
   │           threeToThriveData, plus handle* mutations  │
   └──────────────────────────────────────────────────────┘
                             ▲
-                            │ used directly by /dashboard
+                            │ used directly by /dashboard/legacy
                             │ wrapped by useMissionStore
-                            │ for /dashboard/v2
+                            │ for /dashboard (the v2 default)
                             ▲
   ┌──────────── useMissionStore (v2-only) ─────────────┐
   │  - flattens metric data into MetricSnapshot map      │
@@ -92,7 +94,7 @@ src/
   └──────────────────────────────────────────────────────┘
                             ▲
                             │
-              src/app/dashboard/v2/page.tsx
+              src/app/dashboard/page.tsx       (route: /dashboard)
               ── ChipStrip, MetricCard grid, CmdK,
                  ReflectionDrawer, Tab body
                  (Overview | Insights | Review)
@@ -183,7 +185,7 @@ If a UI surface has no data, it must render an **empty state**, not a fallback t
 | Lint                                 | `npx eslint src tests`                                               |
 | E2E (needs DATABASE_URL + secrets)   | `npx playwright test`                                                |
 | Visual parity vs. legacy `/dashboard`| Manual: open both routes side-by-side, log on one, refresh the other |
-| Production build                     | `npx next build` — `/dashboard/v2` registers as `○ static`            |
+| Production build                     | `npx next build` — `/dashboard`, `/dashboard/legacy`, `/dashboard/v2` all register as `○ static` |
 
 ---
 
@@ -197,18 +199,24 @@ The following are tracked as separate work, **not** addressed by the v2 PR chain
 - `src/components/HealthIntelligenceDashboard.tsx:34` — health-data cutoff uses UTC.
 - `src/lib/workspace-reader.ts:82` — scorecard markdown date fallback uses UTC.
 - The "trained" preset uses `addToDay` which is additive but reads/writes a single day's `PerformanceDayEntry`. If a future preset needs to write `deepWorkHours` / `pipelineActions` from v2 without overwriting the others, it should also use `addToDay` (which the lib supports) — not `logDay` (set-not-add).
-- Insights & Review are read-only. Edit/submit flows still live in `/dashboard`. When we flip the default route, those flows need to land in v2 too.
+- Insights & Review are read-only. Submit/edit flows for monthly reviews and weekly logs still live on the legacy dashboard at `/dashboard/legacy`. Migrating them to v2 is a separate work item.
+- Impersonation (`/as/[role]/dashboard`) still renders the LEGACY page. The impersonation banner has been visually validated against it; migrating impersonation to v2 needs the banner to be re-checked against the new dark shell.
 
 ---
 
-## 6 · Switching `/dashboard` over to v2
+## 6 · Route topology after the flip
 
-When the team is ready:
+Done in PR #67 (this PR):
 
-1. Move `src/app/dashboard/page.tsx` → `src/app/dashboard/legacy/page.tsx` (or delete).
-2. Move `src/app/dashboard/v2/page.tsx` → `src/app/dashboard/page.tsx`.
-3. Remove the `Link href="/dashboard"` "← Old dashboard" pill in the header.
-4. Update any tests that still navigate to `/dashboard/v2`.
-5. Update `tests/e2e/dashboard-v2.spec.ts` paths.
+- **`/dashboard`** — v2 dashboard (the new default). Source: `src/app/dashboard/page.tsx`.
+- **`/dashboard/legacy`** — old dashboard. Source: `src/app/dashboard/legacy/page.tsx`. Linked from the v2 header via a "Legacy" pill (data-testid `legacy-dashboard-link`). Still imported by impersonation (`src/app/as/[role]/dashboard/page.tsx`) and the older `src/components/__tests__/DashboardPage.test.tsx` jest suite.
+- **`/dashboard/v2`** — permanent redirect to `/dashboard` (server-side `redirect()` from `next/navigation`). Kept so old bookmarks and external links resolve. Remove the redirect file once we're confident no external references point at the v2 path.
 
-The Playwright `parity` test in the spec is the canary — it asserts that `/dashboard/v2` shows the same Temporal hours as `/api/focus-hours` returns. As long as that test passes, the two routes are observing the same data.
+The Playwright `parity` test in `dashboard-v2.spec.ts` is the canary — it asserts that `/dashboard` shows the same Temporal hours as `/api/focus-hours` returns. As long as that test passes, the dashboard and the API are observing the same data.
+
+### Future cleanup
+
+- Migrate impersonation to v2 (re-test the banner against the dark shell).
+- Migrate the DashboardPage jest suite to point at v2 or delete it (the v2 surface has its own tests under `src/components/dashboard/v2/__tests__`).
+- Delete `src/app/dashboard/v2/page.tsx` (the redirect stub) after a release or two.
+- Delete `src/app/dashboard/legacy/page.tsx` once impersonation is migrated and no one is relying on the legacy UI.

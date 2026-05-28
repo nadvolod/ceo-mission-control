@@ -39,12 +39,14 @@ function waitForFocusHoursPost(page: Page) {
   );
 }
 
-// These tests exercise the new /dashboard/v2 surface end-to-end:
+// These tests exercise the v2 dashboard (now the default at /dashboard
+// after the v2-default route flip; the legacy dashboard moved to
+// /dashboard/legacy) end-to-end:
 //   1. Shell renders and opens the logging palette
 //   2. ⌘K opens, filters, runs a temporal log → server persists it
-//   3. Hover preset on a MetricCard logs to the same data source as /dashboard
+//   3. Hover preset on a MetricCard logs to the focus-hours data source
 //   4. Reflection drawer auto-saves an answer that survives a reload
-//   5. Same data shows on /dashboard and /dashboard/v2 (parity check)
+//   5. The v2 card value matches the /api/focus-hours read (parity check)
 //
 // They use the shared test user from global-setup.ts (rows wiped each run).
 
@@ -60,7 +62,7 @@ test.describe('Mission Control v2', () => {
   test.describe.configure({ mode: 'serial', retries: 0 });
 
   test('renders the new shell and opens the log command palette', async ({ page }) => {
-    const response = await page.goto('/dashboard/v2');
+    const response = await page.goto('/dashboard');
     expect(response?.status()).toBeLessThan(400);
 
     // Brand mark + wordmark. Scope to the desktop tree — the mobile layout
@@ -96,7 +98,7 @@ test.describe('Mission Control v2', () => {
   // someone ran it after a logging test" into a loud failure instead of a
   // silent pass.
   test('empty test user sees no fake activity rows (no SEED_ACTIVITY leak)', async ({ page }) => {
-    await page.goto('/dashboard/v2');
+    await page.goto('/dashboard');
 
     const focus = await readFocusHoursFromPage(page);
     const serverIsEmpty =
@@ -124,7 +126,7 @@ test.describe('Mission Control v2', () => {
   });
 
   test('⌘K opens the palette, filters by keyword, and Esc closes it', async ({ page }) => {
-    await page.goto('/dashboard/v2');
+    await page.goto('/dashboard');
     await page.getByTestId('cmdk-trigger').click();
 
     const dialog = page.getByTestId('cmdk-dialog');
@@ -140,7 +142,7 @@ test.describe('Mission Control v2', () => {
   });
 
   test('⌘K Enter logs +1h Temporal — server records the session', async ({ page }) => {
-    await page.goto('/dashboard/v2');
+    await page.goto('/dashboard');
 
     // Open palette, filter to "+1h temporal", press Enter.
     await page.getByTestId('cmdk-trigger').click();
@@ -165,7 +167,7 @@ test.describe('Mission Control v2', () => {
   });
 
   test('hover preset on the Pipeline card logs +Call to focus-hours', async ({ page }) => {
-    await page.goto('/dashboard/v2');
+    await page.goto('/dashboard');
 
     const card = page.getByTestId('metric-card-pipeline');
     await card.hover();
@@ -179,7 +181,7 @@ test.describe('Mission Control v2', () => {
   });
 
   test('reflection drawer opens, autosaves an answer, and the answer survives reload', async ({ page }) => {
-    await page.goto('/dashboard/v2');
+    await page.goto('/dashboard');
     await page.getByTestId('open-reflection').click();
     await expect(page.getByTestId('reflection-drawer')).toBeVisible();
 
@@ -202,8 +204,8 @@ test.describe('Mission Control v2', () => {
     );
   });
 
-  test('parity: /dashboard/v2 shows the same temporal hours as /dashboard', async ({ page }) => {
-    await page.goto('/dashboard/v2');
+  test('parity: /dashboard shows the same temporal hours as /api/focus-hours returns', async ({ page }) => {
+    await page.goto('/dashboard');
     // Read through the same browser session that renders the card. This keeps
     // the assertion tied to the owner-scoped data source the dashboard uses.
     const focus = await readFocusHoursFromPage(page);
@@ -229,7 +231,7 @@ test.describe('Mission Control v2', () => {
     // wrong day. The client now sends its local YYYY-MM-DD in the POST
     // body. We intercept the call and assert the date matches the
     // browser's local computation, not UTC.
-    await page.goto('/dashboard/v2');
+    await page.goto('/dashboard');
 
     // Capture expectedLocal BEFORE issuing the request so that if midnight
     // crosses between the POST and the assertion, both sides see the same
@@ -258,7 +260,7 @@ test.describe('Mission Control v2', () => {
     // The pre-fix bug: clicking Insights toggled the pill but the body never
     // changed. After PR B the tab gates the panels area, so the Insights body
     // (period selector + 4 cards) must show and the Overview panels must hide.
-    await page.goto('/dashboard/v2');
+    await page.goto('/dashboard');
     await page.getByTestId('tab-insights').click();
 
     await expect(page.getByTestId('insights-tab')).toBeVisible();
@@ -282,17 +284,17 @@ test.describe('Mission Control v2', () => {
     // Review body should show the empty-state copy — NOT seed data and NOT
     // a blank panel area. This is the regression test for "Review tab does
     // nothing when clicked".
-    await page.goto('/dashboard/v2');
+    await page.goto('/dashboard');
     await page.getByTestId('tab-review').click();
     await expect(page.getByTestId('review-tab-empty')).toBeVisible();
     await expect(page.getByText(/No monthly reviews yet/i)).toBeVisible();
   });
 
   test('Tasks panel was removed from the Overview body', async ({ page }) => {
-    // The handoff dropped Tasks from /dashboard/v2 ("we no longer need it").
+    // The handoff dropped Tasks from the new dashboard ("we no longer need it").
     // The legacy /dashboard still has its own task list — this PR removes the
     // panel from the new dashboard only.
-    await page.goto('/dashboard/v2');
+    await page.goto('/dashboard');
     // No CollapsiblePanel titled "Tasks" should render on the Overview body.
     await expect(page.getByText('Tasks', { exact: true })).toHaveCount(0);
   });
@@ -301,7 +303,7 @@ test.describe('Mission Control v2', () => {
     // The user reported two related issues: (a) wanted to attach a note
     // like "Benepass" to a money entry, (b) money entries not visible
     // in the Activity feed. This test pins both.
-    await page.goto('/dashboard/v2');
+    await page.goto('/dashboard');
 
     const note = `Benepass-${Date.now()}`;
 
@@ -336,7 +338,7 @@ test.describe('Mission Control v2', () => {
     // The user complaint: money entries were logging hardcoded amounts
     // ($250 / $500 / $100). Now the preset just selects the CATEGORY and
     // the user types the actual amount.
-    await page.goto('/dashboard/v2');
+    await page.goto('/dashboard');
 
     const card = page.getByTestId('metric-card-moneyMoved');
     await card.hover();
@@ -369,7 +371,7 @@ test.describe('Mission Control v2 — mobile viewport', () => {
   test.use({ viewport: { width: 390, height: 844 } }); // iPhone 14-ish
 
   test('renders the mobile shell with hero, snapshot strip, quick log, bottom nav', async ({ page }) => {
-    const response = await page.goto('/dashboard/v2');
+    const response = await page.goto('/dashboard');
     expect(response?.status()).toBeLessThan(400);
 
     await expect(page.getByTestId('mobile-layout')).toBeVisible();
@@ -383,7 +385,7 @@ test.describe('Mission Control v2 — mobile viewport', () => {
   });
 
   test('tapping a hero preset logs Temporal hours via /api/focus-hours', async ({ page }) => {
-    await page.goto('/dashboard/v2');
+    await page.goto('/dashboard');
     const focusPost = page.waitForRequest((req) =>
       req.url().includes('/api/focus-hours') && req.method() === 'POST',
     );
@@ -395,7 +397,7 @@ test.describe('Mission Control v2 — mobile viewport', () => {
   });
 
   test('bottom-nav Reflect tap opens the reflection drawer', async ({ page }) => {
-    await page.goto('/dashboard/v2');
+    await page.goto('/dashboard');
     await page.getByTestId('mobile-nav-reflect').click();
     await expect(page.getByTestId('reflection-drawer')).toBeVisible();
   });
@@ -403,7 +405,7 @@ test.describe('Mission Control v2 — mobile viewport', () => {
   test('quick-log + Moved opens the amount editor and submits the typed value', async ({ page }) => {
     // Same custom-amount behavior on mobile: tap the money button →
     // editor appears → type the amount → submit.
-    await page.goto('/dashboard/v2');
+    await page.goto('/dashboard');
 
     const financialPost = page.waitForRequest((req) =>
       req.url().includes('/api/financial') && req.method() === 'POST',

@@ -1,7 +1,7 @@
 import { test, expect, type Page } from '@playwright/test';
 
 // Comprehensive autosave coverage for the Three to Thrive inline panel
-// on /dashboard/v2. The autosave is a 600ms-debounced PATCH to
+// on /dashboard (the v2 default). The autosave is a 600ms-debounced PATCH to
 // /api/three-to-thrive plus a flush-on-blur and a flush-on-unmount.
 //
 // The prior implementation only debounced — fast-typing then navigating
@@ -27,7 +27,7 @@ async function answerFor(page: Page, questionMatch: RegExp): Promise<string | nu
 }
 
 async function openOverviewT3T(page: Page) {
-  await page.goto('/dashboard/v2');
+  await page.goto('/dashboard');
   // The CollapsiblePanel is open by default at md+. Just wait for the
   // first input to be present and visible.
   await expect(page.getByTestId('t3t-inline-input-0')).toBeVisible();

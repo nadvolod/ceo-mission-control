@@ -1,240 +1,700 @@
 'use client';
 
-import { useState } from 'react';
-import { RefreshCw } from 'lucide-react';
-import { TaskDashboard } from '@/components/TaskDashboard';
-import { FocusOptimization } from '@/components/FocusOptimization';
-import { MissionTracker } from '@/components/MissionTracker';
-import { WeeklyPerformanceTracker } from '@/components/WeeklyPerformanceTracker';
-import { ThreeToThrive } from '@/components/ThreeToThrive';
-import { MonthlyReviewTracker } from '@/components/MonthlyReviewTracker';
-import { HealthIntelligenceDashboard } from '@/components/HealthIntelligenceDashboard';
-import { DashboardTabs } from '@/components/DashboardTabs';
-import type { TabId } from '@/components/DashboardTabs';
-import { enrichScorecard } from '@/lib/derive-focus';
-import { useDashboardData } from '@/hooks/useDashboardData';
-import { AdminHandoffButtons } from '@/components/AdminHandoffButtons';
-import { KeyMetricsStrip } from '@/components/KeyMetricsStrip';
-import { computeTotalFocusHoursThisWeek } from '@/lib/dashboard-metrics';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Link from 'next/link';
+import { Plus, Search } from 'lucide-react';
+import { localDate } from '@/lib/dates';
+import { Aurora } from '@/components/dashboard/v2/primitives/Aurora';
+import { OrbitStar } from '@/components/dashboard/v2/primitives/OrbitStar';
+import { MetricCard } from '@/components/dashboard/v2/MetricCard';
+import { ChipStrip } from '@/components/dashboard/v2/ChipStrip';
+import { ActivityFeed } from '@/components/dashboard/v2/ActivityFeed';
+import { CollapsiblePanel } from '@/components/dashboard/v2/CollapsiblePanel';
+import { CmdK } from '@/components/dashboard/v2/CmdK';
+import { ReflectionDrawer } from '@/components/dashboard/v2/ReflectionDrawer';
+import { useMissionStore } from '@/components/dashboard/v2/useMissionStore';
+import { deriveActivity, deriveChips, consecutiveStreak } from '@/components/dashboard/v2/derive';
+import { TrendsPanel, buildOverviewTrendSeries } from '@/components/dashboard/v2/TrendsPanel';
+import { InsightsTab } from '@/components/dashboard/v2/InsightsTab';
+import { ReviewTab } from '@/components/dashboard/v2/ReviewTab';
+import { MobileLayout } from '@/components/dashboard/v2/MobileLayout';
 
-export default function HomePage() {
-  const {
-    aiTasks, taskStats, initiatives, scorecard, financialData, focusData,
-    monarchData, weeklyTrackerData, isLoading,
-    loadAllData, handleCreateTask, handleUpdateTask, handleDeleteTask,
-    handleMonarchRefresh,
-    handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleAddToDay, handleSubmitWeeklyReview,
-    monthlyReviewData, handleSubmitMonthlyReview, handleDeleteMonthlyReview,
-    handleDeleteDay, handleDeleteWeeklyReview,
-    threeToThriveData, handleSaveThreeToThriveAnswer,
-  } = useDashboardData();
+type Tab = 'overview' | 'insights' | 'review';
 
-  // Header refresh: force-refresh Monarch (POST bypasses the 15-min snapshot
-  // cache) AND reload every other dashboard data source. loadAllData alone
-  // would re-read the cached Monarch snapshot via GET.
-  const handleRefreshAll = () => {
-    void handleMonarchRefresh();
-    void loadAllData();
-  };
+const DAY_LABELS = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT'];
 
-  const [activeTab, setActiveTab] = useState<TabId>('dashboard');
+function fmtHeaderDate(d: Date): string {
+  const day = DAY_LABELS[d.getDay()];
+  const date = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const time = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return `${day} · ${date} · ${time}`;
+}
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-100 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading Mission Control...</p>
+export default function MissionControlV2Page() {
+  const store = useMissionStore();
+  const { focusData, financialData, weeklyTrackerData, monarchData, monthlyReviewData } = store;
+
+  const [tab, setTab] = useState<Tab>('overview');
+  const [cmdOpen, setCmdOpen] = useState(false);
+  const [reflectOpen, setReflectOpen] = useState(false);
+  const [now, setNow] = useState<Date | null>(null);
+
+  useEffect(() => {
+    const raf = requestAnimationFrame(() => setNow(new Date()));
+    const id = setInterval(() => setNow(new Date()), 60_000);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearInterval(id);
+    };
+  }, []);
+
+  // ⌘K + ⌘R global handlers
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const meta = e.metaKey || e.ctrlKey;
+      const lower = e.key.toLowerCase();
+      if (meta && lower === 'k') {
+        e.preventDefault();
+        setCmdOpen((o) => !o);
+      } else if (meta && lower === 'r') {
+        const target = document.activeElement as HTMLElement | null;
+        const isTypingTarget =
+          !!target &&
+          (['INPUT', 'TEXTAREA', 'SELECT'].includes(target.tagName) || target.isContentEditable);
+        e.preventDefault();
+        if (!isTypingTarget) setReflectOpen((o) => !o);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+
+  // Auto-dismiss error toast.
+  useEffect(() => {
+    if (!store.toast) return;
+    const id = setTimeout(() => store.clearToast(), 4000);
+    return () => clearTimeout(id);
+  }, [store.toast, store.clearToast]);
+
+  // Derive the live activity feed. An empty array is the correct "no activity
+  // today" state — the ActivityFeed component already renders the empty UI.
+  // We do NOT fall back to fixtures: that leaked fake rows ("+ Generated
+  // $2,000 · Annual contract · Vega") to real users with no real entries.
+  const activity = useMemo(() => {
+    return deriveActivity({
+      focus: focusData?.recentSessions,
+      financial: financialData?.recentEntries,
+      optimistic: store.activity,
+      limit: 25,
+    });
+  }, [focusData, financialData, store.activity]);
+
+  // Derive chips.
+  const chips = useMemo(() => {
+    const streak = consecutiveStreak(weeklyTrackerData);
+    const cashMoM =
+      monarchData && monarchData.previousMonthIncome && monarchData.previousMonthIncome > 0
+        ? ((monarchData.monthlyIncome - monarchData.previousMonthIncome) /
+            monarchData.previousMonthIncome) *
+          100
+        : null;
+    return deriveChips({
+      streakDays: streak,
+      monarchSyncedAt: monarchData?.lastSynced ?? null,
+      cashMoMPct: cashMoM,
+      deepWorkPace: 'flat',
+    });
+  }, [weeklyTrackerData, monarchData]);
+
+  return (
+    <>
+    {/* Mobile layout — hidden at md+ */}
+    <div className="md:hidden">
+      <MobileLayout
+        metrics={store.metrics}
+        activity={activity}
+        tab={tab}
+        onTab={setTab}
+        onOpenReflection={() => setReflectOpen(true)}
+        onLog={store.log}
+      />
+    </div>
+
+    {/* Desktop layout — hidden below md */}
+    <div
+      className="mc-root relative hidden md:flex min-h-screen flex-col overflow-hidden"
+      style={{
+        background: 'var(--color-mc-bg)',
+        color: 'var(--color-mc-fg)',
+        fontFamily: 'var(--font-mc-sans)',
+        fontSize: 13,
+      }}
+      data-testid="desktop-layout"
+    >
+      <Aurora />
+
+      <header
+        className="relative flex items-center gap-3.5"
+        style={{
+          padding: '12px 20px',
+          borderBottom: '1px solid rgba(255,255,255,0.08)',
+          background: 'rgba(14,12,20,0.6)',
+          backdropFilter: 'blur(24px)',
+        }}
+      >
+        <div className="flex items-center gap-2.5">
+          <div
+            className="flex items-center justify-center rounded-lg"
+            style={{
+              width: 28,
+              height: 28,
+              background: 'var(--color-mc-uv)',
+              boxShadow: '0 0 18px rgba(124,124,255,0.55)',
+            }}
+          >
+            <OrbitStar size={16} color="#fff" />
+          </div>
+          <span
+            style={{
+              fontWeight: 600,
+              fontSize: 14,
+              letterSpacing: '-0.01em',
+              color: 'var(--color-mc-ink)',
+            }}
+          >
+            Mission Control
+          </span>
         </div>
+        <span
+          className="font-numerics hidden md:inline"
+          style={{
+            color: 'var(--color-mc-fg-muted)',
+            fontSize: 11,
+            letterSpacing: '0.06em',
+          }}
+          suppressHydrationWarning
+        >
+          {now ? fmtHeaderDate(now) : ''}
+        </span>
+
+        <nav className="ml-4 flex items-center gap-1" aria-label="Sections">
+          {(['overview', 'insights', 'review'] as const).map((t) => {
+            const active = tab === t;
+            return (
+              <button
+                key={t}
+                type="button"
+                onClick={() => setTab(t)}
+                className="rounded-md capitalize"
+                style={{
+                  padding: '5px 12px',
+                  fontSize: 12,
+                  fontWeight: 500,
+                  background: active ? 'rgba(124,124,255,0.14)' : 'transparent',
+                  color: active ? 'var(--color-mc-uv-hi)' : 'var(--color-mc-fg-dim)',
+                  border: active
+                    ? '1px solid rgba(124,124,255,0.33)'
+                    : '1px solid transparent',
+                  cursor: 'pointer',
+                  font: 'inherit',
+                }}
+                data-testid={`tab-${t}`}
+                aria-pressed={active}
+              >
+                {t}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="ml-auto flex items-center gap-2.5">
+          <button
+            type="button"
+            onClick={() => setCmdOpen(true)}
+            className="hidden sm:flex items-center gap-2 rounded-lg cursor-pointer"
+            style={{
+              padding: '5px 10px',
+              border: '1px solid rgba(255,255,255,0.08)',
+              background: 'rgba(255,255,255,0.04)',
+              color: 'var(--color-mc-fg-dim)',
+              fontSize: 12,
+              minWidth: 240,
+              font: 'inherit',
+            }}
+            data-testid="cmdk-trigger"
+            aria-label="Open command palette"
+          >
+            <Search size={14} aria-hidden />
+            <span className="flex-1 text-left">Log, jump, find…</span>
+            <span
+              className="font-numerics"
+              style={{
+                fontSize: 10,
+                padding: '1px 5px',
+                background: 'rgba(255,255,255,0.07)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                borderRadius: 3,
+                color: 'var(--color-mc-fg-dim)',
+              }}
+            >
+              ⌘K
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setCmdOpen(true)}
+            className="flex items-center gap-1.5 rounded-lg cursor-pointer"
+            style={{
+              padding: '6px 14px',
+              background: 'var(--color-mc-uv)',
+              color: '#fff',
+              border: 'none',
+              fontSize: 12,
+              fontWeight: 500,
+              font: 'inherit',
+              boxShadow: '0 4px 14px rgba(124,124,255,0.33)',
+            }}
+            data-testid="log-button"
+          >
+            <Plus size={12} aria-hidden /> Log
+          </button>
+          <Link
+            href="/dashboard/legacy"
+            className="rounded-md text-[11px]"
+            style={{
+              padding: '5px 10px',
+              border: '1px solid rgba(255,255,255,0.08)',
+              color: 'var(--color-mc-fg-dim)',
+            }}
+            data-testid="legacy-dashboard-link"
+          >
+            Legacy
+          </Link>
+        </div>
+      </header>
+
+      <div
+        className="relative flex flex-1 flex-col gap-3.5 overflow-auto"
+        style={{ padding: '16px 20px' }}
+      >
+        <ChipStrip chips={chips} />
+
+        <div className="grid gap-2.5 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
+          <MetricCard metric={store.metrics.cash}       onLog={store.log} />
+          <MetricCard metric={store.metrics.netWorth}   onLog={store.log} />
+          <MetricCard metric={store.metrics.temporal}   onLog={store.log} />
+          <MetricCard metric={store.metrics.pipeline}   onLog={store.log} />
+          <MetricCard metric={store.metrics.deepWork}   onLog={store.log} />
+          <MetricCard metric={store.metrics.moneyMoved} onLog={store.log} />
+        </div>
+
+        {tab === 'overview' && (
+        <div className="grid flex-1 gap-3.5 lg:grid-cols-[1fr_320px] min-h-0">
+          <div className="flex flex-col gap-2.5 min-h-0">
+            <CollapsiblePanel
+              title="Three to Thrive"
+              count={
+                store.threeToThrive?.todaysEntry
+                  ? `${store.threeToThrive.todaysEntry.answers.filter((a) => a.answer.trim()).length} / ${store.threeToThrive.todaysEntry.questions.length}`
+                  : '0 / 3'
+              }
+              defaultOpen
+              accent={
+                <span
+                  className="font-numerics"
+                  style={{
+                    marginLeft: 6,
+                    padding: '1px 8px',
+                    background: 'rgba(255,180,84,0.14)',
+                    color: 'var(--color-mc-amber)',
+                    fontSize: 10,
+                    letterSpacing: '0.06em',
+                    borderRadius: 999,
+                    border: '1px solid rgba(255,180,84,0.25)',
+                  }}
+                >
+                  DAILY
+                </span>
+              }
+              action={
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setReflectOpen(true);
+                  }}
+                  className="rounded-md"
+                  style={{
+                    padding: '4px 10px',
+                    fontSize: 11,
+                    fontWeight: 500,
+                    background: 'rgba(124,124,255,0.14)',
+                    color: 'var(--color-mc-uv-hi)',
+                    border: '1px solid rgba(124,124,255,0.33)',
+                    cursor: 'pointer',
+                    font: 'inherit',
+                  }}
+                  data-testid="open-reflection"
+                >
+                  Open
+                </button>
+              }
+            >
+              <T3TPanelInline
+                entryDate={store.threeToThrive?.todaysEntry?.date ?? localDate()}
+                questions={store.threeToThrive?.todaysEntry?.questions ?? []}
+                answers={store.threeToThrive?.todaysEntry?.answers ?? []}
+                onSave={store.saveThreeToThriveAnswer}
+              />
+            </CollapsiblePanel>
+
+            <CollapsiblePanel
+              title="Trends · last 14 days"
+              defaultOpen
+              accent={
+                <span
+                  className="font-numerics"
+                  style={{
+                    marginLeft: 6,
+                    padding: '1px 8px',
+                    background: 'rgba(124,124,255,0.14)',
+                    color: 'var(--color-mc-uv-hi)',
+                    fontSize: 10,
+                    letterSpacing: '0.06em',
+                    borderRadius: 999,
+                    border: '1px solid rgba(124,124,255,0.33)',
+                  }}
+                >
+                  TRENDS
+                </span>
+              }
+            >
+              <TrendsPanel
+                series={buildOverviewTrendSeries(
+                  focusData?.dailyTrend,
+                  { temporalWeekly: 5, deepWorkWeekly: 10, pipelineWeekly: 3 },
+                )}
+              />
+            </CollapsiblePanel>
+          </div>
+
+          <ActivityFeed entries={activity} />
+        </div>
+        )}
+
+        {tab === 'insights' && (
+          <InsightsTab
+            focusDailyTrend={focusData?.dailyTrend}
+            financialDailyTrend={financialData?.dailyFinancialTrend}
+          />
+        )}
+
+        {tab === 'review' && (
+          <ReviewTab
+            currentMonthReview={monthlyReviewData?.currentMonthReview ?? null}
+            recentReviews={monthlyReviewData?.recentReviews ?? []}
+            ratingsTrend={monthlyReviewData?.ratingsTrend ?? []}
+          />
+        )}
+
+        {store.toast && (
+          <div
+            role="alert"
+            className="fixed bottom-6 left-1/2 z-30 -translate-x-1/2 rounded-lg"
+            style={{
+              padding: '10px 14px',
+              fontSize: 12.5,
+              color: '#fff',
+              background: 'var(--color-mc-red)',
+              border: '1px solid rgba(255,255,255,0.16)',
+              boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
+            }}
+            data-testid="error-toast"
+          >
+            {store.toast.text}
+          </div>
+        )}
+      </div>
+    </div>
+
+    {/* Modal overlays — Radix portals to document.body, shared by both layouts */}
+    <CmdK
+      open={cmdOpen}
+      onOpenChange={setCmdOpen}
+      onLog={store.log}
+      onOpenReflection={() => setReflectOpen(true)}
+      onSwitchTab={setTab}
+    />
+
+    <ReflectionDrawer
+      open={reflectOpen}
+      onOpenChange={setReflectOpen}
+      data={store.threeToThrive}
+      onSave={store.saveThreeToThriveAnswer}
+    />
+    </>
+  );
+}
+
+// Compact 3-row T3T inside the collapsible panel — the same surface as the
+// drawer but a single line per question. Updates the same store as the
+// drawer so toggling between them is consistent.
+function T3TPanelInline({
+  entryDate,
+  questions,
+  answers,
+  onSave,
+}: {
+  // The DATE the rendered entry belongs to — threaded down to T3TPanelRow
+  // so saves anchor to the day the row was loaded for, not whatever
+  // `localDate()` returns at flush time. Important when a tab is left
+  // open across midnight: a late save must not land on tomorrow's row.
+  entryDate: string;
+  questions: string[];
+  answers: Array<{ question: string; answer: string }>;
+  onSave: (date: string, question: string, answer: string) => Promise<void>;
+}) {
+  const initialMap = new Map<string, string>();
+  answers.forEach((a) => initialMap.set(a.question, a.answer));
+
+  if (questions.length === 0) {
+    return (
+      <div
+        style={{
+          padding: '14px 18px',
+          fontSize: 12.5,
+          color: 'var(--color-mc-fg-dim)',
+        }}
+      >
+        Reflection prompts load with the day&apos;s entry.
       </div>
     );
   }
 
-  // scorecard may be null if workspace data hasn't been seeded yet — the
-  // top metrics strip still renders, and the section content below shows a
-  // workspace-missing notice in place of the tabs.
-  const enrichedScorecard = scorecard ? enrichScorecard(scorecard, aiTasks, initiatives) : null;
+  return (
+    <div>
+      {questions.map((q, i) => (
+        <T3TPanelRow
+          key={q}
+          index={i}
+          entryDate={entryDate}
+          question={q}
+          initial={initialMap.get(q) ?? ''}
+          onSave={onSave}
+        />
+      ))}
+    </div>
+  );
+}
+
+type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
+
+function T3TPanelRow({
+  index,
+  entryDate,
+  question,
+  initial,
+  onSave,
+}: {
+  index: number;
+  // Date the parent rendered for. Saves anchor to this even if the wall
+  // clock crosses midnight while the user types — see T3TPanelInline.
+  entryDate: string;
+  question: string;
+  initial: string;
+  onSave: (date: string, question: string, answer: string) => Promise<void>;
+}) {
+  const [value, setValue] = useState(initial);
+  const [status, setStatus] = useState<SaveStatus>(initial.trim() ? 'saved' : 'idle');
+
+  // Refs hold debounce state so we don't trigger re-renders on every
+  // keystroke. The pending value is the latest typed string that hasn't
+  // been persisted yet; the timer is the 600ms debounce handle.
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingRef = useRef<string | null>(null);
+  // Serialization guard. While a save is in flight, additional calls to
+  // flushNow just update pendingRef and return — the in-flight handler
+  // will drain the latest pending value in a loop once it resolves.
+  // Without this, two concurrent saves race on the (date, question)
+  // upsert and an older response can overwrite newer text (data loss).
+  const inFlightRef = useRef(false);
+
+  // Drain pending writes one-at-a-time. The loop body snapshots the
+  // current pendingRef, clears it, awaits the save, then re-checks: if
+  // the user typed more during the await, the loop runs again with the
+  // latest value. On error we KEEP the pending value so the next
+  // keystroke / debounce tick gets another shot.
+  const flushNow = useCallback(async () => {
+    if (inFlightRef.current) return; // another loop already draining
+    if (pendingRef.current === null) return;
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    inFlightRef.current = true;
+    try {
+      while (pendingRef.current !== null) {
+        const snapshot = pendingRef.current;
+        pendingRef.current = null;
+        setStatus(snapshot.trim() ? 'saving' : 'idle');
+        try {
+          await onSave(entryDate, question, snapshot);
+        } catch (err) {
+          console.error('T3T inline save failed', err);
+          setStatus('error');
+          // Re-queue the unsaved value so the next debounce / blur picks
+          // it up. If the user has already typed more, prefer their
+          // newer value over the failed snapshot.
+          if (pendingRef.current === null) {
+            pendingRef.current = snapshot;
+          }
+          return;
+        }
+        // After a successful save, only stop and show SAVED when there
+        // is nothing newer waiting. Otherwise the loop runs again.
+        if (pendingRef.current === null) {
+          setStatus(snapshot.trim() ? 'saved' : 'idle');
+        }
+      }
+    } finally {
+      inFlightRef.current = false;
+    }
+  }, [onSave, question, entryDate]);
+
+  // Sync local draft when the server-supplied initial answer changes.
+  // Deferred via rAF for the React 19 lint rule. Only sync from the
+  // server when nothing is pending locally — otherwise we'd clobber the
+  // user's in-progress keystrokes.
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      if (pendingRef.current === null) {
+        setValue(initial);
+        setStatus(initial.trim() ? 'saved' : 'idle');
+      }
+    });
+    return () => cancelAnimationFrame(id);
+  }, [initial]);
+
+  // Flush on unmount. Fire-and-forget; we can't await in cleanup.
+  useEffect(() => {
+    return () => {
+      void flushNow();
+    };
+  }, [flushNow]);
+
+  const done = !!value.trim();
+  const onChange = (next: string) => {
+    setValue(next);
+    pendingRef.current = next;
+    setStatus(next.trim() ? 'saving' : 'idle');
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(() => {
+      void flushNow();
+    }, 600);
+  };
 
   return (
-    <div className="min-h-screen bg-gray-100 overflow-x-hidden">
-      {/* Compact header */}
-      <header className="bg-white shadow-sm border-b border-gray-200">
-        <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-2 sm:py-2.5 flex items-center justify-between gap-3">
-          <div className="flex items-baseline gap-2 min-w-0">
-            <h1 className="text-base sm:text-lg font-semibold text-gray-900 truncate">
-              Mission Control
-            </h1>
-            {scorecard && (
-              <span className="text-[11px] sm:text-xs text-gray-500 truncate hidden sm:inline">
-                {scorecard.date}
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
-            <AdminHandoffButtons />
-            <button
-              onClick={handleRefreshAll}
-              className="p-1.5 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md transition-colors"
-              title="Refresh all data"
-              aria-label="Refresh all data"
-            >
-              <RefreshCw className="h-4 w-4" />
-            </button>
-          </div>
+    <div
+      className="flex items-start gap-2.5"
+      style={{
+        padding: '10px 14px',
+        borderTop: index ? '1px solid rgba(255,255,255,0.08)' : 'none',
+      }}
+    >
+      <span
+        className="flex items-center justify-center font-numerics"
+        style={{
+          width: 20,
+          height: 20,
+          borderRadius: '50%',
+          background: done ? 'var(--color-mc-green)' : 'rgba(255,255,255,0.07)',
+          color: done ? '#000' : 'var(--color-mc-fg-dim)',
+          fontSize: 10,
+          fontWeight: 600,
+          flexShrink: 0,
+          marginTop: 1,
+        }}
+        aria-hidden
+      >
+        {done ? '✓' : index + 1}
+      </span>
+      <div className="flex-1 min-w-0">
+        <div
+          style={{
+            fontSize: 12.5,
+            color: 'var(--color-mc-fg)',
+            lineHeight: 1.45,
+            marginBottom: 5,
+          }}
+        >
+          {question}
         </div>
-      </header>
-
-      {/* Key Metrics Strip — always visible, independent of scorecard */}
-      <div className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 pt-3 sm:pt-4">
-        <KeyMetricsStrip
-          monarchData={monarchData}
-          temporalHoursThisWeek={focusData?.weeklyTotals?.Temporal ?? 0}
-          moneyMovedThisWeek={financialData?.weeklyTotals?.moved ?? 0}
-          focusHoursThisWeek={computeTotalFocusHoursThisWeek(
-            focusData?.weeklyTotals,
-            weeklyTrackerData?.currentWeekSummary?.deepWorkTotal,
-          )}
+        <textarea
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          onBlur={() => {
+            void flushNow();
+          }}
+          placeholder="Type your answer · auto-saves"
+          rows={1}
+          style={{
+            width: '100%',
+            resize: 'none',
+            padding: '7px 9px',
+            fontSize: 12,
+            lineHeight: 1.5,
+            fontFamily: 'inherit',
+            border: '1px solid rgba(255,255,255,0.08)',
+            borderRadius: 6,
+            background: 'var(--color-mc-bg-warm)',
+            color: 'var(--color-mc-ink)',
+            outline: 'none',
+          }}
+          data-testid={`t3t-inline-input-${index}`}
         />
+        {status === 'saving' && (
+          <div
+            className="font-numerics"
+            style={{
+              marginTop: 4,
+              fontSize: 10,
+              color: 'var(--color-mc-fg-dim)',
+              letterSpacing: '0.06em',
+            }}
+            data-testid={`t3t-inline-status-${index}`}
+          >
+            ● SAVING…
+          </div>
+        )}
+        {status === 'saved' && value.trim() && (
+          <div
+            className="font-numerics"
+            style={{
+              marginTop: 4,
+              fontSize: 10,
+              color: 'var(--color-mc-green)',
+              letterSpacing: '0.06em',
+            }}
+            data-testid={`t3t-inline-status-${index}`}
+          >
+            ● SAVED · {value.length} CHARS
+          </div>
+        )}
+        {status === 'error' && (
+          <div
+            className="font-numerics"
+            style={{
+              marginTop: 4,
+              fontSize: 10,
+              color: 'var(--color-mc-red)',
+              letterSpacing: '0.06em',
+            }}
+            data-testid={`t3t-inline-status-${index}`}
+          >
+            ● SAVE FAILED · WILL RETRY ON NEXT KEYSTROKE
+          </div>
+        )}
       </div>
-
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-3 sm:px-4 lg:px-6 py-4 sm:py-6">
-        {!scorecard ? (
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <h2 className="text-lg font-semibold text-red-800 mb-2">Cannot Load Workspace Data</h2>
-            <p className="text-red-700">
-              Unable to read DAILY_SCORECARD.md from workspace.
-              Make sure the file exists and the app has access to your OpenClaw workspace.
-            </p>
-            <div className="mt-4 text-sm text-red-600">
-              <p>Check that workspace data files are available.</p>
-            </div>
-          </div>
-        ) : (
-          <>
-        <DashboardTabs activeTab={activeTab} onTabChange={setActiveTab} />
-
-        {/* Dashboard Tab - Daily items */}
-        {activeTab === 'dashboard' && (
-          <>
-            {/* Three to Thrive - Daily Focus Questions */}
-            {threeToThriveData && (
-              <div className="mb-8">
-                <ThreeToThrive
-                  todaysEntry={threeToThriveData.todaysEntry}
-                  history={threeToThriveData.history}
-                  onSaveAnswer={handleSaveThreeToThriveAnswer}
-                />
-              </div>
-            )}
-
-            {/* Weekly Performance Tracker */}
-            {weeklyTrackerData && (
-              <div className="mb-8">
-                <WeeklyPerformanceTracker
-                  todaysEntry={weeklyTrackerData.todaysEntry}
-                  currentWeekSummary={weeklyTrackerData.currentWeekSummary}
-                  previousWeekSummary={weeklyTrackerData.previousWeekSummary}
-                  dailyTrend={weeklyTrackerData.dailyTrend}
-                  recentReviews={weeklyTrackerData.recentReviews}
-                  onLogDay={handleLogDay}
-                  onAddToDay={handleAddToDay}
-                  onSubmitReview={(review) =>
-                    handleSubmitWeeklyReview({
-                      slipAnalysis: review.slipAnalysis,
-                      systemAdjustment: review.systemAdjustment,
-                      nextWeekTargets: review.nextWeekTargets,
-                      bottleneck: review.bottleneck,
-                      temporalTarget: review.temporalTarget,
-                    })
-                  }
-                  onAddFocusSession={handleAddFocusSession}
-                  temporalActual={focusData?.weeklyTotals?.Temporal ?? scorecard.temporalActual ?? 0}
-                  todaysFocusSessions={focusData?.recentSessions?.filter((s: { date: string }) => s.date === scorecard.date)}
-                  todaysFocusTotal={focusData?.todaysMetrics?.totalHours ?? 0}
-                  todaysFinancial={
-                    financialData?.todaysMetrics ?? {
-                      date: '',
-                      entries: [],
-                      totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 },
-                    }
-                  }
-                  weekFinancialByDay={
-                    financialData?.weekFinancialByDay ??
-                    Array.from({ length: 7 }, () => ({
-                      date: '',
-                      entries: [],
-                      totals: { moved: 0, generated: 0, cut: 0, netImpact: 0 },
-                    }))
-                  }
-                  weekFinancialTotals={
-                    financialData?.weeklyTotals ?? { moved: 0, generated: 0, cut: 0, netImpact: 0 }
-                  }
-                  previousWeekFinancialTotals={
-                    financialData?.previousWeekTotals ?? { moved: 0, generated: 0, cut: 0, netImpact: 0 }
-                  }
-                  dailyFinancialTrend={financialData?.dailyFinancialTrend ?? []}
-                  onAddFinancialEntry={handleAddFinancialEntry}
-                  onDeleteDay={handleDeleteDay}
-                  onDeleteReview={handleDeleteWeeklyReview}
-                />
-              </div>
-            )}
-
-            {/* Health Intelligence */}
-            <div className="mb-8">
-              <HealthIntelligenceDashboard />
-            </div>
-
-            {/* Today's Plan - Priorities, Critical Moves, Focus Blocks */}
-            {enrichedScorecard && (
-              <div className="mb-8">
-                <FocusOptimization scorecard={enrichedScorecard} />
-              </div>
-            )}
-          </>
-        )}
-
-        {/* Tasks Tab */}
-        {activeTab === 'tasks' && (
-          <div className="mb-8">
-            <TaskDashboard
-              tasks={aiTasks.filter(t => t.status !== 'done')}
-              stats={taskStats}
-              onCreateTask={handleCreateTask}
-              onUpdateTask={handleUpdateTask}
-              onDeleteTask={handleDeleteTask}
-              onRefresh={loadAllData}
-              taskListUrl={process.env.NEXT_PUBLIC_AI_TASK_LIST_URL || 'https://tasklistai.vercel.app'}
-            />
-          </div>
-        )}
-
-        {/* Monthly Review Tab */}
-        {activeTab === 'monthly-review' && (
-          <>
-            {/* Mission Tracker - Connected to real MRR from Monarch */}
-            <div className="mb-8">
-              <MissionTracker currentMRR={monarchData?.monthlyIncome} />
-            </div>
-
-            {/* Monthly Review */}
-            {monthlyReviewData && (
-              <div className="mb-8">
-                <MonthlyReviewTracker
-                  currentMonthReview={monthlyReviewData.currentMonthReview}
-                  recentReviews={monthlyReviewData.recentReviews}
-                  ratingsTrend={monthlyReviewData.ratingsTrend}
-                  onSubmitReview={handleSubmitMonthlyReview}
-                  onDeleteReview={handleDeleteMonthlyReview}
-                />
-              </div>
-            )}
-          </>
-        )}
-          </>
-        )}
-      </main>
     </div>
   );
 }
