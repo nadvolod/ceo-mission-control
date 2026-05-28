@@ -1,5 +1,9 @@
 import { notFound, redirect } from 'next/navigation';
-import HomePage from '@/app/dashboard/page';
+// Impersonation still renders the LEGACY dashboard while the v2 default
+// settles. The legacy page has the existing admin/test affordances and
+// the impersonation banner has been visually validated against it.
+// Migrating impersonation to v2 is a separate PR — see follow-ups.
+import HomePage from '@/app/dashboard/legacy/page';
 import { getOptionalSession } from '@/lib/session';
 import { ImpersonationBanner } from '@/components/ImpersonationBanner';
 

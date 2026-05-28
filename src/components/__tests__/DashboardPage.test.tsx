@@ -147,7 +147,10 @@ jest.mock('@/lib/derive-focus', () => ({
 }));
 
 import { useDashboardData } from '@/hooks/useDashboardData';
-import HomePage from '@/app/dashboard/page';
+// Legacy dashboard is now at /dashboard/legacy after the v2 flip. This
+// test was written against the legacy layout/assertions; the v2 surface
+// has its own test files under src/components/dashboard/v2/__tests__.
+import HomePage from '@/app/dashboard/legacy/page';
 
 const mockUseDashboardData = useDashboardData as jest.MockedFunction<typeof useDashboardData>;
 
