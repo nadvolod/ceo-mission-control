@@ -47,7 +47,7 @@ describe('Insights internals', () => {
 
 describe('buildInsightCards', () => {
   it('returns 4 cards always (Temporal, Deep work, Pipeline, Money moved)', () => {
-    const cards = buildInsightCards(7, undefined, undefined, undefined);
+    const cards = buildInsightCards(7, undefined, undefined);
     expect(cards.map((c) => c.label)).toEqual(['Temporal', 'Deep work', 'Pipeline', 'Money moved']);
     cards.forEach((c) => {
       expect(c.data).toEqual([]);
@@ -60,8 +60,8 @@ describe('buildInsightCards', () => {
       date: `2026-05-${String(i + 1).padStart(2, '0')}`,
       byCategory: { Temporal: 1 },
     }));
-    const card7 = buildInsightCards(7, focus, undefined, undefined);
-    const card30 = buildInsightCards(30, focus, undefined, undefined);
+    const card7 = buildInsightCards(7, focus, undefined);
+    const card30 = buildInsightCards(30, focus, undefined);
     expect(card7[0].data).toHaveLength(7);
     expect(card7[0].total).toBe(7);
     expect(card30[0].data).toHaveLength(30);
@@ -73,9 +73,20 @@ describe('buildInsightCards', () => {
       { date: 'd1', totals: { moved: 100, generated: 200, cut: 50, netImpact: 350 } },
       { date: 'd2', totals: { moved: 0,   generated: 500, cut: 0,  netImpact: 500 } },
     ];
-    const cards = buildInsightCards(7, undefined, fin, undefined);
+    const cards = buildInsightCards(7, undefined, fin);
     const money = cards.find((c) => c.label === 'Money moved')!;
     expect(money.total).toBe(850);
+  });
+
+  it('uses focus-hours Other as the v2 Deep work source', () => {
+    const focus = Array.from({ length: 14 }, () => ({
+      date: 'd',
+      byCategory: { Other: 2 },
+    }));
+    const cards = buildInsightCards(14, focus, undefined);
+    const deepWork = cards.find((c) => c.label === 'Deep work')!;
+    expect(deepWork.total).toBe(28);
+    expect(deepWork.data.every((v) => v === 2)).toBe(true);
   });
 });
 

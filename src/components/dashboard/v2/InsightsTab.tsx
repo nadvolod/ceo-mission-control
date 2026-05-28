@@ -4,7 +4,6 @@ import { useMemo, useState } from 'react';
 import { Sparkline } from './primitives/Sparkline';
 import { MC_COLORS } from './palette';
 import { fmtMetric } from './format';
-import type { PerformanceDayEntry } from '@/lib/types';
 
 type Period = 7 | 14 | 30;
 
@@ -22,17 +21,16 @@ type DailyFinancialEntry = {
 type Props = {
   focusDailyTrend?: DailyFocusEntry[];
   financialDailyTrend?: DailyFinancialEntry[];
-  weeklyDailyTrend?: Array<PerformanceDayEntry | (PerformanceDayEntry & { isEmpty: boolean })>;
 };
 
 // Insights body. Period selector controls all the cards. Each card shows
 // label / period total / sparkline / week-over-week delta.
-export function InsightsTab({ focusDailyTrend, financialDailyTrend, weeklyDailyTrend }: Props) {
+export function InsightsTab({ focusDailyTrend, financialDailyTrend }: Props) {
   const [period, setPeriod] = useState<Period>(14);
 
   const cards = useMemo(
-    () => buildInsightCards(period, focusDailyTrend, financialDailyTrend, weeklyDailyTrend),
-    [period, focusDailyTrend, financialDailyTrend, weeklyDailyTrend],
+    () => buildInsightCards(period, focusDailyTrend, financialDailyTrend),
+    [period, focusDailyTrend, financialDailyTrend],
   );
 
   return (
@@ -228,18 +226,16 @@ function buildInsightCards(
   period: Period,
   focusDailyTrend: DailyFocusEntry[] | undefined,
   financialDailyTrend: DailyFinancialEntry[] | undefined,
-  weeklyDailyTrend: Array<PerformanceDayEntry | (PerformanceDayEntry & { isEmpty: boolean })> | undefined,
 ): InsightCard[] {
   // Period-scoped series — used for the sparkline + total.
   const focus = (focusDailyTrend ?? []).slice(-period);
   const fin = (financialDailyTrend ?? []).slice(-period);
-  const weekly = (weeklyDailyTrend ?? []).slice(-period);
 
   const temporal = focus.map((d) => d.byCategory?.Temporal ?? 0);
   const pipeline = focus.map((d) => d.byCategory?.Revenue ?? 0);
-  const deepWorkFromFocus = focus.map((d) => d.byCategory?.Other ?? 0);
-  const deepWorkFromWeekly = weekly.map((d) => d?.deepWorkHours ?? 0);
-  const deepWork = deepWorkFromWeekly.some((v) => v > 0) ? deepWorkFromWeekly : deepWorkFromFocus;
+  // v2 logs Deep Work to focus-hours category "Other"; keep the insight card
+  // on that same canonical source so the chart matches the MetricCard.
+  const deepWork = focus.map((d) => d.byCategory?.Other ?? 0);
   const moneyMoved = fin.map((d) =>
     (d.totals?.moved ?? 0) + (d.totals?.generated ?? 0) + (d.totals?.cut ?? 0),
   );
@@ -248,12 +244,9 @@ function buildInsightCards(
   // accurate regardless of the selected display period.
   const focus14 = (focusDailyTrend ?? []).slice(-14);
   const fin14 = (financialDailyTrend ?? []).slice(-14);
-  const weekly14 = (weeklyDailyTrend ?? []).slice(-14);
   const temporal14 = focus14.map((d) => d.byCategory?.Temporal ?? 0);
   const pipeline14 = focus14.map((d) => d.byCategory?.Revenue ?? 0);
-  const deepWorkFromFocus14 = focus14.map((d) => d.byCategory?.Other ?? 0);
-  const deepWorkFromWeekly14 = weekly14.map((d) => d?.deepWorkHours ?? 0);
-  const deepWork14 = deepWorkFromWeekly14.some((v) => v > 0) ? deepWorkFromWeekly14 : deepWorkFromFocus14;
+  const deepWork14 = focus14.map((d) => d.byCategory?.Other ?? 0);
   const moneyMoved14 = fin14.map((d) =>
     (d.totals?.moved ?? 0) + (d.totals?.generated ?? 0) + (d.totals?.cut ?? 0),
   );

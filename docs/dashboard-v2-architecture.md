@@ -48,54 +48,54 @@ src/
 ## 2 · Data flow
 
 ```
-                      Postgres (Neon)                       
-                            ▲                               
-                            │ via @neondatabase/serverless  
-                            │                               
-   ┌─────────────────── server-side lib/*-tracker ───────┐  
-   │  FocusTracker  FinancialTracker  WeeklyTracker      │  
-   │  ThreeToThriveTracker  MonarchService               │  
-   │  ↑ all take an optional `todayKey` arg              │  
-   └──────────────────────────────────────────────────────┘  
-                            ▲                               
-                            │ /api/{financial,focus-hours,  
-                            │  weekly-tracker,three-to-     
-                            │  thrive,temporal,monarch,...} 
-                            │   (POST adds, GET reads;      
-                            │    every "today" GET/POST     
-                            │    accepts ?date=YYYY-MM-DD   
-                            │    or body.date)              
-                            ▲                               
-                            │                               
-  ┌────────── useDashboardData (client hook) ──────────┐    
-  │  fetches everything in parallel on mount + on demand │  
-  │  computes `today = localDate()` once and pins every  │  
-  │  "today" GET to it (?date=…)                         │  
-  │  exposes: monarchData, focusData, financialData,     │  
-  │           weeklyTrackerData, monthlyReviewData,      │  
-  │           threeToThriveData, plus handle* mutations  │  
-  └──────────────────────────────────────────────────────┘  
-                            ▲                               
-                            │ used directly by /dashboard   
-                            │ wrapped by useMissionStore    
-                            │ for /dashboard/v2             
-                            ▲                               
-  ┌──────────── useMissionStore (v2-only) ─────────────┐    
-  │  - flattens metric data into MetricSnapshot map      │  
-  │  - exposes log(metricId, delta, label) which:        │  
-  │      1. optimistically updates overlay + activity    │  
-  │      2. POSTs to the matching /api endpoint          │  
-  │      3. on success, refreshes via useDashboardData   │  
-  │         and commits the optimistic mutation          │  
-  │      4. on error, rolls back and surfaces a toast    │  
-  │  - exposes activity, toast, threeToThrive, etc.      │  
-  └──────────────────────────────────────────────────────┘  
-                            ▲                               
-                            │                               
-              src/app/dashboard/v2/page.tsx                 
-              ── ChipStrip, MetricCard grid, CmdK,          
-                 ReflectionDrawer, Tab body                 
-                 (Overview | Insights | Review)             
+                      Postgres (Neon)
+                            ▲
+                            │ via @neondatabase/serverless
+                            │
+   ┌─────────────────── server-side lib/*-tracker ───────┐
+   │  FocusTracker  FinancialTracker  WeeklyTracker      │
+   │  ThreeToThriveTracker  MonarchService               │
+   │  ↑ today-sensitive reads accept a date hint         │
+   └──────────────────────────────────────────────────────┘
+                            ▲
+                            │ /api/{financial,focus-hours,
+                            │  weekly-tracker,three-to-
+                            │  thrive,temporal,monarch,...}
+                            │   (POST adds, GET reads;
+                            │    "today" reads/writes accept
+                            │    ?date=YYYY-MM-DD or body.date
+                            │    where the route is date-bound)
+                            ▲
+                            │
+  ┌────────── useDashboardData (client hook) ──────────┐
+  │  fetches everything in parallel on mount + on demand │
+  │  computes `today = localDate()` once and pins every  │
+  │  "today" GET to it (?date=…)                         │
+  │  exposes: monarchData, focusData, financialData,     │
+  │           weeklyTrackerData, monthlyReviewData,      │
+  │           threeToThriveData, plus handle* mutations  │
+  └──────────────────────────────────────────────────────┘
+                            ▲
+                            │ used directly by /dashboard
+                            │ wrapped by useMissionStore
+                            │ for /dashboard/v2
+                            ▲
+  ┌──────────── useMissionStore (v2-only) ─────────────┐
+  │  - flattens metric data into MetricSnapshot map      │
+  │  - exposes log(metricId, delta, label) which:        │
+  │      1. optimistically updates overlay + activity    │
+  │      2. POSTs to the matching /api endpoint          │
+  │      3. on success, refreshes via useDashboardData   │
+  │         and commits the optimistic mutation          │
+  │      4. on error, rolls back and surfaces a toast    │
+  │  - exposes activity, toast, threeToThrive, etc.      │
+  └──────────────────────────────────────────────────────┘
+                            ▲
+                            │
+              src/app/dashboard/v2/page.tsx
+              ── ChipStrip, MetricCard grid, CmdK,
+                 ReflectionDrawer, Tab body
+                 (Overview | Insights | Review)
 ```
 
 ### Metric ID → API endpoint
@@ -114,7 +114,7 @@ src/
 | tab        | body component             | data source                                              |
 | ---------- | -------------------------- | -------------------------------------------------------- |
 | `overview` | CollapsiblePanels in page  | live activity + T3T + Trends                             |
-| `insights` | `<InsightsTab>`            | `focusData.dailyTrend`, `financialData.dailyFinancialTrend`, `weeklyTrackerData.dailyTrend` |
+| `insights` | `<InsightsTab>`            | `focusData.dailyTrend`, `financialData.dailyFinancialTrend` |
 | `review`   | `<ReviewTab>`              | `monthlyReviewData` (currentMonthReview, recentReviews, ratingsTrend) |
 
 ---
