@@ -225,4 +225,47 @@ test.describe('Mission Control v2', () => {
     const sentDate = (await focusPost).postDataJSON().date;
     expect(sentDate).toBe(expectedLocal);
   });
+
+  test('Insights tab swaps the body to the period selector + insight cards', async ({ page }) => {
+    // The pre-fix bug: clicking Insights toggled the pill but the body never
+    // changed. After PR B the tab gates the panels area, so the Insights body
+    // (period selector + 4 cards) must show and the Overview panels must hide.
+    await page.goto('/dashboard/v2');
+    await page.getByTestId('tab-insights').click();
+
+    await expect(page.getByTestId('insights-tab')).toBeVisible();
+    await expect(page.getByTestId('insights-period-7')).toBeVisible();
+    await expect(page.getByTestId('insights-period-14')).toBeVisible();
+    await expect(page.getByTestId('insights-period-30')).toBeVisible();
+    await expect(page.getByTestId('insight-card-temporal')).toBeVisible();
+    await expect(page.getByTestId('insight-card-money moved')).toBeVisible();
+
+    // Overview panels not visible while Insights is active.
+    await expect(page.getByText('Three to Thrive')).toHaveCount(0);
+
+    // Switch back to Overview restores the panels.
+    await page.getByTestId('tab-overview').click();
+    await expect(page.getByText('Three to Thrive')).toBeVisible();
+    await expect(page.getByTestId('insights-tab')).toHaveCount(0);
+  });
+
+  test('Review tab renders monthly-review content (empty state when no data)', async ({ page }) => {
+    // The test user has no monthly reviews (global-setup wipes them), so the
+    // Review body should show the empty-state copy — NOT seed data and NOT
+    // a blank panel area. This is the regression test for "Review tab does
+    // nothing when clicked".
+    await page.goto('/dashboard/v2');
+    await page.getByTestId('tab-review').click();
+    await expect(page.getByTestId('review-tab-empty')).toBeVisible();
+    await expect(page.getByText(/No monthly reviews yet/i)).toBeVisible();
+  });
+
+  test('Tasks panel was removed from the Overview body', async ({ page }) => {
+    // The handoff dropped Tasks from /dashboard/v2 ("we no longer need it").
+    // The legacy /dashboard still has its own task list — this PR removes the
+    // panel from the new dashboard only.
+    await page.goto('/dashboard/v2');
+    // No CollapsiblePanel titled "Tasks" should render on the Overview body.
+    await expect(page.getByText('Tasks', { exact: true })).toHaveCount(0);
+  });
 });
