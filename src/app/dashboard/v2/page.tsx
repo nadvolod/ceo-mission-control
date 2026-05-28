@@ -340,6 +340,7 @@ export default function MissionControlV2Page() {
               }
             >
               <T3TPanelInline
+                entryDate={store.threeToThrive?.todaysEntry?.date ?? localDate()}
                 questions={store.threeToThrive?.todaysEntry?.questions ?? []}
                 answers={store.threeToThrive?.todaysEntry?.answers ?? []}
                 onSave={store.saveThreeToThriveAnswer}
@@ -438,10 +439,16 @@ export default function MissionControlV2Page() {
 // drawer but a single line per question. Updates the same store as the
 // drawer so toggling between them is consistent.
 function T3TPanelInline({
+  entryDate,
   questions,
   answers,
   onSave,
 }: {
+  // The DATE the rendered entry belongs to — threaded down to T3TPanelRow
+  // so saves anchor to the day the row was loaded for, not whatever
+  // `localDate()` returns at flush time. Important when a tab is left
+  // open across midnight: a late save must not land on tomorrow's row.
+  entryDate: string;
   questions: string[];
   answers: Array<{ question: string; answer: string }>;
   onSave: (date: string, question: string, answer: string) => Promise<void>;
@@ -469,6 +476,7 @@ function T3TPanelInline({
         <T3TPanelRow
           key={q}
           index={i}
+          entryDate={entryDate}
           question={q}
           initial={initialMap.get(q) ?? ''}
           onSave={onSave}
@@ -482,11 +490,15 @@ type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 
 function T3TPanelRow({
   index,
+  entryDate,
   question,
   initial,
   onSave,
 }: {
   index: number;
+  // Date the parent rendered for. Saves anchor to this even if the wall
+  // clock crosses midnight while the user types — see T3TPanelInline.
+  entryDate: string;
   question: string;
   initial: string;
   onSave: (date: string, question: string, answer: string) => Promise<void>;
@@ -499,37 +511,54 @@ function T3TPanelRow({
   // been persisted yet; the timer is the 600ms debounce handle.
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const pendingRef = useRef<string | null>(null);
+  // Serialization guard. While a save is in flight, additional calls to
+  // flushNow just update pendingRef and return — the in-flight handler
+  // will drain the latest pending value in a loop once it resolves.
+  // Without this, two concurrent saves race on the (date, question)
+  // upsert and an older response can overwrite newer text (data loss).
+  const inFlightRef = useRef(false);
 
-  // Flush whatever is pending right now. Used by:
-  //   - the 600ms debounce timeout
-  //   - onBlur (user tabs/clicks away — old code lost this)
-  //   - unmount (user navigates away — old code lost this)
-  //
-  // Race-safety: while `await onSave` is in flight the user may type more,
-  // which writes to `pendingRef.current`. When the await resolves we only
-  // transition to 'saved' if no newer pending value exists. The next
-  // debounce tick will save the new value and flip status correctly.
+  // Drain pending writes one-at-a-time. The loop body snapshots the
+  // current pendingRef, clears it, awaits the save, then re-checks: if
+  // the user typed more during the await, the loop runs again with the
+  // latest value. On error we KEEP the pending value so the next
+  // keystroke / debounce tick gets another shot.
   const flushNow = useCallback(async () => {
-    const pending = pendingRef.current;
-    if (pending === null) return;
-    pendingRef.current = null;
+    if (inFlightRef.current) return; // another loop already draining
+    if (pendingRef.current === null) return;
     if (timerRef.current) {
       clearTimeout(timerRef.current);
       timerRef.current = null;
     }
-    setStatus(pending.trim() ? 'saving' : 'idle');
+    inFlightRef.current = true;
     try {
-      await onSave(localDate(), question, pending);
-      // Only mark saved if nothing new is waiting. Otherwise we'd flash
-      // SAVED for a value the user has already replaced.
-      if (pendingRef.current === null) {
-        setStatus(pending.trim() ? 'saved' : 'idle');
+      while (pendingRef.current !== null) {
+        const snapshot = pendingRef.current;
+        pendingRef.current = null;
+        setStatus(snapshot.trim() ? 'saving' : 'idle');
+        try {
+          await onSave(entryDate, question, snapshot);
+        } catch (err) {
+          console.error('T3T inline save failed', err);
+          setStatus('error');
+          // Re-queue the unsaved value so the next debounce / blur picks
+          // it up. If the user has already typed more, prefer their
+          // newer value over the failed snapshot.
+          if (pendingRef.current === null) {
+            pendingRef.current = snapshot;
+          }
+          return;
+        }
+        // After a successful save, only stop and show SAVED when there
+        // is nothing newer waiting. Otherwise the loop runs again.
+        if (pendingRef.current === null) {
+          setStatus(snapshot.trim() ? 'saved' : 'idle');
+        }
       }
-    } catch (err) {
-      console.error('T3T inline save failed', err);
-      setStatus('error');
+    } finally {
+      inFlightRef.current = false;
     }
-  }, [onSave, question]);
+  }, [onSave, question, entryDate]);
 
   // Sync local draft when the server-supplied initial answer changes.
   // Deferred via rAF for the React 19 lint rule. Only sync from the

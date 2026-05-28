@@ -199,6 +199,57 @@ test.describe('Three to Thrive — inline autosave', () => {
     );
   });
 
+  // ---------- Negative: slow-save serialization (race CodeRabbit caught) ----------
+  test('negative: typing during a slow in-flight save does not lose later text', async ({ page }) => {
+    // Intercept the T3T POST and stall its response so we can guarantee
+    // there's an in-flight save while we type more. Without the
+    // serialization fix, the second save would race the first and the
+    // older response could overwrite the newer text.
+    let firstSaveSeen = false;
+    let secondSaveSeen = false;
+    let releaseFirst!: () => void;
+    const firstSavePromise = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+
+    await page.route('**/api/three-to-thrive', async (route) => {
+      const req = route.request();
+      if (req.method() !== 'POST') return route.continue();
+      const body = JSON.parse(req.postData() || '{}');
+      // Tag specific keystrokes by the unique phrase we send.
+      if (body.answer?.includes('SLOW1') && !firstSaveSeen) {
+        firstSaveSeen = true;
+        await firstSavePromise; // hold the first save open until we type more
+      } else if (body.answer?.includes('SLOW2')) {
+        secondSaveSeen = true;
+      }
+      return route.continue();
+    });
+
+    await openOverviewT3T(page);
+    const input = page.getByTestId('t3t-inline-input-0');
+
+    // Type the first value — its save will be stalled at the network.
+    await input.fill('SLOW1');
+    // Give the debounce + the intercept a moment to register the request.
+    await page.waitForTimeout(800);
+    expect(firstSaveSeen).toBe(true);
+
+    // Now type more while the first save is still stuck.
+    await input.fill('SLOW1-SLOW2-final');
+
+    // Release the first save so the drain loop can run the second one.
+    releaseFirst();
+
+    // Wait for the second save and the final persisted answer.
+    await expect.poll(() => secondSaveSeen, { timeout: 5_000 }).toBe(true);
+    await expect
+      .poll(() => answerFor(page, /courage and determination/i), { timeout: 5_000 })
+      .toBe('SLOW1-SLOW2-final');
+
+    await page.unroute('**/api/three-to-thrive');
+  });
+
   // ---------- Negative: independent saves per prompt ----------
   test('negative: each prompt has an independent save lane (one save does not clobber another)', async ({ page }) => {
     await openOverviewT3T(page);
