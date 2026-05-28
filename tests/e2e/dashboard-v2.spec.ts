@@ -55,8 +55,11 @@ test.describe('Mission Control v2', () => {
     const response = await page.goto('/dashboard/v2');
     expect(response?.status()).toBeLessThan(400);
 
-    // Brand mark + wordmark
-    await expect(page.getByText('Mission Control', { exact: true })).toBeVisible();
+    // Brand mark + wordmark. Scope to the desktop tree — the mobile layout
+    // also contains "Mission Control" and Playwright's strict mode rightly
+    // refuses an ambiguous getByText.
+    const desktop = page.getByTestId('desktop-layout');
+    await expect(desktop.getByText('Mission Control', { exact: true })).toBeVisible();
     // The CTA pair
     await expect(page.getByTestId('cmdk-trigger')).toBeVisible();
     await expect(page.getByTestId('log-button')).toBeVisible();
@@ -93,7 +96,11 @@ test.describe('Mission Control v2', () => {
       (focus?.recentSessions?.length ?? 0) === 0;
     expect(serverIsEmpty).toBe(true);
 
-    await expect(page.getByText('Activity', { exact: true })).toBeVisible();
+    // Scope to the desktop tree — the mobile layout also renders an
+    // <ActivityFeed> instance, so a top-level getByText('Activity') hits
+    // both and fails Playwright strict mode.
+    const desktop = page.getByTestId('desktop-layout');
+    await expect(desktop.getByText('Activity', { exact: true })).toBeVisible();
     const body = await page.locator('body').textContent();
     // Strings from the old SEED_ACTIVITY fixture rows — none of these may
     // ever appear in front of a real user.
@@ -130,6 +137,12 @@ test.describe('Mission Control v2', () => {
     // Open palette, filter to "+1h temporal", press Enter.
     await page.getByTestId('cmdk-trigger').click();
     await page.getByTestId('cmdk-input').fill('+1h temporal');
+    // CRITICAL: wait for the filtered list to settle on the +1h action BEFORE
+    // pressing Enter. Without this, React's setQuery from the fill's onChange
+    // may not have flushed yet, so `filtered[0]` is still the empty-query
+    // default — the +0.5h Temporal action — and the test logs 0.5h instead.
+    // (CI caught this; matches the wait pattern in the other ⌘K test above.)
+    await expect(page.getByTestId('cmdk-action-0')).toContainText('+1h Temporal');
     const focusPost = waitForFocusHoursPost(page);
     await page.keyboard.press('Enter');
 
@@ -220,6 +233,11 @@ test.describe('Mission Control v2', () => {
 
     await page.getByTestId('cmdk-trigger').click();
     await page.getByTestId('cmdk-input').fill('+1h temporal');
+    // Wait for the filter to settle (same fill+Enter race as in the cmdK
+    // Enter test above). The specific action label is checked elsewhere;
+    // here we just need the list to have updated past the empty-query
+    // default before Enter fires.
+    await expect(page.getByTestId('cmdk-action-0')).toContainText('+1h Temporal');
     await page.keyboard.press('Enter');
 
     const sentDate = (await focusPost).postDataJSON().date;
@@ -267,5 +285,44 @@ test.describe('Mission Control v2', () => {
     await page.goto('/dashboard/v2');
     // No CollapsiblePanel titled "Tasks" should render on the Overview body.
     await expect(page.getByText('Tasks', { exact: true })).toHaveCount(0);
+  });
+});
+
+// Mobile-viewport coverage. The desktop tree is gated by `hidden md:flex`;
+// at viewports below the md breakpoint the MobileLayout shell renders
+// instead (hero card · snapshot strip · quick-log grid · bottom nav).
+test.describe('Mission Control v2 — mobile viewport', () => {
+  test.use({ viewport: { width: 390, height: 844 } }); // iPhone 14-ish
+
+  test('renders the mobile shell with hero, snapshot strip, quick log, bottom nav', async ({ page }) => {
+    const response = await page.goto('/dashboard/v2');
+    expect(response?.status()).toBeLessThan(400);
+
+    await expect(page.getByTestId('mobile-layout')).toBeVisible();
+    await expect(page.getByTestId('mobile-hero-temporal')).toBeVisible();
+    await expect(page.getByTestId('mobile-snapshot-strip')).toBeVisible();
+    await expect(page.getByTestId('mobile-quick-log')).toBeVisible();
+    await expect(page.getByTestId('mobile-bottom-nav')).toBeVisible();
+
+    // The desktop tabs in the header are hidden at this viewport.
+    await expect(page.getByTestId('tab-overview')).toBeHidden();
+  });
+
+  test('tapping a hero preset logs Temporal hours via /api/focus-hours', async ({ page }) => {
+    await page.goto('/dashboard/v2');
+    const focusPost = page.waitForRequest((req) =>
+      req.url().includes('/api/focus-hours') && req.method() === 'POST',
+    );
+    await page.getByTestId('mobile-hero-preset-0-5h').click();
+    const body = (await focusPost).postDataJSON();
+    expect(body.category).toBe('Temporal');
+    expect(body.hours).toBe(0.5);
+    expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  test('bottom-nav Reflect tap opens the reflection drawer', async ({ page }) => {
+    await page.goto('/dashboard/v2');
+    await page.getByTestId('mobile-nav-reflect').click();
+    await expect(page.getByTestId('reflection-drawer')).toBeVisible();
   });
 });
