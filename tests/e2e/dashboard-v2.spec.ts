@@ -137,6 +137,12 @@ test.describe('Mission Control v2', () => {
     // Open palette, filter to "+1h temporal", press Enter.
     await page.getByTestId('cmdk-trigger').click();
     await page.getByTestId('cmdk-input').fill('+1h temporal');
+    // CRITICAL: wait for the filtered list to settle on the +1h action BEFORE
+    // pressing Enter. Without this, React's setQuery from the fill's onChange
+    // may not have flushed yet, so `filtered[0]` is still the empty-query
+    // default — the +0.5h Temporal action — and the test logs 0.5h instead.
+    // (CI caught this; matches the wait pattern in the other ⌘K test above.)
+    await expect(page.getByTestId('cmdk-action-0')).toContainText('+1h Temporal');
     const focusPost = waitForFocusHoursPost(page);
     await page.keyboard.press('Enter');
 
@@ -227,6 +233,11 @@ test.describe('Mission Control v2', () => {
 
     await page.getByTestId('cmdk-trigger').click();
     await page.getByTestId('cmdk-input').fill('+1h temporal');
+    // Wait for the filter to settle (same fill+Enter race as in the cmdK
+    // Enter test above). The specific action label is checked elsewhere;
+    // here we just need the list to have updated past the empty-query
+    // default before Enter fires.
+    await expect(page.getByTestId('cmdk-action-0')).toContainText('+1h Temporal');
     await page.keyboard.press('Enter');
 
     const sentDate = (await focusPost).postDataJSON().date;
