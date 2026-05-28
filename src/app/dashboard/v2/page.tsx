@@ -353,7 +353,6 @@ export default function MissionControlV2Page() {
               <TrendsPanel
                 series={buildOverviewTrendSeries(
                   focusData?.dailyTrend,
-                  weeklyTrackerData?.dailyTrend,
                   { temporalWeekly: 5, deepWorkWeekly: 10, pipelineWeekly: 3 },
                 )}
               />
@@ -368,7 +367,6 @@ export default function MissionControlV2Page() {
           <InsightsTab
             focusDailyTrend={focusData?.dailyTrend}
             financialDailyTrend={financialData?.dailyFinancialTrend}
-            weeklyDailyTrend={weeklyTrackerData?.dailyTrend}
           />
         )}
 

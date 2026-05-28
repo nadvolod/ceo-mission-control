@@ -2,11 +2,10 @@
 
 import { Sparkline } from './primitives/Sparkline';
 import { MC_COLORS } from './palette';
-import type { PerformanceDayEntry } from '@/lib/types';
 
 // Compact 3-column trends. Rendered inside the Overview's "Trends" collapsible
 // panel. Sparklines pull from focusData.dailyTrend (focus-hours by category)
-// and weeklyTrackerData (for deep work + pipeline action count).
+// so the series matches the same source the v2 MetricCards read and write.
 //
 // Empty / missing data renders as a flat zero line and a "—" delta — never a
 // fake series. The component takes already-derived numeric arrays so it stays
@@ -127,17 +126,13 @@ function weekOverWeekDelta(series: number[]): number | undefined {
 
 export function buildOverviewTrendSeries(
   focusDailyTrend: DailyFocusEntry[] | undefined,
-  weeklyDailyTrend: Array<PerformanceDayEntry | (PerformanceDayEntry & { isEmpty: boolean })> | undefined,
   goals: { temporalWeekly: number; deepWorkWeekly: number; pipelineWeekly: number },
 ): TrendSeries[] {
   const focus14 = lastNDays(focusDailyTrend ?? [], 14);
   const temporal = focus14.map((d) => d.byCategory?.Temporal ?? 0);
   const pipelineHours = focus14.map((d) => d.byCategory?.Revenue ?? 0);
-  // Deep work uses focus-hours "Other" by convention. If weeklyTrackerData
-  // is available, prefer its deepWorkHours since that's the dedicated field.
-  const deepWorkByFocus = focus14.map((d) => d.byCategory?.Other ?? 0);
-  const deepWorkByWeekly = (weeklyDailyTrend ?? []).slice(-14).map((d) => d?.deepWorkHours ?? 0);
-  const deepWork = deepWorkByWeekly.some((v) => v > 0) ? deepWorkByWeekly : deepWorkByFocus;
+  // Deep work uses focus-hours "Other" by convention in v2.
+  const deepWork = focus14.map((d) => d.byCategory?.Other ?? 0);
 
   const fmtHours = (mean: number) => `${(mean * 7).toFixed(1)}h this week`;
 
