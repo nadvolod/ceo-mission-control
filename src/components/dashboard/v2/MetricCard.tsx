@@ -225,10 +225,15 @@ export function MetricCard({ metric, big = false, onLog, onUpdateGoal }: MetricC
             accent={accent}
             idPrefix={`${metric.id}-goal-editor`}
             onSubmit={async (newGoal) => {
+              // Close the editor only on success. If onUpdateGoal rejects
+              // (network/API failure), keep the editor open so the user can
+              // retry without re-opening; the error is logged by the caller.
               try {
                 await onUpdateGoal(newGoal);
-              } finally {
                 setEditingGoal(false);
+              } catch {
+                // Intentionally swallow — onUpdateGoal already logs.
+                // Leaving the editor open is the user-visible signal.
               }
             }}
             onCancel={() => setEditingGoal(false)}

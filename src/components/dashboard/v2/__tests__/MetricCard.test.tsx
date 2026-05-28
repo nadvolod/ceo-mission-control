@@ -470,5 +470,55 @@ describe('MetricCard', () => {
       await user.keyboard('{Enter}');
       expect(onUpdateGoal).toHaveBeenLastCalledWith(40);
     });
+
+    // CodeRabbit PR-68 catch: `finally { setEditingGoal(false) }` hid the
+    // editor on failure too, making errors look like silent successes. The
+    // editor must stay open if the update rejects so the user can retry.
+    it('keeps the editor open when onUpdateGoal rejects', async () => {
+      const user = userEvent.setup();
+      const onUpdateGoal = jest.fn().mockRejectedValue(new Error('boom'));
+      const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
+      render(
+        <MetricCard
+          metric={temporalMetric()}
+          onLog={jest.fn()}
+          onUpdateGoal={onUpdateGoal}
+        />,
+      );
+
+      fireEvent.focus(screen.getByTestId('metric-card-temporal'));
+      await user.click(screen.getByTestId('temporal-edit-goal'));
+      await user.clear(screen.getByTestId('temporal-goal-editor-input'));
+      await user.type(screen.getByTestId('temporal-goal-editor-input'), '7');
+      await user.keyboard('{Enter}');
+
+      // Editor stays mounted so the user can retry in place.
+      expect(screen.queryByTestId('temporal-goal-editor-row')).toBeInTheDocument();
+      expect(onUpdateGoal).toHaveBeenCalledWith(7);
+      errSpy.mockRestore();
+    });
+
+    it('closes the editor on successful update', async () => {
+      const user = userEvent.setup();
+      const onUpdateGoal = jest.fn().mockResolvedValue(undefined);
+      render(
+        <MetricCard
+          metric={temporalMetric()}
+          onLog={jest.fn()}
+          onUpdateGoal={onUpdateGoal}
+        />,
+      );
+
+      fireEvent.focus(screen.getByTestId('metric-card-temporal'));
+      await user.click(screen.getByTestId('temporal-edit-goal'));
+      await user.clear(screen.getByTestId('temporal-goal-editor-input'));
+      await user.type(screen.getByTestId('temporal-goal-editor-input'), '6');
+      await user.keyboard('{Enter}');
+
+      // wait a microtask so the async onSubmit resolves
+      await Promise.resolve();
+      expect(onUpdateGoal).toHaveBeenCalledWith(6);
+      expect(screen.queryByTestId('temporal-goal-editor-row')).not.toBeInTheDocument();
+    });
   });
 });

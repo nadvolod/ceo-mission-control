@@ -118,12 +118,13 @@ export default function MissionControlV2Page() {
           body: JSON.stringify({ action: 'submitReview', temporalTarget: newGoal }),
         });
         if (!res.ok) {
-          console.error('Failed to update Temporal target', await res.text());
-          return;
+          const message = await res.text();
+          throw new Error(`Failed to update Temporal target: ${message}`);
         }
         await store.refresh();
       } catch (err) {
         console.error('Error updating Temporal target', err);
+        throw err;
       }
     },
     [store],
