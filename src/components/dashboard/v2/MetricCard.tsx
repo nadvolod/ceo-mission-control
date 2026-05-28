@@ -2,20 +2,31 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { Check } from 'lucide-react';
+import { AmountEditor } from './AmountEditor';
 import { Sparkline } from './primitives/Sparkline';
 import { fmtMetric, clamp } from './format';
 import type { MetricId, MetricSnapshot } from './types';
 
 type Preset = { label: string; delta: number };
 
+// Hour-based metrics keep their fixed quick-add deltas — `+1h Temporal` is a
+// useful muscle-memory shortcut. Money is different: every entry is a
+// different dollar amount, so the preset buttons just identify the
+// CATEGORY and the actual amount comes from a typed input. See the
+// `requiresAmountInput` branch in the render path below.
 const PRESETS: Partial<Record<MetricId, Preset[]>> = {
   temporal:   [{ label: '+0.5h', delta: 0.5 }, { label: '+1h', delta: 1 }, { label: '+2h', delta: 2 }],
   focus:      [{ label: '+0.5h', delta: 0.5 }, { label: '+1h', delta: 1 }, { label: '+2h', delta: 2 }],
   pipeline:   [{ label: '+ Call', delta: 0.5 }, { label: '+ Demo', delta: 1 }, { label: '+ FU', delta: 0.5 }],
   deepWork:   [{ label: '+0.5h', delta: 0.5 }, { label: '+1h', delta: 1 }],
   trained:    [{ label: '+ Session', delta: 1 }],
-  moneyMoved: [{ label: '+ Moved', delta: 250 }, { label: '+ Generated', delta: 500 }, { label: '+ Cut', delta: 100 }],
+  moneyMoved: [{ label: '+ Moved', delta: 0 }, { label: '+ Generated', delta: 0 }, { label: '+ Cut', delta: 0 }],
 };
+
+// Metrics whose preset buttons act as a CATEGORY selector, with the
+// amount typed by the user. Adding a metric here turns its preset row
+// into a two-step flow: click category → input amount → submit.
+const REQUIRES_AMOUNT_INPUT: ReadonlySet<MetricId> = new Set(['moneyMoved']);
 
 type MetricCardProps = {
   metric: MetricSnapshot;
@@ -35,6 +46,9 @@ export function MetricCard({ metric, big = false, onLog }: MetricCardProps) {
   const [hover, setHover] = useState(false);
   const [focusWithin, setFocusWithin] = useState(false);
   const [flash, setFlash] = useState(false);
+  // Tracks which category preset the user is in the middle of entering an
+  // amount for. Only used when REQUIRES_AMOUNT_INPUT.has(metric.id).
+  const [editingLabel, setEditingLabel] = useState<string | null>(null);
   const prevRef = useRef<number | undefined>(undefined);
 
   // Flash the border when the metric.today value changes. The setState is
@@ -63,6 +77,30 @@ export function MetricCard({ metric, big = false, onLog }: MetricCardProps) {
   const presets = PRESETS[metric.id] ?? [];
   const active = hover || focusWithin;
   const showPresets = active && presets.length > 0 && !!onLog;
+  const requiresAmount = REQUIRES_AMOUNT_INPUT.has(metric.id);
+  const isEditing = editingLabel !== null && requiresAmount;
+
+  // Reset the editing state when the card loses both hover and keyboard
+  // focus. Deferred via rAF so the setState isn't a synchronous effect-
+  // body setter (React 19 lint rule); the visible effect is the same.
+  useEffect(() => {
+    if (!(!active && isEditing)) return;
+    const id = requestAnimationFrame(() => {
+      setEditingLabel(null);
+    });
+    return () => cancelAnimationFrame(id);
+  }, [active, isEditing]);
+
+  const handlePresetClick = (preset: Preset) => {
+    if (!onLog) return;
+    if (requiresAmount) {
+      // Don't log a hardcoded amount — open the input. The user types the
+      // real number and submits via Enter / ✓.
+      setEditingLabel(preset.label);
+    } else {
+      onLog(metric.id, preset.delta, preset.label);
+    }
+  };
 
   const subLine =
     week != null && week !== 0
@@ -212,8 +250,8 @@ export function MetricCard({ metric, big = false, onLog }: MetricCardProps) {
           )}
         </div>
 
-        {/* Preset row (hover-revealed) */}
-        {presets.length > 0 && onLog && (
+        {/* Preset row (hover-revealed) — shown when not editing an amount. */}
+        {presets.length > 0 && onLog && !isEditing && (
           <div
             className="absolute inset-0 flex items-center gap-1"
             style={{
@@ -227,7 +265,7 @@ export function MetricCard({ metric, big = false, onLog }: MetricCardProps) {
               <button
                 key={preset.label}
                 type="button"
-                onClick={() => onLog(metric.id, preset.delta, preset.label)}
+                onClick={() => handlePresetClick(preset)}
                 tabIndex={showPresets ? 0 : -1}
                 className="flex-1 rounded-md cursor-pointer"
                 style={{
@@ -244,6 +282,23 @@ export function MetricCard({ metric, big = false, onLog }: MetricCardProps) {
                 {preset.label}
               </button>
             ))}
+          </div>
+        )}
+
+        {/* Amount-entry row — replaces the presets when a money category is
+            selected. Submit via Enter or the ✓ button; cancel with × or Esc. */}
+        {isEditing && onLog && editingLabel && (
+          <div className="absolute inset-0">
+            <AmountEditor
+              label={editingLabel}
+              accent={accent}
+              idPrefix={`${metric.id}-amount`}
+              onSubmit={(amount) => {
+                onLog(metric.id, amount, editingLabel);
+                setEditingLabel(null);
+              }}
+              onCancel={() => setEditingLabel(null)}
+            />
           </div>
         )}
       </div>

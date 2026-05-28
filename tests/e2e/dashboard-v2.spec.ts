@@ -296,6 +296,35 @@ test.describe('Mission Control v2', () => {
     // No CollapsiblePanel titled "Tasks" should render on the Overview body.
     await expect(page.getByText('Tasks', { exact: true })).toHaveCount(0);
   });
+
+  test('Money Moved card: click preset → type amount → log custom value', async ({ page }) => {
+    // The user complaint: money entries were logging hardcoded amounts
+    // ($250 / $500 / $100). Now the preset just selects the CATEGORY and
+    // the user types the actual amount.
+    await page.goto('/dashboard/v2');
+
+    const card = page.getByTestId('metric-card-moneyMoved');
+    await card.hover();
+
+    // Click "+ Generated" — should open the editor, NOT log immediately.
+    const financialPost = page.waitForRequest((req) =>
+      req.url().includes('/api/financial') && req.method() === 'POST',
+    );
+
+    await page.getByTestId('preset-moneyMoved-generated').click();
+    await expect(page.getByTestId('moneyMoved-amount-editor')).toBeVisible();
+
+    // Type a custom amount with formatting characters that should be
+    // stripped: "$1,234.50" → 1234.5.
+    await page.getByTestId('moneyMoved-amount-input').fill('$1,234.50');
+    await page.keyboard.press('Enter');
+
+    // Server received the typed amount + correct category.
+    const body = (await financialPost).postDataJSON();
+    expect(body.category).toBe('generated');
+    expect(body.amount).toBe(1234.5);
+    expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
 });
 
 // Mobile-viewport coverage. The desktop tree is gated by `hidden md:flex`;
@@ -334,5 +363,25 @@ test.describe('Mission Control v2 — mobile viewport', () => {
     await page.goto('/dashboard/v2');
     await page.getByTestId('mobile-nav-reflect').click();
     await expect(page.getByTestId('reflection-drawer')).toBeVisible();
+  });
+
+  test('quick-log + Moved opens the amount editor and submits the typed value', async ({ page }) => {
+    // Same custom-amount behavior on mobile: tap the money button →
+    // editor appears → type the amount → submit.
+    await page.goto('/dashboard/v2');
+
+    const financialPost = page.waitForRequest((req) =>
+      req.url().includes('/api/financial') && req.method() === 'POST',
+    );
+
+    await page.getByTestId('mobile-quick-moved').click();
+    await expect(page.getByTestId('mobile-quick-amount-editor-wrap')).toBeVisible();
+
+    await page.getByTestId('mobile-quick-amount-input').fill('789');
+    await page.keyboard.press('Enter');
+
+    const body = (await financialPost).postDataJSON();
+    expect(body.category).toBe('moved');
+    expect(body.amount).toBe(789);
   });
 });
