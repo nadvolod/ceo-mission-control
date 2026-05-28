@@ -325,9 +325,11 @@ test.describe('Mission Control v2', () => {
 
     // The activity feed shows the new entry. Optimistic + server-side
     // entries both flow through deriveActivity; the note ends up in the
-    // row's meta line. We use the unique note string as the locator so
-    // the assertion is unambiguous even if other entries exist.
-    await expect(page.getByText(note)).toBeVisible({ timeout: 5_000 });
+    // row's meta line. Scope to the desktop tree because the mobile
+    // ActivityFeed also renders (just CSS-hidden at desktop width) and
+    // Playwright's strict mode rejects ambiguous getByText matches.
+    const desktop = page.getByTestId('desktop-layout');
+    await expect(desktop.getByText(note)).toBeVisible({ timeout: 5_000 });
   });
 
   test('Money Moved card: click preset → type amount → log custom value', async ({ page }) => {
