@@ -31,7 +31,15 @@ const REQUIRES_AMOUNT_INPUT: ReadonlySet<MetricId> = new Set(['moneyMoved']);
 type MetricCardProps = {
   metric: MetricSnapshot;
   big?: boolean;
-  onLog?: (metricId: MetricId, delta: number, label: string) => void;
+  // The 4th arg `options.description` is forwarded to the store's log()
+  // so money entries can attach a user-typed note (e.g. "Benepass") in
+  // place of the auto-generated string.
+  onLog?: (
+    metricId: MetricId,
+    delta: number,
+    label: string,
+    options?: { description?: string },
+  ) => void;
 };
 
 function presetTestId(metricId: MetricId, label: string): string {
@@ -286,15 +294,18 @@ export function MetricCard({ metric, big = false, onLog }: MetricCardProps) {
         )}
 
         {/* Amount-entry row — replaces the presets when a money category is
-            selected. Submit via Enter or the ✓ button; cancel with × or Esc. */}
+            selected. Submit via Enter or the ✓ button; cancel with × or Esc.
+            For money, an additional note input lets the user describe the
+            entry ("Benepass") rather than the auto "via Mission Control". */}
         {isEditing && onLog && editingLabel && (
           <div className="absolute inset-0">
             <AmountEditor
               label={editingLabel}
               accent={accent}
               idPrefix={`${metric.id}-amount`}
-              onSubmit={(amount) => {
-                onLog(metric.id, amount, editingLabel);
+              withNote={metric.id === 'moneyMoved'}
+              onSubmit={(amount, note) => {
+                onLog(metric.id, amount, editingLabel, { description: note });
                 setEditingLabel(null);
               }}
               onCancel={() => setEditingLabel(null)}

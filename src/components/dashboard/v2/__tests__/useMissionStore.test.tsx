@@ -20,7 +20,15 @@ jest.mock('@/hooks/useDashboardData', () => ({
 
 describe('useMissionStore.log', () => {
   beforeEach(() => {
+    // clearAllMocks resets call history but NOT implementations — a prior
+    // test's `.mockImplementation(...)` would leak into the next case.
+    // Reset both explicitly so each test starts from the immediate-
+    // resolve default.
     jest.clearAllMocks();
+    mockLoadAllData.mockReset();
+    mockLoadAllData.mockImplementation(async () => {});
+    mockSaveT3T.mockReset();
+    mockSaveT3T.mockImplementation(async () => {});
     global.fetch = jest.fn(() =>
       Promise.resolve({ ok: true, json: () => Promise.resolve({ success: true }) }),
     ) as unknown as typeof fetch;
@@ -204,5 +212,88 @@ describe('useMissionStore.log', () => {
     });
 
     expect(result.current.activity).toHaveLength(0);
+  });
+
+  // Money entries: the optimistic row should show $amount and the
+  // user's note so the user sees their entry land immediately, with
+  // the same shape the server-side row will have once the refresh
+  // resolves. The earlier shape ("+ Moved Money moved | Quick log")
+  // was confusing — users thought the log didn't take.
+  describe('moneyMoved optimistic entry', () => {
+    it('shows the dollar amount as the label (not "Money moved")', async () => {
+      // Hold refresh open so the optimistic row is observable, then
+      // release it cleanly at the end so the dangling promise doesn't
+      // leak into the next test.
+      let releaseRefresh!: () => void;
+      mockLoadAllData.mockImplementationOnce(
+        () => new Promise<void>((res) => { releaseRefresh = () => res(); }),
+      );
+      const { result } = renderHook(() => useMissionStore());
+      let p!: Promise<void>;
+      act(() => {
+        p = result.current.log('moneyMoved', 1234.5, '+ Moved');
+      });
+      await waitFor(() => {
+        expect(result.current.activity).toHaveLength(1);
+      });
+      const row = result.current.activity[0];
+      expect(row.kind).toBe('moneyMoved');
+      expect(row.delta).toBe('+ Moved');
+      // Formatted with locale separators so the user sees "$1,234.5".
+      expect(row.label).toBe('$1,234.5');
+      // Default meta when no note supplied — matches what the server
+      // entry will have after refresh.
+      expect(row.meta).toBe('+ Moved via Mission Control');
+
+      await act(async () => {
+        releaseRefresh();
+        await p;
+      });
+    });
+
+    it('uses the user-supplied note as the meta when one is passed', async () => {
+      let releaseRefresh!: () => void;
+      mockLoadAllData.mockImplementationOnce(
+        () => new Promise<void>((res) => { releaseRefresh = () => res(); }),
+      );
+      const { result } = renderHook(() => useMissionStore());
+      let p!: Promise<void>;
+      act(() => {
+        p = result.current.log('moneyMoved', 500, '+ Generated', { description: 'Benepass' });
+      });
+      await waitFor(() => {
+        expect(result.current.activity).toHaveLength(1);
+      });
+      expect(result.current.activity[0].meta).toBe('Benepass');
+
+      await act(async () => {
+        releaseRefresh();
+        await p;
+      });
+    });
+
+    it('forwards options.description to the /api/financial POST body', async () => {
+      const { result } = renderHook(() => useMissionStore());
+      await act(async () => {
+        await result.current.log('moneyMoved', 250, '+ Cut', { description: 'office supplies' });
+      });
+      const call = (global.fetch as jest.Mock).mock.calls.find(([url]) => url === '/api/financial');
+      expect(call).toBeDefined();
+      const body = JSON.parse(call![1].body);
+      expect(body.category).toBe('cut');
+      expect(body.amount).toBe(250);
+      expect(body.description).toBe('office supplies');
+    });
+
+    it('falls back to the auto-generated description when no note is provided', async () => {
+      const { result } = renderHook(() => useMissionStore());
+      await act(async () => {
+        await result.current.log('moneyMoved', 100, '+ Moved');
+      });
+      const body = JSON.parse((global.fetch as jest.Mock).mock.calls[0][1].body);
+      // Server requires non-empty description; the auto string keeps the
+      // POST valid even when the user skipped the note input.
+      expect(body.description).toBe('+ Moved via Mission Control');
+    });
   });
 });
