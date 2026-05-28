@@ -504,6 +504,11 @@ function T3TPanelRow({
   //   - the 600ms debounce timeout
   //   - onBlur (user tabs/clicks away — old code lost this)
   //   - unmount (user navigates away — old code lost this)
+  //
+  // Race-safety: while `await onSave` is in flight the user may type more,
+  // which writes to `pendingRef.current`. When the await resolves we only
+  // transition to 'saved' if no newer pending value exists. The next
+  // debounce tick will save the new value and flip status correctly.
   const flushNow = useCallback(async () => {
     const pending = pendingRef.current;
     if (pending === null) return;
@@ -515,7 +520,11 @@ function T3TPanelRow({
     setStatus(pending.trim() ? 'saving' : 'idle');
     try {
       await onSave(localDate(), question, pending);
-      setStatus(pending.trim() ? 'saved' : 'idle');
+      // Only mark saved if nothing new is waiting. Otherwise we'd flash
+      // SAVED for a value the user has already replaced.
+      if (pendingRef.current === null) {
+        setStatus(pending.trim() ? 'saved' : 'idle');
+      }
     } catch (err) {
       console.error('T3T inline save failed', err);
       setStatus('error');

@@ -98,13 +98,14 @@ test.describe('Three to Thrive — inline autosave', () => {
     const input = page.getByTestId('t3t-inline-input-0');
     await input.fill(phrase);
     await waitForSaved(page, 0);
-    // Now clear it.
+    // Now clear it. The status badge transitions to idle (it hides because
+    // there's nothing saved). We poll the server until the answer is empty
+    // — that's the deterministic signal that the empty-save round-trip
+    // completed, rather than sleeping a fixed amount.
     await input.fill('');
-    // After clearing, the status badge goes away (status === 'idle'). Give the
-    // debounce + server PATCH time to complete.
-    await page.waitForTimeout(1200);
-    const saved = await answerFor(page, /courage and determination/i);
-    expect(saved ?? '').toBe('');
+    await expect
+      .poll(() => answerFor(page, /courage and determination/i), { timeout: 5_000 })
+      .toBe('');
   });
 
   // ---------- Boundary: single character ----------
@@ -129,13 +130,18 @@ test.describe('Three to Thrive — inline autosave', () => {
     expect(saved.endsWith(tag)).toBe(true);
   });
 
-  // ---------- Boundary: leading + trailing whitespace ----------
-  test('boundary: leading/trailing whitespace is preserved verbatim', async ({ page }) => {
+  // ---------- Boundary: leading + trailing whitespace gets trimmed ----------
+  test('boundary: leading/trailing whitespace is trimmed server-side', async ({ page }) => {
+    // The ThreeToThriveTracker on the server intentionally trims
+    // (src/lib/three-to-thrive.ts:126). This test pins that behavior so a
+    // future change to either side surfaces in CI rather than silently
+    // dropping user content.
     await openOverviewT3T(page);
-    const phrase = `   padded value ${Date.now()}   `;
-    await page.getByTestId('t3t-inline-input-0').fill(phrase);
+    const inner = `padded value ${Date.now()}`;
+    const padded = `   ${inner}   `;
+    await page.getByTestId('t3t-inline-input-0').fill(padded);
     await waitForSaved(page, 0);
-    expect(await answerFor(page, /courage and determination/i)).toBe(phrase);
+    expect(await answerFor(page, /courage and determination/i)).toBe(inner);
   });
 
   // ---------- Negative: flush on blur (the original bug) ----------
@@ -145,11 +151,12 @@ test.describe('Three to Thrive — inline autosave', () => {
     const input = page.getByTestId('t3t-inline-input-0');
     await input.fill(phrase);
     // Immediately blur — before the 600ms debounce fires. The flush-on-blur
-    // path should persist the value anyway.
+    // path should persist the value anyway. Poll the server until the
+    // answer arrives (deterministic) rather than sleeping a fixed amount.
     await input.blur();
-    // Give the synchronous save a moment to round-trip.
-    await page.waitForTimeout(800);
-    expect(await answerFor(page, /courage and determination/i)).toContain(phrase);
+    await expect
+      .poll(() => answerFor(page, /courage and determination/i), { timeout: 5_000 })
+      .toContain(phrase);
   });
 
   // ---------- Negative: flush on tab away to a different input ----------
@@ -157,10 +164,12 @@ test.describe('Three to Thrive — inline autosave', () => {
     await openOverviewT3T(page);
     const phrase = `tab-flush-${Date.now()}`;
     await page.getByTestId('t3t-inline-input-0').fill(phrase);
-    // Tab to the next textarea — this blurs the first one.
+    // Tab to the next textarea — this blurs the first one and the
+    // flush-on-blur path persists it. Poll until the value arrives.
     await page.getByTestId('t3t-inline-input-0').press('Tab');
-    await page.waitForTimeout(800);
-    expect(await answerFor(page, /courage and determination/i)).toContain(phrase);
+    await expect
+      .poll(() => answerFor(page, /courage and determination/i), { timeout: 5_000 })
+      .toContain(phrase);
   });
 
   // ---------- Negative: rapid typing only fires one save ----------

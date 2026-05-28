@@ -178,10 +178,13 @@ function RatingsTrend({ trend }: { trend: RatingsTrendEntry[] }) {
         wide column, which visually disconnected the two. The big colored
         N/10 numeral now sits right under the label so the association is
         unambiguous; the sparkline runs full-width below.
+
+        Min column width is 140px so the 140px-wide Sparkline doesn't clip
+        when the grid fits multiple columns at narrow viewports.
       */}
       <div
         className="grid gap-2.5"
-        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))' }}
+        style={{ gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))' }}
       >
         {RATING_KEYS.map(({ key, label, color }) => {
           const data = trend.map((t) => t[key]);
@@ -189,7 +192,7 @@ function RatingsTrend({ trend }: { trend: RatingsTrendEntry[] }) {
           return (
             <div
               key={key}
-              className="flex flex-col gap-2 rounded-lg"
+              className="flex flex-col gap-2 rounded-lg overflow-hidden"
               style={{
                 padding: '12px 14px',
                 background: 'rgba(255,255,255,0.03)',
@@ -214,7 +217,20 @@ function RatingsTrend({ trend }: { trend: RatingsTrendEntry[] }) {
                   /10
                 </span>
               </span>
-              <Sparkline data={data} color={color} fill={color} height={24} width={140} strokeWidth={1.5} dots />
+              {/* Sparkline uses preserveAspectRatio='none' so the fixed
+                  140-wide viewBox stretches/shrinks to the available cell
+                  width. width:100% in CSS overrides the SVG width attr. */}
+              <div style={{ width: '100%' }}>
+                <Sparkline
+                  data={data}
+                  color={color}
+                  fill={color}
+                  height={24}
+                  width={140}
+                  strokeWidth={1.5}
+                  dots
+                />
+              </div>
             </div>
           );
         })}

@@ -49,7 +49,15 @@ function waitForFocusHoursPost(page: Page) {
 // They use the shared test user from global-setup.ts (rows wiped each run).
 
 test.describe('Mission Control v2', () => {
-  test.describe.configure({ mode: 'serial' });
+  // Serial because each test depends on prior DB state (the cmdK Enter
+  // test logs +1h Temporal which the parity test then reads). We disable
+  // retries for the same reason: Playwright's retry mechanism re-runs the
+  // entire serial group from the start, but it does NOT reset DB state
+  // between attempts. So the empty-user precondition test would always
+  // fail on retry once any earlier attempt had logged data — a guaranteed
+  // false negative that masked the real failure. Better to fail loudly on
+  // the first run with the truthful error than to silently pass-on-retry.
+  test.describe.configure({ mode: 'serial', retries: 0 });
 
   test('renders the new shell and opens the log command palette', async ({ page }) => {
     const response = await page.goto('/dashboard/v2');
@@ -201,16 +209,18 @@ test.describe('Mission Control v2', () => {
     const focus = await readFocusHoursFromPage(page);
     const expectedTemporalToday = focus?.todaysMetrics?.byCategory?.Temporal ?? 0;
 
-    // The Temporal card surfaces today's Temporal hours in its main value.
-    const value = page.getByTestId('metric-card-temporal-value');
-    // The value renders as "Nh" or "0h".
-    const text = await value.textContent();
-    expect(text).not.toBeNull();
-    const match = text!.match(/(\d+(?:\.\d+)?)h/);
-    expect(match).not.toBeNull();
-    const shownTemporal = parseFloat(match![1]);
-    // Both should round-trip through the same number; allow a small tolerance.
-    expect(Math.abs(shownTemporal - expectedTemporalToday)).toBeLessThan(0.05);
+    // Wait for the card to converge on the API value. After page.goto the
+    // metric card mounts at 0h (empty initial state) while useDashboardData
+    // fetches in parallel; a single textContent read could race that
+    // fetch's re-render. Poll with a 5s budget so the assertion measures
+    // the *settled* value, not whichever side won the race.
+    await expect
+      .poll(async () => {
+        const text = await page.getByTestId('metric-card-temporal-value').textContent();
+        const m = text?.match(/(\d+(?:\.\d+)?)h/);
+        return m ? parseFloat(m[1]) : null;
+      }, { timeout: 5_000 })
+      .toBeCloseTo(expectedTemporalToday, 1);
   });
 
   test('timezone: client local date is what the server records', async ({ page }) => {

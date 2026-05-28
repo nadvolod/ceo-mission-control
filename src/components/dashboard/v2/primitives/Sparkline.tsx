@@ -39,7 +39,18 @@ export function Sparkline({
   const fillPath = `${linePath} L ${(width).toFixed(2)} ${height} L 0 ${height} Z`;
 
   return (
-    <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" aria-hidden>
+    <svg
+      width={width}
+      height={height}
+      viewBox={`0 0 ${width} ${height}`}
+      preserveAspectRatio="none"
+      // Stretch to fill the parent container. The `width` attribute and
+      // viewBox define the COORDINATE space; the CSS width here makes the
+      // SVG element itself shrink/grow with the layout. Without this, fixed
+      // pixel widths could overflow narrow cells (caught by Copilot).
+      style={{ width: '100%', maxWidth: width, display: 'block' }}
+      aria-hidden
+    >
       {fill && (
         <path d={fillPath} fill={fill} opacity={0.18} />
       )}

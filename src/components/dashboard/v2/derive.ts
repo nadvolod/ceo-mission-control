@@ -86,7 +86,7 @@ export function deriveActivity(opts: {
   // Drop e2e-test-authored rows before mapping. Belt-and-suspenders for
   // when stale rows survive in the DB despite global-setup wiping the
   // test user; the rule is documented in docs/dashboard-v2-architecture.md
-  // under R1 ("no fixtures in production code").
+  // under R5 ("derive.ts filters e2e-authored rows from the activity feed").
   const liveFocus = focus.filter((s) => !isE2EDescription(s.description));
   const liveFinancial = financial.filter((e) => !isE2EDescription(e.description));
   const merged: ActivityEntry[] = [
