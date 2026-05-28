@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { AiTask, TaskStats, FocusCategory, MonarchFinancialSnapshot, AdjustmentType, RevenueProjectionData, MonthProjection, Initiative, DailyScorecard, PerformanceDayEntry, WeeklySummary, WeeklyReview, MonthlyReview, MonthlyReviewRatings, ThreeToThriveEntry } from '@/lib/types';
+import { localDate } from '@/lib/dates';
 
 export interface RevenueProjectionApiResponse {
   data: RevenueProjectionData;
@@ -99,6 +100,10 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
   const [isLoading, setIsLoading] = useState(true);
 
   const loadAllData = useCallback(async () => {
+    // Compute the user's local YYYY-MM-DD once and pin every GET that has
+    // a "today" semantic to it. Server endpoints prefer this over their
+    // own UTC clock, so the snapshot we render matches the wall clock.
+    const today = localDate();
     const fetchers = [
       async () => {
         try {
@@ -122,7 +127,7 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
       },
       async () => {
         try {
-          const res = await fetch('/api/financial');
+          const res = await fetch(`/api/financial?date=${today}`);
           if (res.ok) {
             const data = await res.json();
             setFinancialData(data);
@@ -131,7 +136,7 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
       },
       async () => {
         try {
-          const res = await fetch('/api/focus-hours');
+          const res = await fetch(`/api/focus-hours?date=${today}`);
           if (res.ok) {
             const data = await res.json();
             setFocusData(data);
@@ -164,11 +169,9 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
           const res = await fetch('/api/weekly-tracker');
           if (res.ok) {
             const data = await res.json();
-            // Derive todaysEntry client-side using local date to avoid server timezone mismatch
-            const now = new Date();
-            const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            // Derive todaysEntry client-side using local date to avoid server timezone mismatch.
             const localEntry = data.currentWeekSummary?.dailyEntries?.find(
-              (e: PerformanceDayEntry | null) => e?.date === localDate
+              (e: PerformanceDayEntry | null) => e?.date === today
             ) ?? null;
             setWeeklyTrackerData({ ...data, todaysEntry: localEntry });
           }
@@ -353,8 +356,7 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
 
   const handleAddToDay = useCallback(async (deepWorkDelta: number, pipelineDelta: number, setTrained: boolean) => {
     try {
-      const now = new Date();
-      const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const date = localDate();
       const response = await fetch('/api/weekly-tracker', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -373,9 +375,7 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
 
   const handleLogDay = useCallback(async (deepWorkHours: number, pipelineActions: number, trained: boolean) => {
     try {
-      // Use local date to avoid UTC/timezone mismatch on the server
-      const now = new Date();
-      const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+      const date = localDate();
       const response = await fetch('/api/weekly-tracker', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -13,7 +13,6 @@ import { CmdK } from '@/components/dashboard/v2/CmdK';
 import { ReflectionDrawer } from '@/components/dashboard/v2/ReflectionDrawer';
 import { useMissionStore } from '@/components/dashboard/v2/useMissionStore';
 import { deriveActivity, deriveChips, consecutiveStreak } from '@/components/dashboard/v2/derive';
-import { SEED_ACTIVITY } from '@/components/dashboard/v2/seed';
 
 type Tab = 'overview' | 'insights' | 'review';
 
@@ -72,15 +71,17 @@ export default function MissionControlV2Page() {
     return () => clearTimeout(id);
   }, [store.toast, store.clearToast]);
 
-  // Derive the live activity feed.
+  // Derive the live activity feed. An empty array is the correct "no activity
+  // today" state — the ActivityFeed component already renders the empty UI.
+  // We do NOT fall back to fixtures: that leaked fake rows ("+ Generated
+  // $2,000 · Annual contract · Vega") to real users with no real entries.
   const activity = useMemo(() => {
-    const derived = deriveActivity({
+    return deriveActivity({
       focus: focusData?.recentSessions,
       financial: financialData?.recentEntries,
       optimistic: store.activity,
       limit: 25,
     });
-    return derived.length > 0 ? derived : SEED_ACTIVITY;
   }, [focusData, financialData, store.activity]);
 
   // Derive chips.

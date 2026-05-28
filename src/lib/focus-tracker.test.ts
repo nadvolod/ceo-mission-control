@@ -29,6 +29,33 @@ describe('FocusTracker', () => {
     storage._reset();
   });
 
+  // Regression for the timezone bug: at 9pm EST the local day differs from
+  // UTC's day. The tracker must let the caller (route handler) pin "today"
+  // to the user's local date instead of falling back to UTC.
+  describe('getTodaysMetrics(todayKey) honors the caller-provided local day', () => {
+    it('returns the requested day even when it differs from UTC today', async () => {
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
+      await tracker.addSession('Temporal', 1, 'evening block', '2026-05-27');
+      await tracker.addSession('Temporal', 2, 'morning block', '2026-05-28');
+
+      const may27 = tracker.getTodaysMetrics('2026-05-27');
+      expect(may27.totalHours).toBe(1);
+      expect(may27.byCategory.Temporal).toBe(1);
+
+      const may28 = tracker.getTodaysMetrics('2026-05-28');
+      expect(may28.totalHours).toBe(2);
+      expect(may28.byCategory.Temporal).toBe(2);
+    });
+
+    it('returns an empty day shape when the requested day has no sessions', async () => {
+      const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);
+      const empty = tracker.getTodaysMetrics('2026-05-27');
+      expect(empty.totalHours).toBe(0);
+      expect(empty.byCategory).toEqual({});
+      expect(empty.date).toBe('2026-05-27');
+    });
+  });
+
   describe('addSession', () => {
     it('should add a session and update daily metrics', async () => {
       const tracker = await FocusTracker.create(UNIT_TEST_OWNER_ID);

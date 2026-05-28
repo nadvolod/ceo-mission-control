@@ -3,12 +3,17 @@ import { FinancialTracker, FinancialValidationError } from '@/lib/financial-trac
 import { checkAuth } from '@/lib/auth';
 import { requireEffectiveUserId } from '@/lib/session';
 import { startOfWeek, format, subDays } from 'date-fns';
+import { isLocalDateKey } from '@/lib/dates';
 
 export async function GET(request: NextRequest) {
   try {
     const ownerId = await requireEffectiveUserId(request);
     const financialTracker = await FinancialTracker.create(ownerId);
-    const todaysMetrics = financialTracker.getTodaysMetrics();
+    // Client passes its local YYYY-MM-DD so "today" matches the user's wall
+    // clock, not UTC. See src/lib/dates.ts for context.
+    const dateParam = request.nextUrl.searchParams.get('date');
+    const todayKey = isLocalDateKey(dateParam) ? dateParam : undefined;
+    const todaysMetrics = financialTracker.getTodaysMetrics(todayKey);
     const weeklyTotals = financialTracker.getWeeklyTotals();
     const monthlyTotals = financialTracker.getMonthlyTotals();
     const previousWeekTotals = financialTracker.getPreviousWeekTotals();

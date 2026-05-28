@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { loadJSON, saveJSON, loadText, saveText, appendAuditLog } from '@/lib/storage';
 import { requireEffectiveUserId } from '@/lib/session';
+import { isLocalDateKey, localDate } from '@/lib/dates';
 
 interface TemporalSession {
   id: string;
@@ -74,7 +75,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { action, hours, description } = body;
+    const { action, hours, description, date: dateRaw } = body;
 
     if (action === 'addSession') {
       if (typeof hours !== 'number' || !isFinite(hours) || hours <= 0 || hours > 24) {
@@ -87,7 +88,11 @@ export async function POST(request: NextRequest) {
       const ownerId = await requireEffectiveUserId(request);
       const data = await loadTemporalData(ownerId);
       const now = new Date();
-      const today = now.toISOString().split('T')[0];
+      // Prefer the client-supplied local YYYY-MM-DD so the session
+      // attaches to the user's day, not UTC's day. (Used to be:
+      // `now.toISOString().split('T')[0]` — UTC — which sent EST-evening
+      // sessions to tomorrow.)
+      const today = isLocalDateKey(dateRaw) ? dateRaw : localDate(now);
 
       // Create new session
       const session: TemporalSession = {

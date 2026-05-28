@@ -1,5 +1,5 @@
 import type { ActivityEntry, MetricId } from './types';
-import type { Chip } from './seed';
+import type { Chip } from './palette';
 
 // ----- ActivityFeed derivation -------------------------------------------
 

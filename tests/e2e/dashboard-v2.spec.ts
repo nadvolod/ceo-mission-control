@@ -154,4 +154,48 @@ test.describe('Mission Control v2', () => {
     // Both should round-trip through the same number; allow a small tolerance.
     expect(Math.abs(shownTemporal - expectedTemporalToday)).toBeLessThan(0.05);
   });
+
+  test('empty test user sees no fake activity rows (no SEED_ACTIVITY leak)', async ({ page }) => {
+    // global-setup.ts wipes the test user's rows before each run. Before
+    // anything is logged, the activity feed must be empty — the SEED_ACTIVITY
+    // fallback was the prod data leak this PR fixes. Specifically: no
+    // mention of fixture meta strings like "Annual contract · Vega" or
+    // "Outbound · Northway" should ever reach a real user.
+    await page.goto('/dashboard/v2');
+    await expect(page.getByText('Activity', { exact: true })).toBeVisible();
+    const body = await page.locator('body').textContent();
+    expect(body || '').not.toMatch(/Annual contract · Vega/);
+    expect(body || '').not.toMatch(/Outbound · Northway/);
+    // The numeric metrics must read 0 until the user logs real data —
+    // not the seed values ($35.3K cash, 6.5h temporal).
+    const cashText = (await page.getByTestId('metric-card-cash').textContent()) || '';
+    expect(cashText).not.toMatch(/\$35\.3K/);
+  });
+
+  test('timezone: client local date is what the server records', async ({ page }) => {
+    // The bug class we're guarding against: at 9pm EST the UTC date is
+    // already tomorrow, so a UTC-based server would file the log on the
+    // wrong day. The client now sends its local YYYY-MM-DD in the POST
+    // body. We intercept the call and assert the date matches the
+    // browser's local computation, not UTC.
+    await page.goto('/dashboard/v2');
+
+    const focusPost = page.waitForRequest((req) =>
+      req.url().includes('/api/focus-hours') && req.method() === 'POST',
+    );
+
+    await page.getByTestId('cmdk-trigger').click();
+    await page.getByTestId('cmdk-input').fill('+1h temporal');
+    await page.keyboard.press('Enter');
+
+    const sentDate = (await focusPost).postDataJSON().date;
+    const expectedLocal = await page.evaluate(() => {
+      const d = new Date();
+      const y = d.getFullYear();
+      const m = String(d.getMonth() + 1).padStart(2, '0');
+      const dd = String(d.getDate()).padStart(2, '0');
+      return `${y}-${m}-${dd}`;
+    });
+    expect(sentDate).toBe(expectedLocal);
+  });
 });

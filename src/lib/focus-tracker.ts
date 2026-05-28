@@ -1,6 +1,7 @@
 import { startOfWeek, subWeeks, format, subDays } from 'date-fns';
 import type { FocusCategory, FocusSession, DailyFocusMetrics, FocusData } from './types';
 import { loadJSON, saveJSON } from './storage';
+import { localDate } from './dates';
 
 const VALID_CATEGORIES: FocusCategory[] = [
   'Temporal', 'Finance', 'Revenue', 'Housing',
@@ -87,7 +88,10 @@ export class FocusTracker {
       category = 'Other';
     }
 
-    const sessionDate = date || new Date().toISOString().split('T')[0];
+    // Prefer the caller-provided date (the v2 client sends its local
+    // YYYY-MM-DD); fall back to the server's local zone. UTC was the old
+    // default and caused evening logs in EST to land on the next day.
+    const sessionDate = date || localDate();
     const now = new Date().toISOString();
 
     const session: FocusSession = {
@@ -134,8 +138,11 @@ export class FocusTracker {
     day.byCategory = byCategory;
   }
 
-  getTodaysMetrics(): DailyFocusMetrics {
-    const today = new Date().toISOString().split('T')[0];
+  // `todayKey` is optional so callers (route handlers, tests) can pin
+  // today to the user's local day. When omitted we fall back to the
+  // server runtime's local zone — never UTC.
+  getTodaysMetrics(todayKey?: string): DailyFocusMetrics {
+    const today = todayKey || localDate();
     return this.data.dailyMetrics[today] || {
       date: today,
       sessions: [],

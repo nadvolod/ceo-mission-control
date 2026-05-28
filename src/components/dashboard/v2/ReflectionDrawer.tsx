@@ -5,7 +5,7 @@ import * as Dialog from '@radix-ui/react-dialog';
 import { Check, X } from 'lucide-react';
 import { OrbitStar } from './primitives/OrbitStar';
 import { Aurora } from './primitives/Aurora';
-import { MC_COLORS } from './seed';
+import { MC_COLORS } from './palette';
 import type { ThreeToThriveApiResponse } from '@/hooks/useDashboardData';
 
 type Save = (date: string, question: string, answer: string) => Promise<void>;

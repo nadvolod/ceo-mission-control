@@ -4,7 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { Search } from 'lucide-react';
 import type { MetricId } from './types';
-import { MC_COLORS } from './seed';
+import { MC_COLORS } from './palette';
 
 export type CmdAction = {
   kw: string;

@@ -1,19 +1,34 @@
-import type { ActivityEntry, MetricId, MetricSnapshot } from './types';
+// =========================================================================
+//   ⚠️  FIXTURES — TEST-ONLY DATA. NEVER IMPORT FROM PRODUCTION CODE.
+// =========================================================================
+//
+// The names below are deliberately prefixed `__FIXTURE_` so any import in a
+// non-test file is glaring in code review. A runtime guard below ALSO throws
+// if this module is loaded with NODE_ENV=production. The combination —
+// loud naming, runtime guard, and the file living under `__tests__/` —
+// is what enforces the rule "no fake/seed data ever reaches a real user".
+//
+// If you find yourself wanting these values in production: stop. Reach for
+// a real data source (Monarch, focus-tracker, financial-tracker) and let
+// the UI render an empty state when the data hasn't loaded yet.
 
-export const MC_COLORS = {
-  uv: '#7C7CFF',
-  uvHi: '#9D9CFF',
-  pink: '#FF7AD8',
-  green: '#3DDC97',
-  amber: '#FFB454',
-  red: '#FF6469',
-  cyan: '#5DD9FF',
-} as const;
+import type { ActivityEntry, MetricId, MetricSnapshot } from '../types';
+import type { Chip } from '../palette';
+import { MC_COLORS } from '../palette';
 
-// Numbers come from the design handoff source brief — used as the read-only
-// first-render baseline before any real data is wired in. Once the v2 page
-// reads from useDashboardData, real values override these per metric.
-export const SEED_METRICS: Record<MetricId, MetricSnapshot> = {
+// Hard guard. Production builds set NODE_ENV='production'; jest sets 'test';
+// `next dev` sets 'development'. Allow test + development, reject production.
+// `globalThis` indirection avoids being tree-shaken out by Next's bundler.
+const env = (globalThis as { process?: { env?: { NODE_ENV?: string } } }).process?.env?.NODE_ENV;
+if (env === 'production') {
+  throw new Error(
+    '[mission-control] __FIXTURE_* values are test-only and must never be ' +
+      'imported in a production build. If you see this, audit the call site ' +
+      'and replace the import with real data or an empty-state UI.',
+  );
+}
+
+export const __FIXTURE_METRICS: Record<MetricId, MetricSnapshot> = {
   cash:       { id: 'cash',       label: 'Cash',        today: 35300,  week: 35300,  unit: '$', fmt: 'money', note: 'No burn',           color: MC_COLORS.uv },
   cashMoM:    { id: 'cashMoM',    label: 'Cash MoM',    today: 228.0,  week: 228.0,  unit: '%', fmt: 'pct',   note: '+$2.4K vs last mo', color: MC_COLORS.green },
   netWorth:   { id: 'netWorth',   label: 'Net worth',   today: 982000, week: 982000, unit: '$', fmt: 'money', note: '$1.01M − $27.9K',   color: MC_COLORS.cyan },
@@ -26,8 +41,7 @@ export const SEED_METRICS: Record<MetricId, MetricSnapshot> = {
   trained:    { id: 'trained',    label: 'Trained',     today: 0,      week: 0,      goal: 4,   unit: '×', fmt: 'count', note: 'this week', color: MC_COLORS.amber },
 };
 
-// 14-day spark series, hand-picked from the prototype.
-export const SEED_SPARKS = {
+export const __FIXTURE_SPARKS = {
   cash:       [28100, 27600, 28400, 30100, 29800, 31200, 30700, 32400, 31500, 32800, 33400, 34100, 34800, 35300],
   netWorth:   [951000, 952500, 954100, 955800, 958200, 960100, 962700, 965300, 968400, 971200, 973900, 976200, 978900, 982000],
   temporal:   [0.5, 1, 0.5, 1.5, 2, 1, 0.5, 1.5, 2, 1, 0, 1, 1.5, 0],
@@ -36,7 +50,7 @@ export const SEED_SPARKS = {
   moneyMoved: [250, 500, 0, 750, 250, 1000, 500, 250, 0, 500, 1000, 750, 250, 0],
 } as const;
 
-export const SEED_ACTIVITY: ActivityEntry[] = [
+export const __FIXTURE_ACTIVITY: ActivityEntry[] = [
   { id: 'a1', t: '09:12', kind: 'temporal',   delta: '+1h',         label: 'Temporal',  meta: 'Brief read · investor deck' },
   { id: 'a2', t: '09:15', kind: 'money',      delta: '+ Generated', label: '$2,000',    meta: 'Annual contract · Vega' },
   { id: 'a3', t: '09:20', kind: 'pipeline',   delta: '+ Lead',      label: 'Pipeline',  meta: 'Outbound · Northway' },
@@ -44,14 +58,7 @@ export const SEED_ACTIVITY: ActivityEntry[] = [
   { id: 'a5', t: '08:30', kind: 'deepwork',   delta: '+0.5h',       label: 'Deep work', meta: 'Architecture doc' },
 ];
 
-// What gets rendered into the chip strip above the metric grid.
-export type Chip =
-  | { id: string; kind: 'streak'; icon: 'flame'; body: string; meta: string }
-  | { id: string; kind: 'positive'; icon: 'arrow-up'; body: string; emphasis: string }
-  | { id: string; kind: 'warning'; icon: 'zap'; body: string }
-  | { id: string; kind: 'sync'; body: string };
-
-export const SEED_CHIPS: Chip[] = [
+export const __FIXTURE_CHIPS: Chip[] = [
   { id: 'c1', kind: 'streak',   icon: 'flame',    body: '6-day Temporal streak', meta: 'longest in 30d' },
   { id: 'c2', kind: 'positive', icon: 'arrow-up', body: 'Cash MoM',              emphasis: '+228%' },
   { id: 'c3', kind: 'warning',  icon: 'zap',      body: 'Deep work pace ↓ vs 14-day avg' },

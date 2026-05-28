@@ -4,6 +4,7 @@ import { checkAuth } from '@/lib/auth';
 import type { FocusCategory, FocusSession } from '@/lib/types';
 import { appendAuditLog } from '@/lib/storage';
 import { requireEffectiveUserId } from '@/lib/session';
+import { isLocalDateKey } from '@/lib/dates';
 
 const VALID_CATEGORIES: FocusCategory[] = [
   'Temporal', 'Finance', 'Revenue', 'Housing',
@@ -33,10 +34,14 @@ export async function GET(request: NextRequest) {
 
     const now = new Date();
     const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+    // Client passes its local YYYY-MM-DD so "today" matches the user's wall
+    // clock, not UTC. Anonymous calls (no `?date=…`) fall back to server-local.
+    const dateParam = request.nextUrl.searchParams.get('date');
+    const todayKey = isLocalDateKey(dateParam) ? dateParam : undefined;
 
     return NextResponse.json({
       success: true,
-      todaysMetrics: tracker.getTodaysMetrics(),
+      todaysMetrics: tracker.getTodaysMetrics(todayKey),
       weeklyTotals: tracker.getWeeklyTotals(),
       previousWeekTotals: tracker.getPreviousWeekTotals(),
       weekOverWeek: tracker.getWeekOverWeekGrowth(),
@@ -98,7 +103,9 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: true,
           session,
-          todaysMetrics: tracker.getTodaysMetrics()
+          // The POST body's date doubles as the "today" hint for the
+          // returned snapshot so the client sees a consistent total.
+          todaysMetrics: tracker.getTodaysMetrics(isLocalDateKey(date) ? date : undefined)
         });
       }
 

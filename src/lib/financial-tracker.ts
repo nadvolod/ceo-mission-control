@@ -1,5 +1,6 @@
 import { addDays, format, startOfWeek } from 'date-fns';
 import { loadJSON, saveJSON } from './storage';
+import { localDate } from './dates';
 
 export class FinancialValidationError extends Error {
   constructor(message: string) {
@@ -70,7 +71,10 @@ export class FinancialTracker {
       throw new FinancialValidationError('Invalid description: description is required');
     }
 
-    const entryDate = date || new Date().toISOString().split('T')[0];
+    // Prefer the caller-provided date (the v2 client sends its local
+    // YYYY-MM-DD); fall back to the server's local zone. UTC was the old
+    // default and caused evening logs in EST to land on the next day.
+    const entryDate = date || localDate();
     if (!this.isSafeDateKey(entryDate)) {
       throw new FinancialValidationError(`Invalid date: expected YYYY-MM-DD (received ${entryDate})`);
     }
@@ -184,8 +188,8 @@ export class FinancialTracker {
     return parsed.toISOString().slice(0, 10) === value;
   }
 
-  getTodaysMetrics(): DailyFinancialMetrics {
-    const today = new Date().toISOString().split('T')[0];
+  getTodaysMetrics(todayKey?: string): DailyFinancialMetrics {
+    const today = todayKey || localDate();
     return this.data.dailyMetrics[today] || {
       date: today,
       entries: [],
