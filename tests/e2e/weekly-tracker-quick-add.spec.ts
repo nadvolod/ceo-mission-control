@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import { neon } from '@neondatabase/serverless';
 
 /**
- * Quick-add buttons on the Weekly Performance Tracker.
+ * Quick-add buttons on the legacy Weekly Performance Tracker.
  *
  * The new flow replaces the "Log Today" form with category-style buttons that
  * INCREMENT today's entry. The old form-save path silently overwrote, which
@@ -74,7 +74,7 @@ test.describe('Weekly Performance Tracker — additive quick-add', () => {
   });
 
   test('+30m Deep Work button creates a fresh day entry with 0.5h', async ({ page, request }) => {
-    await page.goto('/dashboard');
+    await page.goto('/dashboard/legacy');
     await page.waitForSelector('[data-testid="weekly-tracker-quick-add"]', { timeout: 15_000 });
 
     await page.getByRole('button', { name: '+30m Deep Work' }).click();
@@ -94,7 +94,7 @@ test.describe('Weekly Performance Tracker — additive quick-add', () => {
   });
 
   test('multiple clicks accumulate deepWorkHours additively (no overwrite)', async ({ page, request }) => {
-    await page.goto('/dashboard');
+    await page.goto('/dashboard/legacy');
     await page.waitForSelector('[data-testid="weekly-tracker-quick-add"]', { timeout: 15_000 });
 
     // 0.5h + 1h + 2h = 3.5h after three clicks.
@@ -118,7 +118,7 @@ test.describe('Weekly Performance Tracker — additive quick-add', () => {
   });
 
   test('+1 Pipeline accumulates pipelineActions independently of deep work', async ({ page, request }) => {
-    await page.goto('/dashboard');
+    await page.goto('/dashboard/legacy');
     await page.waitForSelector('[data-testid="weekly-tracker-quick-add"]', { timeout: 15_000 });
 
     await page.getByRole('button', { name: '+1h Deep Work' }).click();
@@ -135,7 +135,7 @@ test.describe('Weekly Performance Tracker — additive quick-add', () => {
   });
 
   test('✓ Trained latches true and stays true on subsequent additive clicks', async ({ page, request }) => {
-    await page.goto('/dashboard');
+    await page.goto('/dashboard/legacy');
     await page.waitForSelector('[data-testid="weekly-tracker-quick-add"]', { timeout: 15_000 });
 
     await page.getByRole('button', { name: '✓ Trained' }).click();
@@ -160,7 +160,7 @@ test.describe('Weekly Performance Tracker — additive quick-add', () => {
   });
 
   test('✓ Good Day tops up to (3h DW + 2 pipeline + trained) without lowering existing values', async ({ page, request }) => {
-    await page.goto('/dashboard');
+    await page.goto('/dashboard/legacy');
     await page.waitForSelector('[data-testid="weekly-tracker-quick-add"]', { timeout: 15_000 });
 
     // Start with 4h deep work + 1 pipeline — Good Day must NOT bring DW down to 3.

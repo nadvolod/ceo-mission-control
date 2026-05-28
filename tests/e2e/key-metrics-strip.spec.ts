@@ -1,7 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * Top-of-dashboard key metrics strip.
+ * Legacy dashboard key metrics strip.
  *
  * Per AGENTS.md: tests must exercise real functionality — not visibility-only.
  * These tests run against the local Next.js server (no mocking), so they
@@ -9,9 +9,9 @@ import { test, expect } from '@playwright/test';
  * data that unit tests can't.
  */
 
-test.describe('Top-of-dashboard key metrics strip', () => {
-  test('renders all seven metric cards with non-empty values on /dashboard', async ({ page }) => {
-    await page.goto('/dashboard');
+test.describe('Legacy dashboard key metrics strip', () => {
+  test('renders all seven metric cards with non-empty values on /dashboard/legacy', async ({ page }) => {
+    await page.goto('/dashboard/legacy');
 
     // Wait until the dashboard finishes its initial data load.
     await page.waitForSelector('[data-testid="key-metrics-strip"]', { timeout: 15_000 });
@@ -37,7 +37,7 @@ test.describe('Top-of-dashboard key metrics strip', () => {
   });
 
   test('Financial Command Center section is gone from the dashboard', async ({ page }) => {
-    await page.goto('/dashboard');
+    await page.goto('/dashboard/legacy');
     await page.waitForSelector('[data-testid="key-metrics-strip"]', { timeout: 15_000 });
 
     // The old FCC heading and its testid should no longer exist anywhere.
@@ -51,7 +51,7 @@ test.describe('Top-of-dashboard key metrics strip', () => {
   test('all seven metric cards fit above the fold on an iPhone 15 Plus viewport', async ({ page }) => {
     // iPhone 15 Plus logical viewport: 430 × 932.
     await page.setViewportSize({ width: 430, height: 932 });
-    await page.goto('/dashboard');
+    await page.goto('/dashboard/legacy');
     await page.waitForSelector('[data-testid="key-metrics-strip"]', { timeout: 15_000 });
 
     const strip = page.getByTestId('key-metrics-strip');
@@ -79,7 +79,7 @@ test.describe('Top-of-dashboard key metrics strip', () => {
   });
 
   test('refresh button on the compact header reloads every dashboard data source', async ({ page }) => {
-    await page.goto('/dashboard');
+    await page.goto('/dashboard/legacy');
     await page.waitForSelector('[data-testid="key-metrics-strip"]', { timeout: 15_000 });
 
     // The compact header exposes refresh as an icon-only button. The handler
@@ -108,7 +108,7 @@ test.describe('Top-of-dashboard key metrics strip', () => {
   });
 
   test('metrics strip survives a full page reload (truly persistent, not just first-mount)', async ({ page }) => {
-    await page.goto('/dashboard');
+    await page.goto('/dashboard/legacy');
     await page.waitForSelector('[data-testid="key-metrics-strip"]', { timeout: 15_000 });
     await expect(page.getByTestId('key-metrics-strip')).toBeVisible();
 
