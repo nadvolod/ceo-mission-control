@@ -128,6 +128,7 @@ export default function MissionControlV2Page() {
         fontFamily: 'var(--font-mc-sans)',
         fontSize: 13,
       }}
+      data-testid="desktop-layout"
     >
       <Aurora />
 

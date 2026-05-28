@@ -55,8 +55,11 @@ test.describe('Mission Control v2', () => {
     const response = await page.goto('/dashboard/v2');
     expect(response?.status()).toBeLessThan(400);
 
-    // Brand mark + wordmark
-    await expect(page.getByText('Mission Control', { exact: true })).toBeVisible();
+    // Brand mark + wordmark. Scope to the desktop tree — the mobile layout
+    // also contains "Mission Control" and Playwright's strict mode rightly
+    // refuses an ambiguous getByText.
+    const desktop = page.getByTestId('desktop-layout');
+    await expect(desktop.getByText('Mission Control', { exact: true })).toBeVisible();
     // The CTA pair
     await expect(page.getByTestId('cmdk-trigger')).toBeVisible();
     await expect(page.getByTestId('log-button')).toBeVisible();
@@ -93,7 +96,11 @@ test.describe('Mission Control v2', () => {
       (focus?.recentSessions?.length ?? 0) === 0;
     expect(serverIsEmpty).toBe(true);
 
-    await expect(page.getByText('Activity', { exact: true })).toBeVisible();
+    // Scope to the desktop tree — the mobile layout also renders an
+    // <ActivityFeed> instance, so a top-level getByText('Activity') hits
+    // both and fails Playwright strict mode.
+    const desktop = page.getByTestId('desktop-layout');
+    await expect(desktop.getByText('Activity', { exact: true })).toBeVisible();
     const body = await page.locator('body').textContent();
     // Strings from the old SEED_ACTIVITY fixture rows — none of these may
     // ever appear in front of a real user.

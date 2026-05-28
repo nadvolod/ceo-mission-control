@@ -251,9 +251,9 @@ function HeroTemporal({
                   background: 'rgba(255,255,255,0.08)',
                   color: 'var(--color-mc-ink)',
                   border: `1px solid ${MC_COLORS.uv}55`,
+                  fontFamily: 'inherit',
                   fontSize: 13,
                   fontWeight: 500,
-                  font: 'inherit',
                 }}
                 data-testid={`mobile-hero-preset-${slugifyLabel(label as string)}`}
               >
@@ -402,9 +402,9 @@ function QuickLogGrid({
               color,
               border: `1px solid ${color}40`,
               borderRadius: 10,
+              fontFamily: 'inherit',
               fontSize: 12,
               fontWeight: 500,
-              font: 'inherit',
             }}
             data-testid={`mobile-quick-${slugifyLabel(label)}`}
           >
@@ -445,7 +445,7 @@ function RecentActivity({
           style={{
             background: 'transparent',
             border: 'none',
-            font: 'inherit',
+            fontFamily: 'inherit',
             fontSize: 11,
             color: 'var(--color-mc-fg-dim)',
           }}
@@ -514,7 +514,7 @@ function BottomNav({
             style={{
               background: 'transparent',
               border: 'none',
-              font: 'inherit',
+              fontFamily: 'inherit',
               fontSize: 11,
               fontWeight: 500,
               color: active ? 'var(--color-mc-uv-hi)' : 'var(--color-mc-fg-dim)',
