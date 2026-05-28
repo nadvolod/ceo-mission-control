@@ -335,10 +335,10 @@ export function ReflectionDrawer({ open, onOpenChange, data, onSave }: Reflectio
                         }}
                       >
                         {saveStatus[q] === 'saved'
-                          ? `● SAVED · ${value.length} CHARS`
+                          ? '● SAVED'
                           : saveStatus[q] === 'error'
-                            ? `● SAVE FAILED · ${value.length} CHARS`
-                            : `● SAVING · ${value.length} CHARS`}
+                            ? '● SAVE FAILED'
+                            : '● SAVING'}
                       </div>
                     )}
                   </div>

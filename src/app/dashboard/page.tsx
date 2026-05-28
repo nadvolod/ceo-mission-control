@@ -106,6 +106,30 @@ export default function MissionControlV2Page() {
     });
   }, [weeklyTrackerData, monarchData]);
 
+  // Update the weekly Temporal target via the Temporal Focus card pencil.
+  // /api/weekly-tracker `submitReview` preserves prior review fields when
+  // called with just `temporalTarget` (verified in weekly-tracker.ts), so
+  // we can do a partial update without sending the full review body.
+  const onUpdateTemporalGoal = useCallback(
+    async (newGoal: number) => {
+      try {
+        const res = await fetch('/api/weekly-tracker', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'submitReview', temporalTarget: newGoal }),
+        });
+        if (!res.ok) {
+          console.error('Failed to update Temporal target', await res.text());
+          return;
+        }
+        await store.refresh();
+      } catch (err) {
+        console.error('Error updating Temporal target', err);
+      }
+    },
+    [store],
+  );
+
   return (
     <>
     {/* Mobile layout — hidden at md+ */}
@@ -282,7 +306,11 @@ export default function MissionControlV2Page() {
         <div className="grid gap-2.5 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
           <MetricCard metric={store.metrics.cash}       onLog={store.log} />
           <MetricCard metric={store.metrics.netWorth}   onLog={store.log} />
-          <MetricCard metric={store.metrics.temporal}   onLog={store.log} />
+          <MetricCard
+            metric={store.metrics.temporal}
+            onLog={store.log}
+            onUpdateGoal={onUpdateTemporalGoal}
+          />
           <MetricCard metric={store.metrics.pipeline}   onLog={store.log} />
           <MetricCard metric={store.metrics.deepWork}   onLog={store.log} />
           <MetricCard metric={store.metrics.moneyMoved} onLog={store.log} />
@@ -677,7 +705,7 @@ function T3TPanelRow({
             }}
             data-testid={`t3t-inline-status-${index}`}
           >
-            ● SAVED · {value.length} CHARS
+            ● SAVED
           </div>
         )}
         {status === 'error' && (

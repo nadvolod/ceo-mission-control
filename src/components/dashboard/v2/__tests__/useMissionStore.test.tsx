@@ -83,6 +83,39 @@ describe('useMissionStore.log', () => {
       expect(m.spark).toBeUndefined();
     }
     expect(result.current.activity).toEqual([]);
+    // Default temporal goal is 5h (the legacy fallback when no review yet).
+    expect(result.current.metrics.temporal.goal).toBe(5);
+    // Display label is "Temporal Focus", not the bare "Temporal".
+    expect(result.current.metrics.temporal.label).toBe('Temporal Focus');
+  });
+
+  // Verify the optimistic ActivityEntry now carries `tsMs` so
+  // deriveActivity can sort across day boundaries. This is the unit
+  // counterpart to the cross-day regression suite in derive.test.ts.
+  it('optimistic activity entries carry an epoch-ms timestamp (tsMs)', async () => {
+    let releaseRefresh!: () => void;
+    mockLoadAllData.mockImplementationOnce(
+      () => new Promise<void>((res) => { releaseRefresh = () => res(); }),
+    );
+    const { result } = renderHook(() => useMissionStore());
+    const before = Date.now();
+    let p!: Promise<void>;
+    act(() => {
+      p = result.current.log('moneyMoved', 100, '+ Moved');
+    });
+    await waitFor(() => {
+      expect(result.current.activity).toHaveLength(1);
+    });
+    const after = Date.now();
+    const row = result.current.activity[0];
+    expect(typeof row.tsMs).toBe('number');
+    expect(row.tsMs).toBeGreaterThanOrEqual(before);
+    expect(row.tsMs).toBeLessThanOrEqual(after);
+
+    await act(async () => {
+      releaseRefresh();
+      await p;
+    });
   });
 
   it('posts to /api/financial with the right category from the label', async () => {

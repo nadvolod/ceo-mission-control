@@ -246,4 +246,229 @@ describe('MetricCard', () => {
       expect(screen.queryByTestId('temporal-amount-editor')).not.toBeInTheDocument();
     });
   });
+
+  describe('Temporal Focus — editable weekly goal', () => {
+    // The Temporal card gets a ✎ pencil button when the parent passes
+    // `onUpdateGoal`. Clicking it opens an inline editor row below the
+    // eyebrow. Submit calls onUpdateGoal with the parsed hours.
+
+    function temporalMetric(goal = 5) {
+      return {
+        ...SEED_METRICS.temporal,
+        today: 1.5,
+        week: 6,
+        goal,
+        spark: [...SEED_SPARKS.temporal],
+      };
+    }
+
+    it('pencil button only renders for temporal + onUpdateGoal + active', () => {
+      const onLog = jest.fn();
+      const onUpdateGoal = jest.fn();
+      render(
+        <MetricCard
+          metric={temporalMetric()}
+          onLog={onLog}
+          onUpdateGoal={onUpdateGoal}
+        />,
+      );
+      // At rest the pencil is hidden (card not active).
+      expect(screen.queryByTestId('temporal-edit-goal')).not.toBeInTheDocument();
+
+      // Hover/focus activates the card → pencil appears.
+      fireEvent.focus(screen.getByTestId('metric-card-temporal'));
+      expect(screen.getByTestId('temporal-edit-goal')).toBeInTheDocument();
+    });
+
+    it('pencil does NOT render without an onUpdateGoal callback', () => {
+      const onLog = jest.fn();
+      render(<MetricCard metric={temporalMetric()} onLog={onLog} />);
+      fireEvent.focus(screen.getByTestId('metric-card-temporal'));
+      expect(screen.queryByTestId('temporal-edit-goal')).not.toBeInTheDocument();
+    });
+
+    it('pencil does NOT render on non-temporal metrics even when callback present', () => {
+      const onLog = jest.fn();
+      const onUpdateGoal = jest.fn();
+      // Pipeline has a goal; ensure the pencil is gated on metric.id.
+      const pipeline = { ...SEED_METRICS.pipeline };
+      render(
+        <MetricCard
+          metric={pipeline}
+          onLog={onLog}
+          onUpdateGoal={onUpdateGoal}
+        />,
+      );
+      fireEvent.focus(screen.getByTestId('metric-card-pipeline'));
+      expect(screen.queryByTestId('pipeline-edit-goal')).not.toBeInTheDocument();
+      expect(screen.queryByTestId('temporal-edit-goal')).not.toBeInTheDocument();
+    });
+
+    it('clicking the pencil opens the goal editor row pre-filled with the current goal', async () => {
+      const user = userEvent.setup();
+      const onLog = jest.fn();
+      const onUpdateGoal = jest.fn();
+      render(
+        <MetricCard
+          metric={temporalMetric(5)}
+          onLog={onLog}
+          onUpdateGoal={onUpdateGoal}
+        />,
+      );
+      fireEvent.focus(screen.getByTestId('metric-card-temporal'));
+      await user.click(screen.getByTestId('temporal-edit-goal'));
+
+      expect(screen.getByTestId('temporal-goal-editor-row')).toBeInTheDocument();
+      const input = screen.getByTestId('temporal-goal-editor-input');
+      expect(input).toHaveValue('5');
+    });
+
+    it('typing a new value + Enter calls onUpdateGoal with the parsed hours', async () => {
+      const user = userEvent.setup();
+      const onLog = jest.fn();
+      const onUpdateGoal = jest.fn().mockResolvedValue(undefined);
+      render(
+        <MetricCard
+          metric={temporalMetric()}
+          onLog={onLog}
+          onUpdateGoal={onUpdateGoal}
+        />,
+      );
+      fireEvent.focus(screen.getByTestId('metric-card-temporal'));
+      await user.click(screen.getByTestId('temporal-edit-goal'));
+      const input = screen.getByTestId('temporal-goal-editor-input');
+      await user.clear(input);
+      await user.type(input, '8');
+      await user.keyboard('{Enter}');
+
+      expect(onUpdateGoal).toHaveBeenCalledWith(8);
+    });
+
+    it('clicking ✓ submits same as Enter', async () => {
+      const user = userEvent.setup();
+      const onLog = jest.fn();
+      const onUpdateGoal = jest.fn().mockResolvedValue(undefined);
+      render(
+        <MetricCard
+          metric={temporalMetric()}
+          onLog={onLog}
+          onUpdateGoal={onUpdateGoal}
+        />,
+      );
+      fireEvent.focus(screen.getByTestId('metric-card-temporal'));
+      await user.click(screen.getByTestId('temporal-edit-goal'));
+      const input = screen.getByTestId('temporal-goal-editor-input');
+      await user.clear(input);
+      await user.type(input, '12.5');
+      await user.click(screen.getByTestId('temporal-goal-editor-submit'));
+
+      expect(onUpdateGoal).toHaveBeenCalledWith(12.5);
+    });
+
+    it('Escape cancels and closes the editor without calling onUpdateGoal', async () => {
+      const user = userEvent.setup();
+      const onLog = jest.fn();
+      const onUpdateGoal = jest.fn();
+      render(
+        <MetricCard
+          metric={temporalMetric()}
+          onLog={onLog}
+          onUpdateGoal={onUpdateGoal}
+        />,
+      );
+      fireEvent.focus(screen.getByTestId('metric-card-temporal'));
+      await user.click(screen.getByTestId('temporal-edit-goal'));
+      await user.type(screen.getByTestId('temporal-goal-editor-input'), '99');
+      await user.keyboard('{Escape}');
+
+      expect(onUpdateGoal).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('temporal-goal-editor-row')).not.toBeInTheDocument();
+    });
+
+    it('× cancels and closes the editor', async () => {
+      const user = userEvent.setup();
+      const onLog = jest.fn();
+      const onUpdateGoal = jest.fn();
+      render(
+        <MetricCard
+          metric={temporalMetric()}
+          onLog={onLog}
+          onUpdateGoal={onUpdateGoal}
+        />,
+      );
+      fireEvent.focus(screen.getByTestId('metric-card-temporal'));
+      await user.click(screen.getByTestId('temporal-edit-goal'));
+      await user.click(screen.getByTestId('temporal-goal-editor-cancel'));
+      expect(onUpdateGoal).not.toHaveBeenCalled();
+      expect(screen.queryByTestId('temporal-goal-editor-row')).not.toBeInTheDocument();
+    });
+
+    // Validation edge cases — same parser shape as AmountEditor.
+    it.each([
+      ['empty input',          ''],
+      ['zero',                 '0'],
+      ['negative',             '-5'],
+      ['scientific notation',  '1e3'],
+      ['double decimal',       '12..3'],
+      ['multi-segment',        '1.2.3'],
+      ['leading dot',          '.50'],
+      ['trailing dot',         '12.'],
+      ['letters mixed in',     '12abc'],
+      ['above max 40',         '50'],
+      ['below min 0.5',        '0.25'],
+    ])('rejects invalid input — %s', async (_label, bad) => {
+      const user = userEvent.setup();
+      const onLog = jest.fn();
+      const onUpdateGoal = jest.fn();
+      render(
+        <MetricCard
+          metric={temporalMetric()}
+          onLog={onLog}
+          onUpdateGoal={onUpdateGoal}
+        />,
+      );
+      fireEvent.focus(screen.getByTestId('metric-card-temporal'));
+      await user.click(screen.getByTestId('temporal-edit-goal'));
+      const input = screen.getByTestId('temporal-goal-editor-input');
+      await user.clear(input);
+      if (bad.length > 0) await user.type(input, bad);
+      await user.keyboard('{Enter}');
+      expect(onUpdateGoal).not.toHaveBeenCalled();
+      // Editor stays open so the user can correct.
+      expect(screen.getByTestId('temporal-goal-editor-row')).toBeInTheDocument();
+    });
+
+    it('accepts boundary values 0.5 and 40', async () => {
+      const user = userEvent.setup();
+      const onUpdateGoal = jest.fn().mockResolvedValue(undefined);
+      const { rerender } = render(
+        <MetricCard
+          metric={temporalMetric()}
+          onLog={jest.fn()}
+          onUpdateGoal={onUpdateGoal}
+        />,
+      );
+
+      fireEvent.focus(screen.getByTestId('metric-card-temporal'));
+      await user.click(screen.getByTestId('temporal-edit-goal'));
+      await user.clear(screen.getByTestId('temporal-goal-editor-input'));
+      await user.type(screen.getByTestId('temporal-goal-editor-input'), '0.5');
+      await user.keyboard('{Enter}');
+      expect(onUpdateGoal).toHaveBeenLastCalledWith(0.5);
+
+      rerender(
+        <MetricCard
+          metric={temporalMetric()}
+          onLog={jest.fn()}
+          onUpdateGoal={onUpdateGoal}
+        />,
+      );
+      fireEvent.focus(screen.getByTestId('metric-card-temporal'));
+      await user.click(screen.getByTestId('temporal-edit-goal'));
+      await user.clear(screen.getByTestId('temporal-goal-editor-input'));
+      await user.type(screen.getByTestId('temporal-goal-editor-input'), '40');
+      await user.keyboard('{Enter}');
+      expect(onUpdateGoal).toHaveBeenLastCalledWith(40);
+    });
+  });
 });

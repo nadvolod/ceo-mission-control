@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Check } from 'lucide-react';
+import { Check, Pencil } from 'lucide-react';
 import { AmountEditor } from './AmountEditor';
+import { InlineHoursEditor } from './InlineHoursEditor';
 import { Sparkline } from './primitives/Sparkline';
 import { fmtMetric, clamp } from './format';
 import type { MetricId, MetricSnapshot } from './types';
@@ -40,6 +41,11 @@ type MetricCardProps = {
     label: string,
     options?: { description?: string },
   ) => void;
+  // When provided AND `metric.id === 'temporal'`, a ✎ pencil button
+  // renders next to the goal text in the eyebrow row. Clicking it opens
+  // an inline editor below the eyebrow; submit calls this callback with
+  // the new hours value. Resolves once the server has acknowledged.
+  onUpdateGoal?: (newGoal: number) => Promise<void> | void;
 };
 
 function presetTestId(metricId: MetricId, label: string): string {
@@ -50,13 +56,16 @@ function presetTestId(metricId: MetricId, label: string): string {
   return `preset-${metricId}-${slug}`;
 }
 
-export function MetricCard({ metric, big = false, onLog }: MetricCardProps) {
+export function MetricCard({ metric, big = false, onLog, onUpdateGoal }: MetricCardProps) {
   const [hover, setHover] = useState(false);
   const [focusWithin, setFocusWithin] = useState(false);
   const [flash, setFlash] = useState(false);
   // Tracks which category preset the user is in the middle of entering an
   // amount for. Only used when REQUIRES_AMOUNT_INPUT.has(metric.id).
   const [editingLabel, setEditingLabel] = useState<string | null>(null);
+  // Open/closed state for the goal-edit row (Temporal Focus only). When
+  // true, a new row renders below the eyebrow with an InlineHoursEditor.
+  const [editingGoal, setEditingGoal] = useState(false);
   const prevRef = useRef<number | undefined>(undefined);
 
   // Flash the border when the metric.today value changes. The setState is
@@ -173,9 +182,59 @@ export function MetricCard({ metric, big = false, onLog }: MetricCardProps) {
           >
             {ahead && <Check size={10} aria-hidden />}
             {fmtMetric(week, metric.fmt)}/{fmtMetric(goal, metric.fmt)}
+            {/* Pencil edit button: only on the Temporal Focus card, only
+                when the parent passes an onUpdateGoal callback, and only
+                while the card is active (hover/focus) so it doesn't add
+                visual noise at rest. */}
+            {metric.id === 'temporal' && onUpdateGoal && active && !editingGoal && (
+              <button
+                type="button"
+                onClick={() => setEditingGoal(true)}
+                className="rounded-md flex items-center justify-center cursor-pointer"
+                style={{
+                  width: 16,
+                  height: 16,
+                  marginLeft: 2,
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--color-mc-fg-dim)',
+                  padding: 0,
+                }}
+                aria-label="Edit weekly goal"
+                data-testid={`${metric.id}-edit-goal`}
+              >
+                <Pencil size={11} aria-hidden />
+              </button>
+            )}
           </span>
         )}
       </div>
+
+      {/* Goal-edit row — renders below the eyebrow when editingGoal is on.
+          Only on the Temporal Focus card. Submitting calls onUpdateGoal
+          and closes the editor; Escape or × cancels. */}
+      {editingGoal && metric.id === 'temporal' && onUpdateGoal && (
+        <div
+          className="relative"
+          style={{ marginTop: 4 }}
+          data-testid={`${metric.id}-goal-editor-row`}
+        >
+          <InlineHoursEditor
+            label="Goal"
+            initial={goal ?? 5}
+            accent={accent}
+            idPrefix={`${metric.id}-goal-editor`}
+            onSubmit={async (newGoal) => {
+              try {
+                await onUpdateGoal(newGoal);
+              } finally {
+                setEditingGoal(false);
+              }
+            }}
+            onCancel={() => setEditingGoal(false)}
+          />
+        </div>
+      )}
 
       <div className="relative flex items-baseline gap-1.5">
         <span

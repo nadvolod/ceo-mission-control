@@ -13,7 +13,7 @@ const METRIC_LABELS: Record<MetricId, string> = {
   cashMoM:    'Cash MoM',
   netWorth:   'Net worth',
   debt:       'Total debt',
-  temporal:   'Temporal',
+  temporal:   'Temporal Focus',
   focus:      'Focus hours',
   moneyMoved: 'Money moved',
   pipeline:   'Pipeline',
@@ -228,7 +228,7 @@ function hhmm(d: Date = new Date()): string {
 
 export function useMissionStore() {
   const dashboard = useDashboardData();
-  const { monarchData, focusData, financialData, threeToThriveData, monthlyReviewData } = dashboard;
+  const { monarchData, focusData, financialData, threeToThriveData, monthlyReviewData, weeklyTrackerData } = dashboard;
 
   const [local, dispatch] = useReducer(localReducer, initialLocal);
   const refreshRef = useRef(dashboard.loadAllData);
@@ -261,7 +261,13 @@ export function useMissionStore() {
       cashMoM:    make('cashMoM',    '%', 'pct'),
       netWorth:   make('netWorth',   '$', 'money'),
       debt:       make('debt',       '$', 'money'),
-      temporal:   make('temporal',   'h', 'hours', { goal: 5,  note: 'this week' }),
+      // Goal is sourced from the current week's review (user-editable via
+      // the Temporal Focus card pencil button). Falls back to 5h until
+      // a review exists for the current week.
+      temporal:   make('temporal',   'h', 'hours', {
+        goal: weeklyTrackerData?.currentWeekSummary?.temporalTarget ?? 5,
+        note: 'this week',
+      }),
       focus:      make('focus',      'h', 'hours', { goal: 15, note: 'this week' }),
       moneyMoved: make('moneyMoved', '$', 'money', { note: 'this week' }),
       pipeline:   make('pipeline',   'h', 'hours', { goal: 3,  note: 'this week' }),
@@ -310,7 +316,7 @@ export function useMissionStore() {
     }
 
     return base;
-  }, [monarchData, focusData, financialData]);
+  }, [monarchData, focusData, financialData, weeklyTrackerData]);
 
   const metrics: Record<MetricId, MetricSnapshot> = useMemo(() => {
     const out = { ...baseMetrics };
@@ -345,9 +351,15 @@ export function useMissionStore() {
         : METRIC_LABELS[metricId];
       const optimisticMeta = userDescription || (isMoney ? `${label.trim()} via Mission Control` : 'Quick log');
 
+      // Use Date.now() for tsMs so deriveActivity's sort places this row
+      // above any older server-side entry, even if that server entry's
+      // HH:MM string is later in the day (cross-day clutter from yesterday
+      // evening, etc.). The HH:MM `t` is for display only.
+      const nowMs = Date.now();
       const entry: ActivityEntry = {
-        id: `local-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        t: hhmm(),
+        id: `local-${nowMs}-${Math.random().toString(36).slice(2, 8)}`,
+        t: hhmm(new Date(nowMs)),
+        tsMs: nowMs,
         kind: metricId,
         delta: label,
         label: optimisticLabel,
@@ -382,6 +394,14 @@ export function useMissionStore() {
 
   const clearToast = useCallback(() => dispatch({ type: 'clearToast' }), []);
 
+  // Public refresh — calls the underlying dashboard hook's loadAllData
+  // so the page can pull authoritative state after a mutation that the
+  // store doesn't own (e.g. updating the weekly Temporal target via
+  // /api/weekly-tracker submitReview).
+  const refresh = useCallback(async () => {
+    await refreshRef.current();
+  }, []);
+
   return {
     metrics,
     activity: local.activity,
@@ -395,6 +415,7 @@ export function useMissionStore() {
     saveThreeToThriveAnswer: dashboard.handleSaveThreeToThriveAnswer,
     isLoading: dashboard.isLoading,
     log,
+    refresh,
     clearToast,
   };
 }
