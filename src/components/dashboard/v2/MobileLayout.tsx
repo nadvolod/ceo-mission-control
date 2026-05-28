@@ -1,9 +1,11 @@
 'use client';
 
+import { useState } from 'react';
 import { Sparkles, Brain, Check, BarChart3 } from 'lucide-react';
 import { Aurora } from './primitives/Aurora';
 import { OrbitStar } from './primitives/OrbitStar';
 import { ActivityFeed } from './ActivityFeed';
+import { AmountEditor } from './AmountEditor';
 import { MC_COLORS } from './palette';
 import { fmtMetric, clamp } from './format';
 import type { ActivityEntry, MetricId, MetricSnapshot } from './types';
@@ -357,15 +359,23 @@ function SnapshotStrip({ metrics }: { metrics: Record<MetricId, MetricSnapshot> 
 
 // ----- Quick log grid (3×2) ---------------------------------------------
 
-type QuickAction = [label: string, metricId: MetricId, delta: number, color: string];
+type QuickAction = {
+  label: string;
+  metricId: MetricId;
+  // delta is null for money entries — those open an AmountEditor and the
+  // user types the actual amount. For hour-based entries the preset
+  // delta is logged directly on tap.
+  delta: number | null;
+  color: string;
+};
 
 const QUICK_ACTIONS: QuickAction[] = [
-  ['+ Moved',     'moneyMoved', 250, MC_COLORS.green],
-  ['+ Generated', 'moneyMoved', 500, MC_COLORS.green],
-  ['+ Call',      'pipeline',   0.5, MC_COLORS.amber],
-  ['+ Demo',      'pipeline',   1,   MC_COLORS.amber],
-  ['+ Deep 0.5h', 'deepWork',   0.5, MC_COLORS.cyan],
-  ['+ Train',     'trained',    1,   MC_COLORS.pink],
+  { label: '+ Moved',     metricId: 'moneyMoved', delta: null, color: MC_COLORS.green },
+  { label: '+ Generated', metricId: 'moneyMoved', delta: null, color: MC_COLORS.green },
+  { label: '+ Call',      metricId: 'pipeline',   delta: 0.5,  color: MC_COLORS.amber },
+  { label: '+ Demo',      metricId: 'pipeline',   delta: 1,    color: MC_COLORS.amber },
+  { label: '+ Deep 0.5h', metricId: 'deepWork',   delta: 0.5,  color: MC_COLORS.cyan },
+  { label: '+ Train',     metricId: 'trained',    delta: 1,    color: MC_COLORS.pink },
 ];
 
 function QuickLogGrid({
@@ -373,6 +383,11 @@ function QuickLogGrid({
 }: {
   onLog: (metricId: MetricId, delta: number, label: string) => void;
 }) {
+  // Track an open amount editor for money entries. When `editing` is set,
+  // we render an inline AmountEditor row above the grid instead of
+  // hijacking the grid layout.
+  const [editing, setEditing] = useState<{ label: string; metricId: MetricId; color: string } | null>(null);
+
   return (
     <div style={{ padding: '0 18px 14px' }} data-testid="mobile-quick-log">
       <div
@@ -386,15 +401,39 @@ function QuickLogGrid({
       >
         QUICK LOG
       </div>
+
+      {editing && (
+        <div style={{ marginBottom: 8 }} data-testid="mobile-quick-amount-editor-wrap">
+          <AmountEditor
+            label={editing.label}
+            accent={editing.color}
+            idPrefix="mobile-quick-amount"
+            onSubmit={(amount) => {
+              onLog(editing.metricId, amount, editing.label.trim());
+              setEditing(null);
+            }}
+            onCancel={() => setEditing(null)}
+          />
+        </div>
+      )}
+
       <div
         className="grid"
         style={{ gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 6 }}
       >
-        {QUICK_ACTIONS.map(([label, metricId, delta, color]) => (
+        {QUICK_ACTIONS.map(({ label, metricId, delta, color }) => (
           <button
             key={label}
             type="button"
-            onClick={() => onLog(metricId, delta, label.trim())}
+            onClick={() => {
+              if (delta === null) {
+                // Money entry — open the amount editor instead of logging
+                // a hardcoded value.
+                setEditing({ label, metricId, color });
+              } else {
+                onLog(metricId, delta, label.trim());
+              }
+            }}
             className="cursor-pointer"
             style={{
               padding: '12px 0',

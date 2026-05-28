@@ -44,12 +44,34 @@ describe('<MobileLayout />', () => {
     expect(onLog).toHaveBeenCalledWith('temporal', 0.5, '+0.5h');
   });
 
-  it('quick log +Generated tap calls onLog with the right args', async () => {
+  it('quick log + Generated opens the amount editor (no hardcoded log)', async () => {
     const user = userEvent.setup();
     const onLog = jest.fn();
     render(<MobileLayout {...defaultProps({ onLog })} />);
     await user.click(screen.getByTestId('mobile-quick-generated'));
-    expect(onLog).toHaveBeenCalledWith('moneyMoved', 500, '+ Generated');
+    // Money entries don't fire onLog directly — the user types an amount.
+    expect(onLog).not.toHaveBeenCalled();
+    expect(screen.getByTestId('mobile-quick-amount-editor-wrap')).toBeInTheDocument();
+  });
+
+  it('mobile money editor: typing an amount and submitting fires onLog with the parsed value', async () => {
+    const user = userEvent.setup();
+    const onLog = jest.fn();
+    render(<MobileLayout {...defaultProps({ onLog })} />);
+    await user.click(screen.getByTestId('mobile-quick-moved'));
+    await user.type(screen.getByTestId('mobile-quick-amount-input'), '$2,000');
+    await user.keyboard('{Enter}');
+    expect(onLog).toHaveBeenCalledWith('moneyMoved', 2000, '+ Moved');
+  });
+
+  it('mobile non-money quick log (+Call) still logs the hardcoded delta directly', async () => {
+    const user = userEvent.setup();
+    const onLog = jest.fn();
+    render(<MobileLayout {...defaultProps({ onLog })} />);
+    await user.click(screen.getByTestId('mobile-quick-call'));
+    expect(onLog).toHaveBeenCalledWith('pipeline', 0.5, '+ Call');
+    // No editor should appear for hour-based entries.
+    expect(screen.queryByTestId('mobile-quick-amount-editor-wrap')).not.toBeInTheDocument();
   });
 
   it('snapshot strip renders the 5 expected mini-cards', () => {
