@@ -121,7 +121,9 @@ export default function MissionControlV2Page() {
           const message = await res.text();
           throw new Error(`Failed to update Temporal target: ${message}`);
         }
-        await store.refresh();
+        // Only the weekly-tracker slice changed; avoid the full dashboard
+        // reload so the editor's "Saving..." spinner unblocks immediately.
+        await store.refreshWeeklyTracker();
       } catch (err) {
         console.error('Error updating Temporal target', err);
         throw err;

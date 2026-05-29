@@ -56,6 +56,9 @@ export interface DashboardData {
 
 export interface DashboardHandlers {
   loadAllData: () => Promise<void>;
+  // Re-fetch only /api/weekly-tracker — for mutations that don't touch
+  // focus/financial/monarch/etc., reloading everything is wasteful.
+  loadWeeklyTracker: () => Promise<void>;
   handleCreateTask: (data: { title: string; category?: string }) => Promise<void>;
   handleUpdateTask: (id: number, data: { status?: string; title?: string }) => Promise<void>;
   handleDeleteTask: (id: number) => Promise<void>;
@@ -98,6 +101,23 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
   const [threeToThriveData, setThreeToThriveData] = useState<ThreeToThriveApiResponse | null>(null);
   const [hasGarminData, setHasGarminData] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Standalone weekly-tracker fetcher so callers can refresh just this slice
+  // after a mutation that doesn't touch other endpoints (e.g. the inline
+  // Temporal goal edit). loadAllData reuses this same fetcher.
+  const loadWeeklyTracker = useCallback(async () => {
+    const today = localDate();
+    try {
+      const res = await fetch('/api/weekly-tracker');
+      if (res.ok) {
+        const data = await res.json();
+        const localEntry = data.currentWeekSummary?.dailyEntries?.find(
+          (e: PerformanceDayEntry | null) => e?.date === today
+        ) ?? null;
+        setWeeklyTrackerData({ ...data, todaysEntry: localEntry });
+      }
+    } catch (e) { console.error('Error loading weekly tracker:', e); }
+  }, []);
 
   const loadAllData = useCallback(async () => {
     // Compute the user's local YYYY-MM-DD once and pin every GET that has
@@ -164,19 +184,7 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
           }
         } catch (e) { console.error('Error loading projections:', e); }
       },
-      async () => {
-        try {
-          const res = await fetch('/api/weekly-tracker');
-          if (res.ok) {
-            const data = await res.json();
-            // Derive todaysEntry client-side using local date to avoid server timezone mismatch.
-            const localEntry = data.currentWeekSummary?.dailyEntries?.find(
-              (e: PerformanceDayEntry | null) => e?.date === today
-            ) ?? null;
-            setWeeklyTrackerData({ ...data, todaysEntry: localEntry });
-          }
-        } catch (e) { console.error('Error loading weekly tracker:', e); }
-      },
+      loadWeeklyTracker,
       async () => {
         try {
           const res = await fetch('/api/monthly-review');
@@ -213,7 +221,7 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
 
     await Promise.allSettled(fetchers.map(f => f()));
     setIsLoading(false);
-  }, []);
+  }, [loadWeeklyTracker]);
 
   useEffect(() => {
     loadAllData();
@@ -520,7 +528,7 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
     aiTasks, taskStats, initiatives, scorecard, financialData, focusData,
     monarchData, monarchError, monarchLoading, projectionData, weeklyTrackerData,
     monthlyReviewData, threeToThriveData, hasGarminData, isLoading,
-    loadAllData, handleCreateTask, handleUpdateTask, handleDeleteTask,
+    loadAllData, loadWeeklyTracker, handleCreateTask, handleUpdateTask, handleDeleteTask,
     handleMonarchRefresh, handleAddProjectionAdjustment, handleRemoveProjectionAdjustment,
     handleAddFinancialEntry, handleAddFocusSession, handleLogDay, handleAddToDay, handleSubmitWeeklyReview,
     handleSubmitMonthlyReview, handleDeleteMonthlyReview,

@@ -3,6 +3,7 @@ import { useMissionStore } from '../useMissionStore';
 
 // Mock the underlying dashboard hook so we only exercise the v2 wrapper.
 const mockLoadAllData = jest.fn(async () => {});
+const mockLoadWeeklyTracker = jest.fn(async () => {});
 const mockSaveT3T = jest.fn(async () => {});
 
 jest.mock('@/hooks/useDashboardData', () => ({
@@ -14,6 +15,7 @@ jest.mock('@/hooks/useDashboardData', () => ({
     threeToThriveData: null,
     isLoading: false,
     loadAllData: mockLoadAllData,
+    loadWeeklyTracker: mockLoadWeeklyTracker,
     handleSaveThreeToThriveAnswer: mockSaveT3T,
   }),
 }));
@@ -27,6 +29,8 @@ describe('useMissionStore.log', () => {
     jest.clearAllMocks();
     mockLoadAllData.mockReset();
     mockLoadAllData.mockImplementation(async () => {});
+    mockLoadWeeklyTracker.mockReset();
+    mockLoadWeeklyTracker.mockImplementation(async () => {});
     mockSaveT3T.mockReset();
     mockSaveT3T.mockImplementation(async () => {});
     global.fetch = jest.fn(() =>
@@ -327,6 +331,29 @@ describe('useMissionStore.log', () => {
       // Server requires non-empty description; the auto string keeps the
       // POST valid even when the user skipped the note input.
       expect(body.description).toBe('+ Moved via Mission Control');
+    });
+  });
+
+  // refresh / refreshWeeklyTracker — the second is a targeted variant for
+  // mutations that only touch the weekly-tracker slice (the inline Temporal
+  // goal edit). It must NOT trigger the full loadAllData fetch.
+  describe('refresh variants', () => {
+    it('refresh() invokes loadAllData (full dashboard reload)', async () => {
+      const { result } = renderHook(() => useMissionStore());
+      await act(async () => {
+        await result.current.refresh();
+      });
+      expect(mockLoadAllData).toHaveBeenCalledTimes(1);
+      expect(mockLoadWeeklyTracker).not.toHaveBeenCalled();
+    });
+
+    it('refreshWeeklyTracker() invokes only loadWeeklyTracker', async () => {
+      const { result } = renderHook(() => useMissionStore());
+      await act(async () => {
+        await result.current.refreshWeeklyTracker();
+      });
+      expect(mockLoadWeeklyTracker).toHaveBeenCalledTimes(1);
+      expect(mockLoadAllData).not.toHaveBeenCalled();
     });
   });
 });

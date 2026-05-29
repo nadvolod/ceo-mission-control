@@ -232,9 +232,11 @@ export function useMissionStore() {
 
   const [local, dispatch] = useReducer(localReducer, initialLocal);
   const refreshRef = useRef(dashboard.loadAllData);
+  const refreshWeeklyTrackerRef = useRef(dashboard.loadWeeklyTracker);
   useEffect(() => {
     refreshRef.current = dashboard.loadAllData;
-  }, [dashboard.loadAllData]);
+    refreshWeeklyTrackerRef.current = dashboard.loadWeeklyTracker;
+  }, [dashboard.loadAllData, dashboard.loadWeeklyTracker]);
 
   const baseMetrics: Record<MetricId, MetricSnapshot> = useMemo(() => {
     // Empty defaults. No fake user values, no fake spark series. The UI
@@ -396,10 +398,17 @@ export function useMissionStore() {
 
   // Public refresh — calls the underlying dashboard hook's loadAllData
   // so the page can pull authoritative state after a mutation that the
-  // store doesn't own (e.g. updating the weekly Temporal target via
-  // /api/weekly-tracker submitReview).
+  // store doesn't own.
   const refresh = useCallback(async () => {
     await refreshRef.current();
+  }, []);
+
+  // Targeted refresh for mutations that only touch the weekly-tracker
+  // slice (e.g. inline Temporal goal edit). Avoids re-fetching focus,
+  // financial, monarch, etc. — that full reload kept the editor in its
+  // "Saving..." state for the duration of the slowest endpoint.
+  const refreshWeeklyTracker = useCallback(async () => {
+    await refreshWeeklyTrackerRef.current();
   }, []);
 
   return {
@@ -416,6 +425,7 @@ export function useMissionStore() {
     isLoading: dashboard.isLoading,
     log,
     refresh,
+    refreshWeeklyTracker,
     clearToast,
   };
 }
