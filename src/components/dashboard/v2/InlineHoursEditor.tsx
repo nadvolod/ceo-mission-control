@@ -13,9 +13,11 @@ type InlineHoursEditorProps = {
   // Fired with the parsed positive number (in hours) on Enter or ✓.
   // Validation is strict: 0.5–40 inclusive, decimal allowed; anything
   // outside the range or non-numeric refocuses the input instead.
-  onSubmit: (hours: number) => void;
+  onSubmit: (hours: number) => void | Promise<void>;
   // Fired on Escape or × click.
   onCancel: () => void;
+  // Prevents edits / duplicate submits while an async caller is saving.
+  disabled?: boolean;
   // testid prefix; "hours-editor" + the various sub-element suffixes.
   idPrefix?: string;
   // Min/max bounds. Defaults: 0.5 and 40.
@@ -33,6 +35,7 @@ export function InlineHoursEditor({
   accent,
   onSubmit,
   onCancel,
+  disabled = false,
   idPrefix = 'hours-editor',
   min = 0.5,
   max = 40,
@@ -52,6 +55,7 @@ export function InlineHoursEditor({
   }, []);
 
   const submit = () => {
+    if (disabled) return;
     // Strip whitespace only — no $ / , here, hours don't carry money
     // formatting. Strict positive-decimal regex (matches AmountEditor's
     // post-PR-65 parser) rejects "-5" / "1e3" / "1.2.3" / ".50" / "12.".
@@ -68,8 +72,10 @@ export function InlineHoursEditor({
     onSubmit(hours);
   };
 
-  const disabled =
-    value.trim().length === 0 || !/^\d+(\.\d+)?$/.test(value.replace(/\s/g, ''));
+  const submitDisabled =
+    disabled ||
+    value.trim().length === 0 ||
+    !/^\d+(\.\d+)?$/.test(value.replace(/\s/g, ''));
 
   return (
     <div
@@ -92,6 +98,7 @@ export function InlineHoursEditor({
         ref={inputRef}
         type="text"
         inputMode="decimal"
+        disabled={disabled}
         value={value}
         onChange={(e) => setValue(e.target.value)}
         onKeyDown={(e) => {
@@ -114,6 +121,7 @@ export function InlineHoursEditor({
           color: 'var(--color-mc-ink)',
           border: `1px solid ${accent}66`,
           outline: 'none',
+          opacity: disabled ? 0.72 : 1,
         }}
         data-testid={`${idPrefix}-input`}
       />
@@ -129,15 +137,15 @@ export function InlineHoursEditor({
       <button
         type="button"
         onClick={submit}
-        disabled={disabled}
+        disabled={submitDisabled}
         className="rounded-md cursor-pointer flex items-center justify-center"
         style={{
           width: 22,
           height: 22,
-          background: disabled ? `${accent}22` : accent,
-          color: disabled ? accent : '#fff',
+          background: submitDisabled ? `${accent}22` : accent,
+          color: submitDisabled ? accent : '#fff',
           border: `1px solid ${accent}`,
-          opacity: disabled ? 0.6 : 1,
+          opacity: submitDisabled ? 0.6 : 1,
         }}
         aria-label="Save hours"
         data-testid={`${idPrefix}-submit`}

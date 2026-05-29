@@ -66,6 +66,8 @@ export function MetricCard({ metric, big = false, onLog, onUpdateGoal }: MetricC
   // Open/closed state for the goal-edit row (Temporal Focus only). When
   // true, a new row renders below the eyebrow with an InlineHoursEditor.
   const [editingGoal, setEditingGoal] = useState(false);
+  const [goalSaving, setGoalSaving] = useState(false);
+  const [goalError, setGoalError] = useState<string | null>(null);
   const prevRef = useRef<number | undefined>(undefined);
 
   // Flash the border when the metric.today value changes. The setState is
@@ -189,7 +191,10 @@ export function MetricCard({ metric, big = false, onLog, onUpdateGoal }: MetricC
             {metric.id === 'temporal' && onUpdateGoal && active && !editingGoal && (
               <button
                 type="button"
-                onClick={() => setEditingGoal(true)}
+                onClick={() => {
+                  setGoalError(null);
+                  setEditingGoal(true);
+                }}
                 className="rounded-md flex items-center justify-center cursor-pointer"
                 style={{
                   width: 16,
@@ -224,20 +229,57 @@ export function MetricCard({ metric, big = false, onLog, onUpdateGoal }: MetricC
             initial={goal ?? 5}
             accent={accent}
             idPrefix={`${metric.id}-goal-editor`}
+            disabled={goalSaving}
             onSubmit={async (newGoal) => {
               // Close the editor only on success. If onUpdateGoal rejects
               // (network/API failure), keep the editor open so the user can
-              // retry without re-opening; the error is logged by the caller.
+              // retry without re-opening.
+              if (goalSaving) return;
+              setGoalSaving(true);
+              setGoalError(null);
               try {
                 await onUpdateGoal(newGoal);
                 setEditingGoal(false);
-              } catch {
-                // Intentionally swallow — onUpdateGoal already logs.
-                // Leaving the editor open is the user-visible signal.
+              } catch (err) {
+                setGoalError(err instanceof Error ? err.message : 'Save failed. Try again.');
+              } finally {
+                setGoalSaving(false);
               }
             }}
-            onCancel={() => setEditingGoal(false)}
+            onCancel={() => {
+              setGoalError(null);
+              setEditingGoal(false);
+            }}
           />
+          {goalSaving && (
+            <div
+              className="font-numerics uppercase"
+              style={{
+                marginTop: 4,
+                fontSize: 10,
+                letterSpacing: 0,
+                color: 'var(--color-mc-fg-dim)',
+              }}
+              data-testid={`${metric.id}-goal-editor-saving`}
+            >
+              Saving...
+            </div>
+          )}
+          {goalError && !goalSaving && (
+            <div
+              role="alert"
+              className="font-numerics uppercase"
+              style={{
+                marginTop: 4,
+                fontSize: 10,
+                letterSpacing: 0,
+                color: 'var(--color-mc-red)',
+              }}
+              data-testid={`${metric.id}-goal-editor-error`}
+            >
+              Save failed. Try again.
+            </div>
+          )}
         </div>
       )}
 

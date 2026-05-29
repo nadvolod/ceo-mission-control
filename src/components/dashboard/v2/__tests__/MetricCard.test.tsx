@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MetricCard } from '../MetricCard';
 import { __FIXTURE_METRICS as SEED_METRICS, __FIXTURE_SPARKS as SEED_SPARKS } from './__fixtures__';
@@ -477,7 +477,6 @@ describe('MetricCard', () => {
     it('keeps the editor open when onUpdateGoal rejects', async () => {
       const user = userEvent.setup();
       const onUpdateGoal = jest.fn().mockRejectedValue(new Error('boom'));
-      const errSpy = jest.spyOn(console, 'error').mockImplementation(() => {});
       render(
         <MetricCard
           metric={temporalMetric()}
@@ -493,9 +492,52 @@ describe('MetricCard', () => {
       await user.keyboard('{Enter}');
 
       // Editor stays mounted so the user can retry in place.
-      expect(screen.queryByTestId('temporal-goal-editor-row')).toBeInTheDocument();
+      await waitFor(() => {
+        expect(screen.getByTestId('temporal-goal-editor-error')).toHaveTextContent(/save failed/i);
+      });
+      expect(screen.getByTestId('temporal-goal-editor-row')).toBeInTheDocument();
+      expect(screen.getByTestId('temporal-goal-editor-input')).toHaveValue('7');
       expect(onUpdateGoal).toHaveBeenCalledWith(7);
-      errSpy.mockRestore();
+    });
+
+    it('disables the editor while saving so duplicate submits do not double-post', async () => {
+      const user = userEvent.setup();
+      let resolveSave!: () => void;
+      const onUpdateGoal = jest.fn(
+        () => new Promise<void>((resolve) => {
+          resolveSave = resolve;
+        }),
+      );
+      render(
+        <MetricCard
+          metric={temporalMetric()}
+          onLog={jest.fn()}
+          onUpdateGoal={onUpdateGoal}
+        />,
+      );
+
+      fireEvent.focus(screen.getByTestId('metric-card-temporal'));
+      await user.click(screen.getByTestId('temporal-edit-goal'));
+      const input = screen.getByTestId('temporal-goal-editor-input');
+      await user.clear(input);
+      await user.type(input, '9');
+      await user.click(screen.getByTestId('temporal-goal-editor-submit'));
+
+      await waitFor(() => {
+        expect(screen.getByTestId('temporal-goal-editor-saving')).toBeInTheDocument();
+        expect(input).toBeDisabled();
+      });
+
+      await user.click(screen.getByTestId('temporal-goal-editor-submit'));
+      expect(onUpdateGoal).toHaveBeenCalledTimes(1);
+
+      await act(async () => {
+        resolveSave();
+        await Promise.resolve();
+      });
+      await waitFor(() => {
+        expect(screen.queryByTestId('temporal-goal-editor-row')).not.toBeInTheDocument();
+      });
     });
 
     it('closes the editor on successful update', async () => {
