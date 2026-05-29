@@ -106,6 +106,32 @@ export default function MissionControlV2Page() {
     });
   }, [weeklyTrackerData, monarchData]);
 
+  // Inline Temporal target edit (pencil on the Temporal Focus card). Partial
+  // POST: only `temporalTarget` is sent. submitWeeklyReview merges with the
+  // prior week's stored review and preserves text fields the caller omits.
+  const onUpdateTemporalGoal = useCallback(
+    async (newGoal: number) => {
+      try {
+        const res = await fetch('/api/weekly-tracker', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ action: 'submitReview', temporalTarget: newGoal }),
+        });
+        if (!res.ok) {
+          const message = await res.text();
+          throw new Error(`Failed to update Temporal target: ${message}`);
+        }
+        // Only the weekly-tracker slice changed; avoid the full dashboard
+        // reload so the editor's "Saving..." spinner unblocks immediately.
+        await store.refreshWeeklyTracker();
+      } catch (err) {
+        console.error('Error updating Temporal target', err);
+        throw err;
+      }
+    },
+    [store],
+  );
+
   return (
     <>
     {/* Mobile layout — hidden at md+ */}
@@ -117,6 +143,7 @@ export default function MissionControlV2Page() {
         onTab={setTab}
         onOpenReflection={() => setReflectOpen(true)}
         onLog={store.log}
+        onUpdateTemporalGoal={onUpdateTemporalGoal}
       />
     </div>
 
@@ -282,7 +309,11 @@ export default function MissionControlV2Page() {
         <div className="grid gap-2.5 grid-cols-2 md:grid-cols-3 lg:grid-cols-6">
           <MetricCard metric={store.metrics.cash}       onLog={store.log} />
           <MetricCard metric={store.metrics.netWorth}   onLog={store.log} />
-          <MetricCard metric={store.metrics.temporal}   onLog={store.log} />
+          <MetricCard
+            metric={store.metrics.temporal}
+            onLog={store.log}
+            onUpdateGoal={onUpdateTemporalGoal}
+          />
           <MetricCard metric={store.metrics.pipeline}   onLog={store.log} />
           <MetricCard metric={store.metrics.deepWork}   onLog={store.log} />
           <MetricCard metric={store.metrics.moneyMoved} onLog={store.log} />
@@ -677,7 +708,7 @@ function T3TPanelRow({
             }}
             data-testid={`t3t-inline-status-${index}`}
           >
-            ● SAVED · {value.length} CHARS
+            ● SAVED
           </div>
         )}
         {status === 'error' && (

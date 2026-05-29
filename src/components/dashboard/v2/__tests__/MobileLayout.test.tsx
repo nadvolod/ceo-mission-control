@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MobileLayout } from '../MobileLayout';
 import { __FIXTURE_METRICS } from './__fixtures__';
@@ -42,6 +42,46 @@ describe('<MobileLayout />', () => {
     render(<MobileLayout {...defaultProps({ onLog })} />);
     await user.click(screen.getByTestId('mobile-hero-preset-0-5h'));
     expect(onLog).toHaveBeenCalledWith('temporal', 0.5, '+0.5h');
+  });
+
+  it('hero goal pencil opens the editor and submits an updated Temporal target', async () => {
+    const user = userEvent.setup();
+    const onUpdateTemporalGoal = jest.fn().mockResolvedValue(undefined);
+    render(<MobileLayout {...defaultProps({ onUpdateTemporalGoal })} />);
+
+    expect(screen.getByTestId('mobile-temporal-goal-readout')).toHaveTextContent('6.5h / 5h');
+    await user.click(screen.getByTestId('mobile-temporal-edit-goal'));
+    expect(screen.getByTestId('mobile-temporal-goal-editor-row')).toBeInTheDocument();
+
+    const input = screen.getByTestId('mobile-temporal-goal-editor-input');
+    await user.clear(input);
+    await user.type(input, '8');
+    await user.click(screen.getByTestId('mobile-temporal-goal-editor-submit'));
+
+    expect(onUpdateTemporalGoal).toHaveBeenCalledWith(8);
+    await waitFor(() => {
+      expect(screen.queryByTestId('mobile-temporal-goal-editor-row')).not.toBeInTheDocument();
+    });
+  });
+
+  it('hero goal editor stays open and shows the server error when submit rejects', async () => {
+    const user = userEvent.setup();
+    const onUpdateTemporalGoal = jest.fn().mockRejectedValue(new Error('weekly tracker unavailable'));
+    render(<MobileLayout {...defaultProps({ onUpdateTemporalGoal })} />);
+
+    await user.click(screen.getByTestId('mobile-temporal-edit-goal'));
+    const input = screen.getByTestId('mobile-temporal-goal-editor-input');
+    await user.clear(input);
+    await user.type(input, '7');
+    await user.keyboard('{Enter}');
+
+    await waitFor(() => {
+      expect(screen.getByTestId('mobile-temporal-goal-editor-error')).toHaveTextContent(
+        'weekly tracker unavailable',
+      );
+    });
+    expect(screen.getByTestId('mobile-temporal-goal-editor-row')).toBeInTheDocument();
+    expect(input).toHaveValue('7');
   });
 
   it('quick log + Generated opens the amount editor (no hardcoded log)', async () => {

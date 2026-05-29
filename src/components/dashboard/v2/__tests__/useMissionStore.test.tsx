@@ -3,6 +3,7 @@ import { useMissionStore } from '../useMissionStore';
 
 // Mock the underlying dashboard hook so we only exercise the v2 wrapper.
 const mockLoadAllData = jest.fn(async () => {});
+const mockLoadWeeklyTracker = jest.fn(async () => {});
 const mockSaveT3T = jest.fn(async () => {});
 
 jest.mock('@/hooks/useDashboardData', () => ({
@@ -14,6 +15,7 @@ jest.mock('@/hooks/useDashboardData', () => ({
     threeToThriveData: null,
     isLoading: false,
     loadAllData: mockLoadAllData,
+    loadWeeklyTracker: mockLoadWeeklyTracker,
     handleSaveThreeToThriveAnswer: mockSaveT3T,
   }),
 }));
@@ -27,6 +29,8 @@ describe('useMissionStore.log', () => {
     jest.clearAllMocks();
     mockLoadAllData.mockReset();
     mockLoadAllData.mockImplementation(async () => {});
+    mockLoadWeeklyTracker.mockReset();
+    mockLoadWeeklyTracker.mockImplementation(async () => {});
     mockSaveT3T.mockReset();
     mockSaveT3T.mockImplementation(async () => {});
     global.fetch = jest.fn(() =>
@@ -83,6 +87,39 @@ describe('useMissionStore.log', () => {
       expect(m.spark).toBeUndefined();
     }
     expect(result.current.activity).toEqual([]);
+    // Default temporal goal is 5h (the legacy fallback when no review yet).
+    expect(result.current.metrics.temporal.goal).toBe(5);
+    // Display label is "Temporal Focus", not the bare "Temporal".
+    expect(result.current.metrics.temporal.label).toBe('Temporal Focus');
+  });
+
+  // Verify the optimistic ActivityEntry now carries `tsMs` so
+  // deriveActivity can sort across day boundaries. This is the unit
+  // counterpart to the cross-day regression suite in derive.test.ts.
+  it('optimistic activity entries carry an epoch-ms timestamp (tsMs)', async () => {
+    let releaseRefresh!: () => void;
+    mockLoadAllData.mockImplementationOnce(
+      () => new Promise<void>((res) => { releaseRefresh = () => res(); }),
+    );
+    const { result } = renderHook(() => useMissionStore());
+    const before = Date.now();
+    let p!: Promise<void>;
+    act(() => {
+      p = result.current.log('moneyMoved', 100, '+ Moved');
+    });
+    await waitFor(() => {
+      expect(result.current.activity).toHaveLength(1);
+    });
+    const after = Date.now();
+    const row = result.current.activity[0];
+    expect(typeof row.tsMs).toBe('number');
+    expect(row.tsMs).toBeGreaterThanOrEqual(before);
+    expect(row.tsMs).toBeLessThanOrEqual(after);
+
+    await act(async () => {
+      releaseRefresh();
+      await p;
+    });
   });
 
   it('posts to /api/financial with the right category from the label', async () => {
@@ -294,6 +331,29 @@ describe('useMissionStore.log', () => {
       // Server requires non-empty description; the auto string keeps the
       // POST valid even when the user skipped the note input.
       expect(body.description).toBe('+ Moved via Mission Control');
+    });
+  });
+
+  // refresh / refreshWeeklyTracker — the second is a targeted variant for
+  // mutations that only touch the weekly-tracker slice (the inline Temporal
+  // goal edit). It must NOT trigger the full loadAllData fetch.
+  describe('refresh variants', () => {
+    it('refresh() invokes loadAllData (full dashboard reload)', async () => {
+      const { result } = renderHook(() => useMissionStore());
+      await act(async () => {
+        await result.current.refresh();
+      });
+      expect(mockLoadAllData).toHaveBeenCalledTimes(1);
+      expect(mockLoadWeeklyTracker).not.toHaveBeenCalled();
+    });
+
+    it('refreshWeeklyTracker() invokes only loadWeeklyTracker', async () => {
+      const { result } = renderHook(() => useMissionStore());
+      await act(async () => {
+        await result.current.refreshWeeklyTracker();
+      });
+      expect(mockLoadWeeklyTracker).toHaveBeenCalledTimes(1);
+      expect(mockLoadAllData).not.toHaveBeenCalled();
     });
   });
 });

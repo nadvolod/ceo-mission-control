@@ -27,6 +27,15 @@ function hhmm(iso?: string): string {
   return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }
 
+// Epoch ms from an ISO timestamp string. 0 for missing/malformed values
+// so deriveActivity's sort treats them as oldest (they fall to the bottom
+// of the feed; their relative order is then insertion-stable).
+function parseTimestampMs(iso?: string): number {
+  if (!iso) return 0;
+  const t = new Date(iso).getTime();
+  return Number.isFinite(t) ? t : 0;
+}
+
 function metricForCategory(category?: string): MetricId {
   if (category === 'Temporal') return 'temporal';
   if (category === 'Revenue') return 'pipeline';
@@ -51,6 +60,7 @@ function focusToActivity(s: FocusSessionLike): ActivityEntry {
   return {
     id: s.id ?? `focus-${s.timestamp ?? Math.random()}`,
     t: hhmm(s.timestamp),
+    tsMs: parseTimestampMs(s.timestamp),
     kind: m,
     delta: `+${hours}h`,
     label: s.category ?? 'Focus',
@@ -67,6 +77,7 @@ function financialToActivity(e: FinancialEntryLike): ActivityEntry {
   return {
     id: e.id ?? `fin-${e.timestamp ?? Math.random()}`,
     t: hhmm(e.timestamp),
+    tsMs: parseTimestampMs(e.timestamp),
     kind: 'moneyMoved',
     delta: verb,
     label: `$${amount.toLocaleString()}`,
@@ -102,25 +113,21 @@ export function deriveActivity(opts: {
     seen.add(entry.id);
     deduped.push(entry);
   }
+  // Sort by full epoch-ms timestamp (newest first). The earlier HH:MM-of-day
+  // sort was the source of the "Money Moved missing from Activity" bug:
+  // yesterday-evening entries outranked today-morning entries because their
+  // minutes-of-day were larger. tsMs includes the date so cross-day order
+  // is correct. Missing/0 tsMs falls to the bottom; ties preserve insertion
+  // order (so optimistic entries still beat their server counterpart when
+  // both have the same ms).
   return deduped
-    .map((entry, index) => ({ entry, index, time: parseActivityTime(entry.t) }))
+    .map((entry, index) => ({ entry, index, ts: entry.tsMs ?? 0 }))
     .sort((a, b) => {
-      if (a.time != null && b.time != null && a.time !== b.time) return b.time - a.time;
-      if (a.time != null && b.time == null) return -1;
-      if (a.time == null && b.time != null) return 1;
+      if (a.ts !== b.ts) return b.ts - a.ts;
       return a.index - b.index;
     })
     .map(({ entry }) => entry)
     .slice(0, limit);
-}
-
-function parseActivityTime(t: string): number | null {
-  const match = t.match(/^(\d{2}):(\d{2})$/);
-  if (!match) return null;
-  const hours = Number(match[1]);
-  const minutes = Number(match[2]);
-  if (hours > 23 || minutes > 59) return null;
-  return hours * 60 + minutes;
 }
 
 // ----- ChipStrip derivation ----------------------------------------------

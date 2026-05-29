@@ -146,6 +146,176 @@ describe('deriveActivity', () => {
       expect(result.map((e) => e.id)).toEqual(['real']);
     });
   });
+
+  // Diagnostic / regression suite for the cross-day sort bug. The user
+  // reported "Money Moved entries not appearing in Activity" — root cause
+  // was deriveActivity sorting by HH:MM only (parseActivityTime ignores
+  // date), so yesterday-evening entries outrank today-morning entries and
+  // can push today's logs off the 25-entry slice limit.
+  //
+  // These positive / negative / boundary cases pin the correct semantics:
+  // sort by the FULL timestamp (epoch ms), not by HH:MM-of-day.
+  describe('cross-day sort (regression for Money Moved missing from Activity)', () => {
+    // --- POSITIVE: same-day entries sort newest-first by full timestamp ---
+    it('positive: same-day financial + focus entries sort newest-first', () => {
+      const result = deriveActivity({
+        focus: [
+          { id: 'f-morning',   category: 'Temporal', hours: 1, description: 'morning', timestamp: '2026-05-27T09:00:00' },
+          { id: 'f-afternoon', category: 'Temporal', hours: 1, description: 'pm',      timestamp: '2026-05-27T15:00:00' },
+        ],
+        financial: [
+          { id: 'fin-noon', category: 'moved', amount: 100, description: 'lunch transfer', timestamp: '2026-05-27T12:00:00' },
+        ],
+      });
+      // newest first: 15:00 > 12:00 > 09:00
+      expect(result.map((e) => e.id)).toEqual(['f-afternoon', 'fin-noon', 'f-morning']);
+    });
+
+    // --- POSITIVE: a single money entry shows up regardless of clutter ---
+    it('positive: a single Money Moved entry appears in the feed', () => {
+      const result = deriveActivity({
+        financial: [
+          { id: 'm1', category: 'moved', amount: 500, description: 'Benepass', timestamp: '2026-05-27T11:00:00' },
+        ],
+      });
+      expect(result).toHaveLength(1);
+      expect(result[0].kind).toBe('moneyMoved');
+      expect(result[0].meta).toContain('Benepass');
+    });
+
+    // --- REGRESSION: yesterday-evening + today-morning → TODAY first ---
+    // This is the failing-before-fix assertion that proves the bug. With the
+    // old HH:MM sort: yesterday 22:00 (1320 min) > today 09:30 (570 min), so
+    // yesterday's entry sorted on top. The user's freshly-logged morning
+    // money entry showed BELOW yesterday's clutter. After the fix (sort by
+    // full timestamp ms), today is correctly first.
+    it('regression: today 09:30 sorts ABOVE yesterday 22:00', () => {
+      const result = deriveActivity({
+        financial: [
+          { id: 'yesterday-late', category: 'cut',       amount: 50,  description: 'late wire',  timestamp: '2026-05-26T22:00:00' },
+          { id: 'today-morning',  category: 'generated', amount: 500, description: 'Benepass',   timestamp: '2026-05-27T09:30:00' },
+        ],
+      });
+      expect(result.map((e) => e.id)).toEqual(['today-morning', 'yesterday-late']);
+    });
+
+    // --- REGRESSION: 25 yesterday-late + 1 today-morning → today survives ---
+    // The user's actual symptom: with the test user accumulated lots of
+    // older entries (many at HH:MM > today's morning), a new money entry
+    // got pushed off the slice. After the fix, today's newest entry stays.
+    it('regression: 25 yesterday-evening entries + 1 today-morning → today appears in feed', () => {
+      const yesterdayLate = Array.from({ length: 25 }, (_, i) => ({
+        id: `yesterday-${i}`,
+        category: 'cut' as const,
+        amount: 1,
+        description: `prior ${i}`,
+        // All at 22:00-22:24 yesterday — would outrank today by HH:MM.
+        timestamp: `2026-05-26T22:${String(i).padStart(2, '0')}:00`,
+      }));
+      const todayMorning = {
+        id: 'today-morning',
+        category: 'generated' as const,
+        amount: 500,
+        description: 'Benepass',
+        timestamp: '2026-05-27T09:30:00',
+      };
+      const result = deriveActivity({
+        financial: [...yesterdayLate, todayMorning],
+        limit: 25,
+      });
+      expect(result.find((e) => e.id === 'today-morning')).toBeDefined();
+      // And it should be first (most recent).
+      expect(result[0].id).toBe('today-morning');
+    });
+
+    // --- BOUNDARY: limit exact → all shown ---
+    it('boundary: exactly limit entries → all included', () => {
+      const focus = Array.from({ length: 25 }, (_, i) => ({
+        id: `f${i}`,
+        category: 'Temporal',
+        hours: 1,
+        description: `d${i}`,
+        timestamp: `2026-05-27T${String(9 + Math.floor(i / 4)).padStart(2, '0')}:${String((i % 4) * 15).padStart(2, '0')}:00`,
+      }));
+      const result = deriveActivity({ focus, limit: 25 });
+      expect(result).toHaveLength(25);
+    });
+
+    // --- BOUNDARY: limit + 1 → OLDEST dropped (by full timestamp) ---
+    it('boundary: limit+1 entries → oldest by full timestamp dropped', () => {
+      const focus = Array.from({ length: 26 }, (_, i) => ({
+        id: `f${i}`,
+        category: 'Temporal',
+        hours: 1,
+        description: `d${i}`,
+        // i=0 → earliest, i=25 → latest. f0 should drop off.
+        timestamp: new Date(2026, 4, 27, 9, i).toISOString(),
+      }));
+      const result = deriveActivity({ focus, limit: 25 });
+      expect(result).toHaveLength(25);
+      expect(result.map((e) => e.id)).not.toContain('f0');
+      // newest at top
+      expect(result[0].id).toBe('f25');
+    });
+
+    // --- BOUNDARY: identical timestamps → stable insertion order ---
+    it('boundary: entries with identical timestamps fall back to insertion order', () => {
+      const ts = '2026-05-27T10:00:00';
+      const result = deriveActivity({
+        focus: [
+          { id: 'a', category: 'Temporal', hours: 1, description: 'a', timestamp: ts },
+          { id: 'b', category: 'Temporal', hours: 1, description: 'b', timestamp: ts },
+          { id: 'c', category: 'Temporal', hours: 1, description: 'c', timestamp: ts },
+        ],
+      });
+      expect(result.map((e) => e.id)).toEqual(['a', 'b', 'c']);
+    });
+
+    // --- NEGATIVE: missing/malformed timestamps don't crash, fall to bottom ---
+    it('negative: entries with missing/malformed timestamps fall to bottom (no crash)', () => {
+      const result = deriveActivity({
+        focus: [
+          { id: 'broken', category: 'Temporal', hours: 1, description: 'no ts' /* no timestamp */ },
+          { id: 'real',   category: 'Temporal', hours: 1, description: 'real',  timestamp: '2026-05-27T10:00:00' },
+          { id: 'garbage', category: 'Temporal', hours: 1, description: 'bad ts', timestamp: 'not-a-date' },
+        ],
+      });
+      expect(result.map((e) => e.id)[0]).toBe('real');
+      // broken + garbage end up at the bottom (their relative order is
+      // insertion-stable since both have tsMs=0).
+      expect(result).toHaveLength(3);
+    });
+
+    // --- NEGATIVE: empty inputs → empty output ---
+    it('negative: all-empty inputs return empty array (no crash)', () => {
+      expect(deriveActivity({})).toEqual([]);
+      expect(deriveActivity({ focus: [], financial: [], optimistic: [] })).toEqual([]);
+    });
+
+    // --- POSITIVE: optimistic money entry appears before older server entries ---
+    // The user's experience: tap "+ Generated $500" and the row should show
+    // at the TOP immediately, not lost below yesterday's clutter.
+    it('positive: an optimistic money entry sorts above yesterday-evening server entries', () => {
+      const justNowMs = new Date('2026-05-27T09:30:00').getTime();
+      const result = deriveActivity({
+        optimistic: [
+          {
+            id: 'local-fresh',
+            t: '09:30',
+            tsMs: justNowMs,
+            kind: 'moneyMoved',
+            delta: '+ Generated',
+            label: '$500',
+            meta: 'Benepass',
+          },
+        ],
+        financial: [
+          { id: 'yesterday', category: 'cut', amount: 1, description: 'old', timestamp: '2026-05-26T22:00:00' },
+        ],
+      });
+      expect(result[0].id).toBe('local-fresh');
+    });
+  });
 });
 
 describe('deriveChips', () => {

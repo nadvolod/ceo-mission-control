@@ -369,6 +369,74 @@ test.describe('Mission Control v2', () => {
     expect(body.amount).toBe(1234.5);
     expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
+
+  test('Temporal Focus: label renamed + pencil opens editor + submit updates the goal', async ({ page }) => {
+    // The Temporal card label is now "Temporal Focus". A pencil button
+    // appears on hover/focus; clicking it opens an editor row; submit
+    // POSTs /api/weekly-tracker with the new temporalTarget.
+    await page.goto('/dashboard');
+
+    const card = page.getByTestId('metric-card-temporal');
+    await card.hover();
+
+    // Verify the renamed label is visible. Scope to desktop to avoid the
+    // mobile layout match.
+    const desktop = page.getByTestId('desktop-layout');
+    await expect(desktop.getByText('Temporal Focus')).toBeVisible();
+
+    const weeklyPost = page.waitForRequest((req) =>
+      req.url().includes('/api/weekly-tracker') && req.method() === 'POST',
+    );
+
+    await page.getByTestId('temporal-edit-goal').click();
+    await expect(page.getByTestId('temporal-goal-editor-row')).toBeVisible();
+    const input = page.getByTestId('temporal-goal-editor-input');
+    await input.fill('8');
+    await page.keyboard.press('Enter');
+
+    const body = (await weeklyPost).postDataJSON();
+    expect(body.action).toBe('submitReview');
+    expect(body.temporalTarget).toBe(8);
+
+    // After the refresh resolves, the new goal shows in the eyebrow.
+    await expect(desktop.locator('text=/\\/8h/')).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('Activity feed includes a money entry even when older cross-day entries exist', async ({ page }) => {
+    // Regression for the user-reported "Money Moved entries not appearing
+    // in Activity": the prior HH:MM-only sort pushed today's morning
+    // entries below yesterday-evening clutter and off the 25-entry slice.
+    // After the tsMs fix, today's entry sits at the top regardless of
+    // what time-of-day prior entries had.
+    await page.goto('/dashboard');
+
+    const note = `regression-${Date.now()}`;
+
+    const card = page.getByTestId('metric-card-moneyMoved');
+    await card.hover();
+    await page.getByTestId('preset-moneyMoved-cut').click();
+    await page.getByTestId('moneyMoved-amount-input').fill('25');
+    await page.getByTestId('moneyMoved-amount-note').fill(note);
+    await page.keyboard.press('Enter');
+
+    // The new entry's note should be visible in the desktop activity feed.
+    const desktop = page.getByTestId('desktop-layout');
+    await expect(desktop.getByText(note)).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('Three to Thrive saved indicator does NOT show a CHARS count', async ({ page }) => {
+    // The user asked for the noisy "· N CHARS" suffix removed. The status
+    // badge should just read "● SAVED" once the answer is persisted.
+    await page.goto('/dashboard');
+    const input = page.getByTestId('t3t-inline-input-0');
+    const phrase = `chars-removed-${Date.now()}`;
+    await input.fill(phrase);
+    // Wait for the SAVED transition (debounce 600ms + server round-trip).
+    const status = page.getByTestId('t3t-inline-status-0');
+    await expect(status).toHaveText('● SAVED', { timeout: 5_000 });
+    // Belt-and-suspenders: explicit assertion that "CHARS" doesn't appear.
+    await expect(status).not.toContainText(/CHARS/i);
+  });
 });
 
 // Mobile-viewport coverage. The desktop tree is gated by `hidden md:flex`;
@@ -401,6 +469,27 @@ test.describe('Mission Control v2 — mobile viewport', () => {
     expect(body.category).toBe('Temporal');
     expect(body.hours).toBe(0.5);
     expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  test('hero goal pencil opens editor and submits a weekly Temporal target', async ({ page }) => {
+    await page.goto('/dashboard');
+
+    const weeklyPost = page.waitForRequest((req) =>
+      req.url().includes('/api/weekly-tracker') && req.method() === 'POST',
+    );
+
+    await page.getByTestId('mobile-temporal-edit-goal').click();
+    await expect(page.getByTestId('mobile-temporal-goal-editor-row')).toBeVisible();
+    await page.getByTestId('mobile-temporal-goal-editor-input').fill('9');
+    await page.keyboard.press('Enter');
+
+    const body = (await weeklyPost).postDataJSON();
+    expect(body.action).toBe('submitReview');
+    expect(body.temporalTarget).toBe(9);
+
+    await expect(page.getByTestId('mobile-temporal-goal-readout')).toContainText('/ 9h', {
+      timeout: 5_000,
+    });
   });
 
   test('bottom-nav Reflect tap opens the reflection drawer', async ({ page }) => {
