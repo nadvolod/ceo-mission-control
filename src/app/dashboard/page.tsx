@@ -141,6 +141,7 @@ export default function MissionControlV2Page() {
         onTab={setTab}
         onOpenReflection={() => setReflectOpen(true)}
         onLog={store.log}
+        onUpdateTemporalGoal={onUpdateTemporalGoal}
       />
     </div>
 

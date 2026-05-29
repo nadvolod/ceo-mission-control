@@ -471,6 +471,27 @@ test.describe('Mission Control v2 — mobile viewport', () => {
     expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
+  test('hero goal pencil opens editor and submits a weekly Temporal target', async ({ page }) => {
+    await page.goto('/dashboard');
+
+    const weeklyPost = page.waitForRequest((req) =>
+      req.url().includes('/api/weekly-tracker') && req.method() === 'POST',
+    );
+
+    await page.getByTestId('mobile-temporal-edit-goal').click();
+    await expect(page.getByTestId('mobile-temporal-goal-editor-row')).toBeVisible();
+    await page.getByTestId('mobile-temporal-goal-editor-input').fill('9');
+    await page.keyboard.press('Enter');
+
+    const body = (await weeklyPost).postDataJSON();
+    expect(body.action).toBe('submitReview');
+    expect(body.temporalTarget).toBe(9);
+
+    await expect(page.getByTestId('mobile-temporal-goal-readout')).toContainText('/ 9h', {
+      timeout: 5_000,
+    });
+  });
+
   test('bottom-nav Reflect tap opens the reflection drawer', async ({ page }) => {
     await page.goto('/dashboard');
     await page.getByTestId('mobile-nav-reflect').click();

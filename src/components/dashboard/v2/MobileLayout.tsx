@@ -1,11 +1,12 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Brain, Check, BarChart3 } from 'lucide-react';
+import { Sparkles, Brain, Check, BarChart3, Pencil } from 'lucide-react';
 import { Aurora } from './primitives/Aurora';
 import { OrbitStar } from './primitives/OrbitStar';
 import { ActivityFeed } from './ActivityFeed';
 import { AmountEditor } from './AmountEditor';
+import { InlineHoursEditor } from './InlineHoursEditor';
 import { MC_COLORS } from './palette';
 import { fmtMetric, clamp } from './format';
 import type { ActivityEntry, MetricId, MetricSnapshot } from './types';
@@ -24,6 +25,7 @@ type Props = {
     label: string,
     options?: { description?: string },
   ) => void;
+  onUpdateTemporalGoal?: (newGoal: number) => void | Promise<void>;
 };
 
 function slugifyLabel(label: string): string {
@@ -46,6 +48,7 @@ export function MobileLayout({
   onTab,
   onOpenReflection,
   onLog,
+  onUpdateTemporalGoal,
 }: Props) {
   return (
     <div
@@ -67,7 +70,11 @@ export function MobileLayout({
         {/* Body — gated on tab */}
         {tab === 'overview' && (
           <>
-            <HeroTemporal metric={metrics.temporal} onLog={onLog} />
+            <HeroTemporal
+              metric={metrics.temporal}
+              onLog={onLog}
+              onUpdateGoal={onUpdateTemporalGoal}
+            />
             <SnapshotStrip metrics={metrics} />
             <QuickLogGrid onLog={onLog} />
             <RecentActivity activity={activity} onOpenReflection={onOpenReflection} />
@@ -159,6 +166,7 @@ function todayHeader(): string {
 function HeroTemporal({
   metric,
   onLog,
+  onUpdateGoal,
 }: {
   metric: MetricSnapshot;
   onLog: (
@@ -167,7 +175,11 @@ function HeroTemporal({
     label: string,
     options?: { description?: string },
   ) => void;
+  onUpdateGoal?: (newGoal: number) => void | Promise<void>;
 }) {
+  const [editingGoal, setEditingGoal] = useState(false);
+  const [goalSaving, setGoalSaving] = useState(false);
+  const [goalError, setGoalError] = useState<string | null>(null);
   const week = metric.week ?? 0;
   const goal = metric.goal ?? 5;
   const pct = clamp(week / goal, 0, 1);
@@ -218,13 +230,41 @@ function HeroTemporal({
             >
               {fmtMetric(metric.today, metric.fmt)}
             </span>
-            <span
-              className="font-numerics"
-              style={{ fontSize: 11, color: 'var(--color-mc-fg-dim)', textAlign: 'right' }}
+            <div
+              className="flex items-center"
+              style={{ gap: 6 }}
             >
-              {fmtMetric(week, metric.fmt)} / {fmtMetric(goal, metric.fmt)}
-              <br />wk
-            </span>
+              <span
+                className="font-numerics"
+                style={{ fontSize: 11, color: 'var(--color-mc-fg-dim)', textAlign: 'right' }}
+                data-testid="mobile-temporal-goal-readout"
+              >
+                {fmtMetric(week, metric.fmt)} / {fmtMetric(goal, metric.fmt)}
+                <br />wk
+              </span>
+              {onUpdateGoal && !editingGoal && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setGoalError(null);
+                    setEditingGoal(true);
+                  }}
+                  className="flex items-center justify-center cursor-pointer"
+                  style={{
+                    width: 28,
+                    height: 28,
+                    borderRadius: 8,
+                    background: `${MC_COLORS.uv}1F`,
+                    border: `1px solid ${MC_COLORS.uv}55`,
+                    color: 'var(--color-mc-uv-hi)',
+                  }}
+                  aria-label="Edit Temporal weekly goal"
+                  data-testid="mobile-temporal-edit-goal"
+                >
+                  <Pencil size={13} aria-hidden />
+                </button>
+              )}
+            </div>
           </div>
           {/* Progress bar */}
           <div
@@ -246,6 +286,66 @@ function HeroTemporal({
               }}
             />
           </div>
+          {editingGoal && onUpdateGoal && (
+            <div
+              style={{ marginTop: 10 }}
+              data-testid="mobile-temporal-goal-editor-row"
+            >
+              <InlineHoursEditor
+                label="Goal"
+                initial={goal}
+                accent={MC_COLORS.uv}
+                idPrefix="mobile-temporal-goal-editor"
+                disabled={goalSaving}
+                onSubmit={async (newGoal) => {
+                  if (goalSaving) return;
+                  setGoalSaving(true);
+                  setGoalError(null);
+                  try {
+                    await onUpdateGoal(newGoal);
+                    setEditingGoal(false);
+                  } catch (err) {
+                    setGoalError(err instanceof Error ? err.message : 'Save failed. Try again.');
+                  } finally {
+                    setGoalSaving(false);
+                  }
+                }}
+                onCancel={() => {
+                  setGoalError(null);
+                  setEditingGoal(false);
+                }}
+              />
+              {goalSaving && (
+                <div
+                  className="font-numerics uppercase"
+                  style={{
+                    marginTop: 4,
+                    fontSize: 10,
+                    letterSpacing: 0,
+                    color: 'var(--color-mc-fg-dim)',
+                  }}
+                  data-testid="mobile-temporal-goal-editor-saving"
+                >
+                  Saving...
+                </div>
+              )}
+              {goalError && !goalSaving && (
+                <div
+                  role="alert"
+                  className="font-numerics uppercase"
+                  style={{
+                    marginTop: 4,
+                    fontSize: 10,
+                    letterSpacing: 0,
+                    color: 'var(--color-mc-red)',
+                  }}
+                  data-testid="mobile-temporal-goal-editor-error"
+                >
+                  {goalError || 'Save failed. Try again.'}
+                </div>
+              )}
+            </div>
+          )}
           {/* Fat preset buttons */}
           <div className="flex gap-1.5" style={{ marginTop: 14 }}>
             {[

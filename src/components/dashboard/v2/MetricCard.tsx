@@ -277,7 +277,7 @@ export function MetricCard({ metric, big = false, onLog, onUpdateGoal }: MetricC
               }}
               data-testid={`${metric.id}-goal-editor-error`}
             >
-              Save failed. Try again.
+              {goalError || 'Save failed. Try again.'}
             </div>
           )}
         </div>

@@ -493,7 +493,7 @@ describe('MetricCard', () => {
 
       // Editor stays mounted so the user can retry in place.
       await waitFor(() => {
-        expect(screen.getByTestId('temporal-goal-editor-error')).toHaveTextContent(/save failed/i);
+        expect(screen.getByTestId('temporal-goal-editor-error')).toHaveTextContent('boom');
       });
       expect(screen.getByTestId('temporal-goal-editor-row')).toBeInTheDocument();
       expect(screen.getByTestId('temporal-goal-editor-input')).toHaveValue('7');
