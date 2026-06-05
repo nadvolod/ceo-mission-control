@@ -412,6 +412,14 @@ export interface SleepEnvironment {
   customFields: Record<string, boolean>;
 }
 
+export interface SleepMetrics {
+  sleepScore: number | null;        // typically 0–100
+  durationMinutes: number | null;   // total minutes slept; UI shows h + m
+  bodyBattery: number | null;       // typically 0–100
+  restingHeartRate: number | null;  // bpm
+  hrv: number | null;               // integer (e.g. ms)
+}
+
 export interface SupplementEntry {
   name: string;
   dosageMg: number;
@@ -426,6 +434,10 @@ export interface HabitEntry {
 export interface DailyHealthNote {
   date: string;
   sleepEnvironment: SleepEnvironment;
+  // Optional for backward compatibility: notes logged before this field
+  // existed read back without it. The tracker normalizes to an all-null
+  // SleepMetrics on write so reads are consistent going forward.
+  sleepMetrics?: SleepMetrics;
   supplements: SupplementEntry[];
   habits: HabitEntry[];
   freeformNote: string;

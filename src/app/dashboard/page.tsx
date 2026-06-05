@@ -12,6 +12,7 @@ import { ActivityFeed } from '@/components/dashboard/v2/ActivityFeed';
 import { CollapsiblePanel } from '@/components/dashboard/v2/CollapsiblePanel';
 import { CmdK } from '@/components/dashboard/v2/CmdK';
 import { ReflectionDrawer } from '@/components/dashboard/v2/ReflectionDrawer';
+import { MorningLogDrawer } from '@/components/dashboard/v2/MorningLogDrawer';
 import { useMissionStore } from '@/components/dashboard/v2/useMissionStore';
 import { deriveActivity, deriveChips, consecutiveStreak } from '@/components/dashboard/v2/derive';
 import { TrendsPanel, buildOverviewTrendSeries } from '@/components/dashboard/v2/TrendsPanel';
@@ -37,6 +38,7 @@ export default function MissionControlV2Page() {
   const [tab, setTab] = useState<Tab>('overview');
   const [cmdOpen, setCmdOpen] = useState(false);
   const [reflectOpen, setReflectOpen] = useState(false);
+  const [morningOpen, setMorningOpen] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -142,6 +144,7 @@ export default function MissionControlV2Page() {
         tab={tab}
         onTab={setTab}
         onOpenReflection={() => setReflectOpen(true)}
+        onOpenMorning={() => setMorningOpen(true)}
         onLog={store.log}
         onUpdateTemporalGoal={onUpdateTemporalGoal}
       />
@@ -284,6 +287,22 @@ export default function MissionControlV2Page() {
             data-testid="log-button"
           >
             <Plus size={12} aria-hidden /> Log
+          </button>
+          <button
+            type="button"
+            onClick={() => setMorningOpen(true)}
+            className="rounded-md text-[11px]"
+            style={{
+              padding: '5px 10px',
+              border: '1px solid rgba(255,255,255,0.08)',
+              background: 'rgba(255,255,255,0.04)',
+              color: 'var(--color-mc-fg-dim)',
+              cursor: 'pointer',
+              font: 'inherit',
+            }}
+            data-testid="morning-log-trigger"
+          >
+            Morning
           </button>
           <Link
             href="/dashboard/legacy"
@@ -454,6 +473,7 @@ export default function MissionControlV2Page() {
       onOpenChange={setCmdOpen}
       onLog={store.log}
       onOpenReflection={() => setReflectOpen(true)}
+      onOpenMorning={() => setMorningOpen(true)}
       onSwitchTab={setTab}
     />
 
@@ -463,6 +483,8 @@ export default function MissionControlV2Page() {
       data={store.threeToThrive}
       onSave={store.saveThreeToThriveAnswer}
     />
+
+    <MorningLogDrawer open={morningOpen} onOpenChange={setMorningOpen} />
     </>
   );
 }

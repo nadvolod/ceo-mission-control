@@ -20,10 +20,11 @@ type CmdKProps = {
   onOpenChange: (open: boolean) => void;
   onLog: (metricId: MetricId, delta: number, label: string) => void;
   onOpenReflection: () => void;
+  onOpenMorning?: () => void;
   onSwitchTab?: (tab: 'overview' | 'insights' | 'review') => void;
 };
 
-function actionsFor({ onLog, onOpenReflection, onSwitchTab }: Pick<CmdKProps, 'onLog' | 'onOpenReflection' | 'onSwitchTab'>): CmdAction[] {
+function actionsFor({ onLog, onOpenReflection, onOpenMorning, onSwitchTab }: Pick<CmdKProps, 'onLog' | 'onOpenReflection' | 'onOpenMorning' | 'onSwitchTab'>): CmdAction[] {
   return [
     { kw: '+0.5h temporal', label: 'Log +0.5h Temporal',  hint: 'temp 0.5', icon: '⏱', accent: MC_COLORS.pink,  run: () => onLog('temporal', 0.5, '+0.5h') },
     { kw: '+1h temporal',   label: 'Log +1h Temporal',    hint: 'temp 1',   icon: '⏱', accent: MC_COLORS.pink,  run: () => onLog('temporal', 1, '+1h') },
@@ -37,6 +38,9 @@ function actionsFor({ onLog, onOpenReflection, onSwitchTab }: Pick<CmdKProps, 'o
     { kw: '+1h deep',       label: '+1h Deep work',       hint: 'deep 1',   icon: '◆', accent: MC_COLORS.cyan,  run: () => onLog('deepWork', 1, '+1h') },
     { kw: '+train session', label: '+ Training session',  hint: 'train',    icon: '△', accent: MC_COLORS.amber, run: () => onLog('trained', 1, '+ Session') },
     { kw: 'reflect t3t',    label: 'Open reflection',     hint: '⌘R',       icon: '❋', accent: MC_COLORS.pink,  run: onOpenReflection },
+    ...(onOpenMorning
+      ? [{ kw: 'morning sleep log health', label: 'Open morning log', hint: 'sleep', icon: '☾', accent: MC_COLORS.cyan, run: onOpenMorning } as CmdAction]
+      : []),
     ...(onSwitchTab
       ? [
           { kw: 'insights trends', label: 'Open insights', hint: 'tab 2', icon: '∿', accent: MC_COLORS.uv, run: () => onSwitchTab('insights') } as CmdAction,
@@ -56,13 +60,13 @@ export function filterActions(actions: CmdAction[], query: string): CmdAction[] 
   );
 }
 
-export function CmdK({ open, onOpenChange, onLog, onOpenReflection, onSwitchTab }: CmdKProps) {
+export function CmdK({ open, onOpenChange, onLog, onOpenReflection, onOpenMorning, onSwitchTab }: CmdKProps) {
   const [query, setQuery] = useState('');
   const inputRef = useRef<HTMLInputElement>(null);
 
   const actions = useMemo(
-    () => actionsFor({ onLog, onOpenReflection, onSwitchTab }),
-    [onLog, onOpenReflection, onSwitchTab],
+    () => actionsFor({ onLog, onOpenReflection, onOpenMorning, onSwitchTab }),
+    [onLog, onOpenReflection, onOpenMorning, onSwitchTab],
   );
   const filtered = useMemo(() => filterActions(actions, query), [actions, query]);
 

@@ -2,6 +2,51 @@ import { NextRequest, NextResponse } from 'next/server';
 import { HealthNotesTracker } from '@/lib/health-notes-tracker';
 import { checkAuth } from '@/lib/auth';
 import { requireEffectiveUserId } from '@/lib/session';
+import type { SleepMetrics } from '@/lib/types';
+
+// Inclusive [min, max] bounds for each manually-entered sleep metric.
+// A field may also be null (not recorded). Anything else is a 400.
+const SLEEP_METRIC_BOUNDS: Record<keyof SleepMetrics, [number, number]> = {
+  sleepScore: [0, 100],
+  durationMinutes: [0, 1440], // 0–24h
+  bodyBattery: [0, 100],
+  restingHeartRate: [0, 300],
+  hrv: [0, 1000],
+};
+
+/**
+ * Validate the optional `sleepMetrics` payload from a 'log' request.
+ * Returns the parsed metrics (or undefined when omitted) on success, or an
+ * error string describing the first invalid field.
+ */
+function parseSleepMetrics(
+  raw: unknown,
+): { ok: true; value: SleepMetrics | undefined } | { ok: false; error: string } {
+  if (raw === undefined || raw === null) return { ok: true, value: undefined };
+  if (typeof raw !== 'object' || Array.isArray(raw)) {
+    return { ok: false, error: 'sleepMetrics must be an object' };
+  }
+  const out = {} as SleepMetrics;
+  for (const key of Object.keys(SLEEP_METRIC_BOUNDS) as Array<keyof SleepMetrics>) {
+    const v = (raw as Record<string, unknown>)[key];
+    if (v === undefined || v === null) {
+      out[key] = null;
+      continue;
+    }
+    if (typeof v !== 'number' || !Number.isFinite(v)) {
+      return { ok: false, error: `sleepMetrics.${key} must be a number or null` };
+    }
+    if (!Number.isInteger(v)) {
+      return { ok: false, error: `sleepMetrics.${key} must be an integer` };
+    }
+    const [min, max] = SLEEP_METRIC_BOUNDS[key];
+    if (v < min || v > max) {
+      return { ok: false, error: `sleepMetrics.${key} must be between ${min} and ${max}` };
+    }
+    out[key] = v;
+  }
+  return { ok: true, value: out };
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -36,7 +81,7 @@ export async function POST(request: NextRequest) {
 
     switch (action) {
       case 'log': {
-        const { date, sleepEnvironment, supplements, habits, freeformNote } = data;
+        const { date, sleepEnvironment, sleepMetrics, supplements, habits, freeformNote } = data;
 
         if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
           return NextResponse.json(
@@ -66,9 +111,18 @@ export async function POST(request: NextRequest) {
           );
         }
 
+        const parsedMetrics = parseSleepMetrics(sleepMetrics);
+        if (!parsedMetrics.ok) {
+          return NextResponse.json(
+            { success: false, error: parsedMetrics.error },
+            { status: 400 }
+          );
+        }
+
         const note = await tracker.logNote({
           date,
           sleepEnvironment: sleepEnvironment || { temperatureF: null, fanRunning: false, dogInRoom: false, customFields: {} },
+          sleepMetrics: parsedMetrics.value,
           supplements: supplements || [],
           habits: habits || [],
           freeformNote: freeformNote || '',

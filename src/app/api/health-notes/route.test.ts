@@ -172,6 +172,108 @@ describe('/api/health-notes', () => {
     });
   });
 
+  describe('POST log sleepMetrics', () => {
+    const baseLog = {
+      action: 'log',
+      date: '2026-04-13',
+      sleepEnvironment: { temperatureF: 68, fanRunning: false, dogInRoom: false, customFields: {} },
+      supplements: [],
+      habits: [],
+      freeformNote: '',
+    };
+
+    it('persists a full sleepMetrics payload on the note', async () => {
+      const response = await POST(makeRequest('POST', {
+        ...baseLog,
+        sleepMetrics: { sleepScore: 88, durationMinutes: 452, bodyBattery: 73, restingHeartRate: 54, hrv: 62 },
+      }, { 'x-sync-api-key': 'test-key' }));
+
+      const data = await response.json();
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.note.sleepMetrics).toEqual({
+        sleepScore: 88,
+        durationMinutes: 452,
+        bodyBattery: 73,
+        restingHeartRate: 54,
+        hrv: 62,
+      });
+    });
+
+    it('normalizes an omitted sleepMetrics group to all-null on the note', async () => {
+      const response = await POST(makeRequest('POST', baseLog, { 'x-sync-api-key': 'test-key' }));
+      const data = await response.json();
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.note.sleepMetrics).toEqual({
+        sleepScore: null,
+        durationMinutes: null,
+        bodyBattery: null,
+        restingHeartRate: null,
+        hrv: null,
+      });
+    });
+
+    it('coerces missing individual metric fields to null', async () => {
+      const response = await POST(makeRequest('POST', {
+        ...baseLog,
+        sleepMetrics: { sleepScore: 90 },
+      }, { 'x-sync-api-key': 'test-key' }));
+      const data = await response.json();
+      expect(response.status).toBe(200);
+      expect(data.note.sleepMetrics).toEqual({
+        sleepScore: 90,
+        durationMinutes: null,
+        bodyBattery: null,
+        restingHeartRate: null,
+        hrv: null,
+      });
+    });
+
+    it('rejects an out-of-range sleepScore', async () => {
+      const response = await POST(makeRequest('POST', {
+        ...baseLog,
+        sleepMetrics: { sleepScore: 150 },
+      }, { 'x-sync-api-key': 'test-key' }));
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.success).toBe(false);
+      expect(data.error).toMatch(/sleepScore/);
+    });
+
+    it('rejects a non-integer metric value', async () => {
+      const response = await POST(makeRequest('POST', {
+        ...baseLog,
+        sleepMetrics: { sleepScore: 88.5 },
+      }, { 'x-sync-api-key': 'test-key' }));
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.success).toBe(false);
+      expect(data.error).toMatch(/integer/);
+    });
+
+    it('rejects a non-numeric metric value', async () => {
+      const response = await POST(makeRequest('POST', {
+        ...baseLog,
+        sleepMetrics: { hrv: 'abc' },
+      }, { 'x-sync-api-key': 'test-key' }));
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.success).toBe(false);
+      expect(data.error).toMatch(/hrv/);
+    });
+
+    it('rejects sleepMetrics sent as an array', async () => {
+      const response = await POST(makeRequest('POST', {
+        ...baseLog,
+        sleepMetrics: [1, 2, 3],
+      }, { 'x-sync-api-key': 'test-key' }));
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.success).toBe(false);
+    });
+  });
+
   describe('POST update-templates input validation', () => {
     it('rejects addSupplement with negative defaultDosageMg', async () => {
       const response = await POST(makeRequest('POST', {

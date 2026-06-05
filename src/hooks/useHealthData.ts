@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import type { GarminDayMetrics, DailyHealthNote } from '@/lib/types';
+import type { GarminDayMetrics, DailyHealthNote, SleepMetrics } from '@/lib/types';
 
 interface HealthTemplates {
   supplementTemplate: Array<{ name: string; defaultDosageMg: number }>;
@@ -69,6 +69,7 @@ export function useHealthData() {
   const logNote = useCallback(async (note: {
     date: string;
     sleepEnvironment: { temperatureF: number | null; fanRunning: boolean; dogInRoom: boolean; customFields: Record<string, boolean> };
+    sleepMetrics?: SleepMetrics | null;
     supplements: Array<{ name: string; dosageMg: number; taken: boolean }>;
     habits: Array<{ name: string; done: boolean }>;
     freeformNote: string;
