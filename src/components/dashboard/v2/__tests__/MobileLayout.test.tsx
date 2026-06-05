@@ -15,6 +15,7 @@ function defaultProps(overrides: Partial<Parameters<typeof MobileLayout>[0]> = {
     tab: 'overview' as const,
     onTab: jest.fn(),
     onOpenReflection: jest.fn(),
+    onOpenMorning: jest.fn(),
     onLog: jest.fn(),
     ...overrides,
   };

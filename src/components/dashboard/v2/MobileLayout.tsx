@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Brain, Check, BarChart3, Pencil } from 'lucide-react';
+import { Sparkles, Brain, Check, BarChart3, Pencil, Moon } from 'lucide-react';
 import { Aurora } from './primitives/Aurora';
 import { OrbitStar } from './primitives/OrbitStar';
 import { ActivityFeed } from './ActivityFeed';
@@ -19,6 +19,7 @@ type Props = {
   tab: Tab;
   onTab: (t: Tab) => void;
   onOpenReflection: () => void;
+  onOpenMorning: () => void;
   onLog: (
     metricId: MetricId,
     delta: number,
@@ -47,6 +48,7 @@ export function MobileLayout({
   tab,
   onTab,
   onOpenReflection,
+  onOpenMorning,
   onLog,
   onUpdateTemporalGoal,
 }: Props) {
@@ -65,7 +67,7 @@ export function MobileLayout({
 
       <div className="relative flex h-full flex-col" style={{ paddingBottom: 80 }}>
         {/* Header */}
-        <MobileHeader />
+        <MobileHeader onOpenMorning={onOpenMorning} />
 
         {/* Body — gated on tab */}
         {tab === 'overview' && (
@@ -102,7 +104,7 @@ export function MobileLayout({
 
 // ----- Header -----------------------------------------------------------
 
-function MobileHeader() {
+function MobileHeader({ onOpenMorning }: { onOpenMorning: () => void }) {
   return (
     <div
       className="flex items-center gap-2.5"
@@ -146,6 +148,23 @@ function MobileHeader() {
           {todayHeader()}
         </div>
       </div>
+      <button
+        type="button"
+        onClick={onOpenMorning}
+        className="ml-auto flex items-center justify-center cursor-pointer"
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 10,
+          background: `${MC_COLORS.uv}1F`,
+          border: `1px solid ${MC_COLORS.uv}55`,
+          color: 'var(--color-mc-uv-hi)',
+        }}
+        aria-label="Open morning log"
+        data-testid="mobile-morning-trigger"
+      >
+        <Moon size={18} aria-hidden />
+      </button>
     </div>
   );
 }

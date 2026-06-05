@@ -1,7 +1,15 @@
-import type { DailyHealthNote, HealthNotesData } from './types';
+import type { DailyHealthNote, HealthNotesData, SleepMetrics } from './types';
 import { loadJSON, saveJSON, appendAuditLog } from './storage';
 
 const STORAGE_KEY = 'health-notes.json';
+
+const EMPTY_SLEEP_METRICS: SleepMetrics = {
+  sleepScore: null,
+  durationMinutes: null,
+  bodyBattery: null,
+  restingHeartRate: null,
+  hrv: null,
+};
 
 function defaultData(): HealthNotesData {
   return {
@@ -61,6 +69,9 @@ export class HealthNotesTracker {
 
     const fullNote: DailyHealthNote = {
       ...note,
+      // Always persist a complete SleepMetrics shape so reads are consistent,
+      // even for notes whose payload omitted the group entirely.
+      sleepMetrics: { ...EMPTY_SLEEP_METRICS, ...(note.sleepMetrics ?? {}) },
       loggedAt: new Date().toISOString(),
     };
 
