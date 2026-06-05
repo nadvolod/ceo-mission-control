@@ -404,7 +404,7 @@ function MorningLogBody({ onClose }: { onClose: () => void }) {
     [notes],
   );
 
-  const saveDisabled = saving || supplements.some((s) => s.taken && s.dosageMg <= 0);
+  const saveDisabled = saving || !hydrated || supplements.some((s) => s.taken && s.dosageMg <= 0);
 
   return (
     <div className="relative flex h-full flex-col">
@@ -462,6 +462,15 @@ function MorningLogBody({ onClose }: { onClose: () => void }) {
         className="flex-1 overflow-auto"
         style={{ padding: '16px 22px 20px', display: 'flex', flexDirection: 'column', gap: 18 }}
       >
+        {!hydrated ? (
+          <div
+            data-testid="morning-log-loading"
+            style={{ padding: '8px 2px', fontSize: 13, color: 'var(--color-mc-fg-dim)' }}
+          >
+            Loading…
+          </div>
+        ) : (
+        <>
         {/* Date */}
         <div className="flex items-center gap-3">
           <label
@@ -765,6 +774,8 @@ function MorningLogBody({ onClose }: { onClose: () => void }) {
               })}
             </div>
           </div>
+        )}
+        </>
         )}
       </div>
 

@@ -106,11 +106,20 @@ test.describe('Morning Log drawer', () => {
 
   test('Save is disabled when a taken supplement has a 0 dosage', async ({ page }) => {
     await openMorningLog(page);
-    await page.getByTestId('supp-toggle-0').click();
-    await page.getByTestId('supp-dosage-0').fill('0');
+    // Ensure the first supplement is taken regardless of any state persisted by
+    // earlier tests (serial mode shares today's note for the test user). The
+    // dosage input is only editable while the supplement is toggled on.
+    const toggle = page.getByTestId('supp-toggle-0');
+    if ((await toggle.getAttribute('aria-checked')) !== 'true') {
+      await toggle.click();
+    }
+    await expect(toggle).toHaveAttribute('aria-checked', 'true');
+
+    const dosage = page.getByTestId('supp-dosage-0');
+    await dosage.fill('0');
     await expect(page.getByTestId('morning-log-save')).toBeDisabled();
     // Restoring a positive dosage re-enables save.
-    await page.getByTestId('supp-dosage-0').fill('1');
+    await dosage.fill('1');
     await expect(page.getByTestId('morning-log-save')).toBeEnabled();
   });
 
