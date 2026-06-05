@@ -36,6 +36,9 @@ function parseSleepMetrics(
     if (typeof v !== 'number' || !Number.isFinite(v)) {
       return { ok: false, error: `sleepMetrics.${key} must be a number or null` };
     }
+    if (!Number.isInteger(v)) {
+      return { ok: false, error: `sleepMetrics.${key} must be an integer` };
+    }
     const [min, max] = SLEEP_METRIC_BOUNDS[key];
     if (v < min || v > max) {
       return { ok: false, error: `sleepMetrics.${key} must be between ${min} and ${max}` };

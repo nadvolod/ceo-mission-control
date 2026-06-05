@@ -241,6 +241,17 @@ describe('/api/health-notes', () => {
       expect(data.error).toMatch(/sleepScore/);
     });
 
+    it('rejects a non-integer metric value', async () => {
+      const response = await POST(makeRequest('POST', {
+        ...baseLog,
+        sleepMetrics: { sleepScore: 88.5 },
+      }, { 'x-sync-api-key': 'test-key' }));
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.success).toBe(false);
+      expect(data.error).toMatch(/integer/);
+    });
+
     it('rejects a non-numeric metric value', async () => {
       const response = await POST(makeRequest('POST', {
         ...baseLog,

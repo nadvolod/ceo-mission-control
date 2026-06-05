@@ -226,7 +226,12 @@ function MetricRow({
         inputMode="numeric"
         value={value ?? ''}
         placeholder={placeholder}
-        onChange={(e) => onChange(e.target.value === '' ? null : Number(e.target.value))}
+        onChange={(e) => {
+          // valueAsNumber is NaN for empty / intermediate input ("-", "e").
+          // Sleep metrics are integers, so round; non-finite → null (cleared).
+          const n = e.target.valueAsNumber;
+          onChange(Number.isFinite(n) ? Math.round(n) : null);
+        }}
         data-testid={testId}
         style={inputStyle}
       />
@@ -404,7 +409,10 @@ function MorningLogBody({ onClose }: { onClose: () => void }) {
     [notes],
   );
 
-  const saveDisabled = saving || !hydrated || supplements.some((s) => s.taken && s.dosageMg <= 0);
+  const saveDisabled =
+    saving ||
+    !hydrated ||
+    supplements.some((s) => s.taken && (!Number.isFinite(s.dosageMg) || s.dosageMg <= 0));
 
   return (
     <div className="relative flex h-full flex-col">
@@ -516,7 +524,10 @@ function MorningLogBody({ onClose }: { onClose: () => void }) {
               inputMode="numeric"
               value={metrics.durH ?? ''}
               placeholder="0"
-              onChange={(e) => setMetrics((m) => ({ ...m, durH: e.target.value === '' ? null : Number(e.target.value) }))}
+              onChange={(e) => {
+                const n = e.target.valueAsNumber;
+                setMetrics((m) => ({ ...m, durH: Number.isFinite(n) ? Math.round(n) : null }));
+              }}
               data-testid="metric-duration-hours"
               style={{ ...inputStyle, width: 56 }}
             />
@@ -526,7 +537,10 @@ function MorningLogBody({ onClose }: { onClose: () => void }) {
               inputMode="numeric"
               value={metrics.durM ?? ''}
               placeholder="0"
-              onChange={(e) => setMetrics((m) => ({ ...m, durM: e.target.value === '' ? null : Number(e.target.value) }))}
+              onChange={(e) => {
+                const n = e.target.valueAsNumber;
+                setMetrics((m) => ({ ...m, durM: Number.isFinite(n) ? Math.round(n) : null }));
+              }}
               data-testid="metric-duration-minutes"
               style={{ ...inputStyle, width: 56 }}
             />
@@ -635,11 +649,13 @@ function MorningLogBody({ onClose }: { onClose: () => void }) {
                 value={supp.taken ? supp.dosageMg : ''}
                 disabled={!supp.taken}
                 placeholder="—"
-                onChange={(e) =>
-                  setSupplements((prev) =>
-                    prev.map((s, i) => (i === idx ? { ...s, dosageMg: Number(e.target.value) } : s)),
-                  )
-                }
+                onChange={(e) => {
+                  // Non-finite (empty / intermediate) → 0 so it trips the
+                  // "taken with 0 dosage" guard rather than serializing to null.
+                  const n = e.target.valueAsNumber;
+                  const dosageMg = Number.isFinite(n) ? n : 0;
+                  setSupplements((prev) => prev.map((s, i) => (i === idx ? { ...s, dosageMg } : s)));
+                }}
                 data-testid={`supp-dosage-${idx}`}
                 style={{ ...inputStyle, opacity: supp.taken ? 1 : 0.4 }}
               />
