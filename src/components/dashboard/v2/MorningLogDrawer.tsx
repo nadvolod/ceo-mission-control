@@ -402,27 +402,55 @@ function MorningLogBody({ onClose }: { onClose: () => void }) {
     }
   }, [newHabitName, updateTemplate]);
 
-  const handleRemoveSupplement = useCallback((name: string) => {
-    void updateTemplate('removeSupplement', name);
+  const handleRemoveSupplement = useCallback(async (name: string) => {
+    const result = await updateTemplate('removeSupplement', name);
+    if (result?.success) {
+      setSupplements((prev) => prev.filter((s) => s.name !== name));
+    }
   }, [updateTemplate]);
-  const handleRenameSupplement = useCallback((originalName: string, newName: string) => {
-    const current = supplements.find((s) => s.name === originalName);
-    void updateTemplate('editSupplement', originalName, undefined, {
-      newName,
-      newDosageMg: current?.dosageMg && current.dosageMg > 0 ? current.dosageMg : 1,
-    });
-  }, [updateTemplate, supplements]);
-  const handleRemoveHabit = useCallback((name: string) => {
-    void updateTemplate('removeHabit', name);
+  const handleRenameSupplement = useCallback(async (originalName: string, newName: string) => {
+    // Read the real dosage from the TEMPLATE, not local state (local dosage is
+    // 0 when the supplement isn't "taken", which would clobber the template).
+    const tmpl = templates.supplementTemplate.find((s) => s.name === originalName);
+    const newDosageMg = tmpl?.defaultDosageMg && tmpl.defaultDosageMg > 0 ? tmpl.defaultDosageMg : 1;
+    const result = await updateTemplate('editSupplement', originalName, undefined, { newName, newDosageMg });
+    if (result?.success) {
+      setSupplements((prev) => prev.map((s) => (s.name === originalName ? { ...s, name: newName } : s)));
+    }
+  }, [updateTemplate, templates]);
+  const handleRemoveHabit = useCallback(async (name: string) => {
+    const result = await updateTemplate('removeHabit', name);
+    if (result?.success) {
+      setHabits((prev) => prev.filter((h) => h.name !== name));
+    }
   }, [updateTemplate]);
-  const handleRenameHabit = useCallback((originalName: string, newName: string) => {
-    void updateTemplate('editHabit', originalName, undefined, { newName });
+  const handleRenameHabit = useCallback(async (originalName: string, newName: string) => {
+    const result = await updateTemplate('editHabit', originalName, undefined, { newName });
+    if (result?.success) {
+      setHabits((prev) => prev.map((h) => (h.name === originalName ? { ...h, name: newName } : h)));
+    }
   }, [updateTemplate]);
-  const handleRemoveEnvField = useCallback((name: string) => {
-    void updateTemplate('removeEnvironmentField', name);
+  const handleRemoveEnvField = useCallback(async (name: string) => {
+    const result = await updateTemplate('removeEnvironmentField', name);
+    if (result?.success) {
+      setEnv((prev) => {
+        const next = { ...prev.customFields };
+        delete next[name];
+        return { ...prev, customFields: next };
+      });
+    }
   }, [updateTemplate]);
-  const handleRenameEnvField = useCallback((originalName: string, newName: string) => {
-    void updateTemplate('editEnvironmentField', originalName, undefined, { newName });
+  const handleRenameEnvField = useCallback(async (originalName: string, newName: string) => {
+    const result = await updateTemplate('editEnvironmentField', originalName, undefined, { newName });
+    if (result?.success) {
+      setEnv((prev) => {
+        const next = { ...prev.customFields };
+        const v = next[originalName];
+        delete next[originalName];
+        next[newName] = v ?? false;
+        return { ...prev, customFields: next };
+      });
+    }
   }, [updateTemplate]);
 
   const recentEntries = useMemo(

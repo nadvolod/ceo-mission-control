@@ -32,6 +32,16 @@ export function EditableItemControls({
     lineHeight: 0,
   };
 
+  const commit = () => {
+    const next = draft.trim();
+    if (next && next !== name) onRename(name, next);
+    setEditing(false);
+  };
+  const cancel = () => {
+    setDraft(name);
+    setEditing(false);
+  };
+
   if (editing) {
     return (
       <span className="flex items-center gap-1">
@@ -39,6 +49,15 @@ export function EditableItemControls({
           autoFocus
           value={draft}
           onChange={(e) => setDraft(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') {
+              e.preventDefault();
+              commit();
+            } else if (e.key === 'Escape') {
+              e.preventDefault();
+              cancel();
+            }
+          }}
           data-testid={`${testIdBase}-edit-input-${idx}`}
           style={{
             width: 110,
@@ -57,11 +76,7 @@ export function EditableItemControls({
           style={iconBtn}
           aria-label={`Save ${name}`}
           data-testid={`${testIdBase}-edit-save-${idx}`}
-          onClick={() => {
-            const next = draft.trim();
-            if (next && next !== name) onRename(name, next);
-            setEditing(false);
-          }}
+          onClick={commit}
         >
           <Check size={14} />
         </button>
@@ -70,10 +85,7 @@ export function EditableItemControls({
           style={iconBtn}
           aria-label={`Cancel editing ${name}`}
           data-testid={`${testIdBase}-edit-cancel-${idx}`}
-          onClick={() => {
-            setDraft(name);
-            setEditing(false);
-          }}
+          onClick={cancel}
         >
           <X size={14} />
         </button>
