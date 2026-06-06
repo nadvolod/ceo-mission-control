@@ -1,5 +1,6 @@
 import type { ActivityEntry, MetricId } from './types';
 import type { Chip } from './palette';
+import type { DailyHealthNote, ThreeToThriveEntry } from '@/lib/types';
 
 // ----- ActivityFeed derivation -------------------------------------------
 
@@ -65,6 +66,8 @@ function focusToActivity(s: FocusSessionLike): ActivityEntry {
     delta: `+${hours}h`,
     label: s.category ?? 'Focus',
     meta: s.description?.slice(0, 70) || '—',
+    source: 'focus',
+    refKey: s.id ?? `focus-${s.timestamp ?? ''}`,
   };
 }
 
@@ -82,6 +85,63 @@ function financialToActivity(e: FinancialEntryLike): ActivityEntry {
     delta: verb,
     label: `$${amount.toLocaleString()}`,
     meta: e.description?.slice(0, 70) || '—',
+    source: 'money',
+    refKey: e.id ?? `fin-${e.timestamp ?? ''}`,
+  };
+}
+
+function fmtDuration(totalMinutes: number | null | undefined): string {
+  if (totalMinutes == null || !Number.isFinite(totalMinutes) || totalMinutes <= 0) return '0h0m';
+  const h = Math.floor(totalMinutes / 60);
+  const m = Math.round(totalMinutes % 60);
+  return `${h}h${m}m`;
+}
+
+function pluralize(n: number, singular: string): string {
+  return `${n} ${singular}${n === 1 ? '' : 's'}`;
+}
+
+export function morningToActivity(note: DailyHealthNote): ActivityEntry {
+  const sm = note.sleepMetrics;
+  const score = sm?.sleepScore;
+  const takenSupps = note.supplements.filter((s) => s.taken).length;
+  const doneHabits = note.habits.filter((h) => h.done).length;
+  const parts: string[] = [];
+  if (score != null) parts.push(`Sleep ${score}`);
+  parts.push(fmtDuration(sm?.durationMinutes));
+  parts.push(pluralize(takenSupps, 'supplement'));
+  parts.push(pluralize(doneHabits, 'habit'));
+  const tsMs = parseTimestampMs(note.loggedAt) || parseTimestampMs(`${note.date}T08:00:00`);
+  return {
+    id: `morning-${note.date}`,
+    t: hhmm(note.loggedAt) === '--:--' ? '08:00' : hhmm(note.loggedAt),
+    tsMs,
+    kind: 'deepwork',
+    delta: '',
+    label: 'Morning Log',
+    meta: parts.join(' · '),
+    source: 'morning',
+    refKey: note.date,
+  };
+}
+
+export function reflectionToActivity(entry: ThreeToThriveEntry): ActivityEntry {
+  const total = entry.questions.length;
+  const answered = entry.answers.filter((a) => a.answer.trim().length > 0).length;
+  const lastAt = entry.answers
+    .map((a) => parseTimestampMs(a.answeredAt))
+    .reduce((max, t) => (t > max ? t : max), 0);
+  const tsMs = lastAt || parseTimestampMs(`${entry.date}T21:00:00`);
+  return {
+    id: `reflection-${entry.date}`,
+    t: hhmm(lastAt ? new Date(lastAt).toISOString() : `${entry.date}T21:00:00`),
+    tsMs,
+    kind: 'temporal',
+    delta: '',
+    label: 'Reflection',
+    meta: `${answered} of ${total} answered`,
+    source: 'reflection',
+    refKey: entry.date,
   };
 }
 
@@ -90,10 +150,12 @@ function financialToActivity(e: FinancialEntryLike): ActivityEntry {
 export function deriveActivity(opts: {
   focus?: FocusSessionLike[];
   financial?: FinancialEntryLike[];
+  morning?: DailyHealthNote[];
+  reflection?: ThreeToThriveEntry[];
   optimistic?: ActivityEntry[];
   limit?: number;
 }): ActivityEntry[] {
-  const { focus = [], financial = [], optimistic = [], limit = 25 } = opts;
+  const { focus = [], financial = [], morning = [], reflection = [], optimistic = [], limit = 25 } = opts;
   // Drop e2e-test-authored rows before mapping. Belt-and-suspenders for
   // when stale rows survive in the DB despite global-setup wiping the
   // test user; the rule is documented in docs/dashboard-v2-architecture.md
@@ -104,6 +166,8 @@ export function deriveActivity(opts: {
     ...optimistic,
     ...liveFocus.map(focusToActivity),
     ...liveFinancial.map(financialToActivity),
+    ...morning.map(morningToActivity),
+    ...reflection.map(reflectionToActivity),
   ];
   // Stable de-dup by id (optimistic entries land first and win).
   const seen = new Set<string>();

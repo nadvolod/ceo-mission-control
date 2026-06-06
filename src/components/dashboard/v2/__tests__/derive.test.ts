@@ -1,4 +1,4 @@
-import { consecutiveStreak, deriveActivity, deriveChips } from '../derive';
+import { consecutiveStreak, deriveActivity, deriveChips, morningToActivity, reflectionToActivity } from '../derive';
 
 describe('consecutiveStreak', () => {
   it('returns 0 when there are no entries', () => {
@@ -315,6 +315,77 @@ describe('deriveActivity', () => {
       });
       expect(result[0].id).toBe('local-fresh');
     });
+  });
+});
+
+describe('morningToActivity', () => {
+  it('summarizes a morning log into one entry', () => {
+    const e = morningToActivity({
+      date: '2026-06-05',
+      sleepEnvironment: { temperatureF: null, fanRunning: false, dogInRoom: false, customFields: {} },
+      sleepMetrics: { sleepScore: 87, durationMinutes: 442, bodyBattery: 95, restingHeartRate: 50, hrv: 40 },
+      supplements: [{ name: 'A', dosageMg: 1, taken: true }, { name: 'B', dosageMg: 2, taken: false }],
+      habits: [{ name: 'H1', done: true }, { name: 'H2', done: true }],
+      freeformNote: '',
+      loggedAt: '2026-06-05T08:14:00.000Z',
+    });
+    expect(e.source).toBe('morning');
+    expect(e.refKey).toBe('2026-06-05');
+    expect(e.label).toBe('Morning Log');
+    expect(e.meta).toContain('87');
+    expect(e.meta).toContain('7h22m');
+    expect(e.meta).toContain('1 supplement'); // only "taken" counted
+    expect(e.meta).toContain('2 habits');
+  });
+
+  it('omits the sleep score when not recorded', () => {
+    const e = morningToActivity({
+      date: '2026-06-05',
+      sleepEnvironment: { temperatureF: null, fanRunning: false, dogInRoom: false, customFields: {} },
+      sleepMetrics: { sleepScore: null, durationMinutes: null, bodyBattery: null, restingHeartRate: null, hrv: null },
+      supplements: [],
+      habits: [],
+      freeformNote: '',
+      loggedAt: '2026-06-05T08:14:00.000Z',
+    });
+    expect(e.meta).not.toContain('Sleep ');
+    expect(e.meta).toContain('0 supplements');
+    expect(e.meta).toContain('0 habits');
+  });
+});
+
+describe('reflectionToActivity', () => {
+  it('summarizes a reflection into one entry', () => {
+    const e = reflectionToActivity({
+      date: '2026-06-05',
+      questions: ['q1', 'q2', 'q3'],
+      answers: [
+        { id: '1', date: '2026-06-05', question: 'q1', answer: 'a', answeredAt: '2026-06-05T21:30:00.000Z' },
+        { id: '2', date: '2026-06-05', question: 'q2', answer: '', answeredAt: '2026-06-05T21:30:00.000Z' },
+      ],
+    });
+    expect(e.source).toBe('reflection');
+    expect(e.refKey).toBe('2026-06-05');
+    expect(e.label).toBe('Reflection');
+    expect(e.meta).toBe('1 of 3 answered');
+  });
+});
+
+describe('deriveActivity with morning + reflection', () => {
+  it('includes morning and reflection entries in the merged feed', () => {
+    const out = deriveActivity({
+      morning: [{
+        date: '2026-06-05',
+        sleepEnvironment: { temperatureF: null, fanRunning: false, dogInRoom: false, customFields: {} },
+        sleepMetrics: { sleepScore: 80, durationMinutes: 420, bodyBattery: null, restingHeartRate: null, hrv: null },
+        supplements: [], habits: [], freeformNote: '', loggedAt: '2026-06-05T08:00:00.000Z',
+      }],
+      reflection: [{
+        date: '2026-06-05', questions: ['q1'], answers: [{ id: '1', date: '2026-06-05', question: 'q1', answer: 'x', answeredAt: '2026-06-05T21:00:00.000Z' }],
+      }],
+    });
+    expect(out.some(e => e.source === 'morning')).toBe(true);
+    expect(out.some(e => e.source === 'reflection')).toBe(true);
   });
 });
 
