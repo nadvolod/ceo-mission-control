@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
 import { NotebookPen, Plus, X } from 'lucide-react';
 import { Aurora } from './primitives/Aurora';
+import { EditableItemControls } from './EditableItemList';
 import { MC_COLORS } from './palette';
 import { useHealthData } from '@/hooks/useHealthData';
 import type { DailyHealthNote, SleepMetrics } from '@/lib/types';
@@ -401,6 +402,29 @@ function MorningLogBody({ onClose }: { onClose: () => void }) {
     }
   }, [newHabitName, updateTemplate]);
 
+  const handleRemoveSupplement = useCallback((name: string) => {
+    void updateTemplate('removeSupplement', name);
+  }, [updateTemplate]);
+  const handleRenameSupplement = useCallback((originalName: string, newName: string) => {
+    const current = supplements.find((s) => s.name === originalName);
+    void updateTemplate('editSupplement', originalName, undefined, {
+      newName,
+      newDosageMg: current?.dosageMg && current.dosageMg > 0 ? current.dosageMg : 1,
+    });
+  }, [updateTemplate, supplements]);
+  const handleRemoveHabit = useCallback((name: string) => {
+    void updateTemplate('removeHabit', name);
+  }, [updateTemplate]);
+  const handleRenameHabit = useCallback((originalName: string, newName: string) => {
+    void updateTemplate('editHabit', originalName, undefined, { newName });
+  }, [updateTemplate]);
+  const handleRemoveEnvField = useCallback((name: string) => {
+    void updateTemplate('removeEnvironmentField', name);
+  }, [updateTemplate]);
+  const handleRenameEnvField = useCallback((originalName: string, newName: string) => {
+    void updateTemplate('editEnvironmentField', originalName, undefined, { newName });
+  }, [updateTemplate]);
+
   const recentEntries = useMemo(
     () =>
       Object.entries(notes)
@@ -595,11 +619,18 @@ function MorningLogBody({ onClose }: { onClose: () => void }) {
               testId="env-dog"
             />
           </div>
-          {Object.keys(env.customFields).map((name) => (
+          {Object.keys(env.customFields).map((name, idx) => (
             <div key={name} className="flex items-center gap-3">
               <span style={rowLabelStyle} title={name}>
                 {name}
               </span>
+              <EditableItemControls
+                name={name}
+                idx={idx}
+                testIdBase="env"
+                onRemove={handleRemoveEnvField}
+                onRename={handleRenameEnvField}
+              />
               <Toggle
                 checked={env.customFields[name]}
                 onChange={(v) =>
@@ -641,6 +672,13 @@ function MorningLogBody({ onClose }: { onClose: () => void }) {
               >
                 {supp.name}
               </span>
+              <EditableItemControls
+                name={supp.name}
+                idx={idx}
+                testIdBase="supp"
+                onRemove={handleRemoveSupplement}
+                onRename={handleRenameSupplement}
+              />
               <input
                 type="number"
                 inputMode="decimal"
@@ -699,11 +737,20 @@ function MorningLogBody({ onClose }: { onClose: () => void }) {
               <span
                 style={{
                   fontSize: 13,
+                  flex: 1,
+                  minWidth: 0,
                   color: habit.done ? 'var(--color-mc-fg)' : 'var(--color-mc-fg-muted)',
                 }}
               >
                 {habit.name}
               </span>
+              <EditableItemControls
+                name={habit.name}
+                idx={idx}
+                testIdBase="habit"
+                onRemove={handleRemoveHabit}
+                onRename={handleRenameHabit}
+              />
             </div>
           ))}
           <AddRow
