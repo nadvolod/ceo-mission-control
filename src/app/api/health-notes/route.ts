@@ -179,12 +179,46 @@ export async function POST(request: NextRequest) {
           case 'removeHabit':
             await tracker.removeHabit(name);
             break;
+          case 'editHabit': {
+            const { newName } = data;
+            if (typeof newName !== 'string' || newName.trim().length === 0) {
+              return NextResponse.json(
+                { success: false, error: 'newName must be a non-empty string' },
+                { status: 400 }
+              );
+            }
+            try {
+              await tracker.editHabit(name, newName.trim());
+            } catch (err) {
+              const message = err instanceof Error ? err.message : 'Failed to edit habit';
+              return NextResponse.json({ success: false, error: message }, { status: 400 });
+            }
+            console.log('Health note template updated:', { operation: 'editHabit', name });
+            break;
+          }
           case 'addEnvironmentField':
             await tracker.addEnvironmentField(name);
             break;
           case 'removeEnvironmentField':
             await tracker.removeEnvironmentField(name);
             break;
+          case 'editEnvironmentField': {
+            const { newName } = data;
+            if (typeof newName !== 'string' || newName.trim().length === 0) {
+              return NextResponse.json(
+                { success: false, error: 'newName must be a non-empty string' },
+                { status: 400 }
+              );
+            }
+            try {
+              await tracker.editEnvironmentField(name, newName.trim());
+            } catch (err) {
+              const message = err instanceof Error ? err.message : 'Failed to edit environment field';
+              return NextResponse.json({ success: false, error: message }, { status: 400 });
+            }
+            console.log('Health note template updated:', { operation: 'editEnvironmentField', name });
+            break;
+          }
           default:
             return NextResponse.json(
               { success: false, error: `Unknown operation: ${operation}` },

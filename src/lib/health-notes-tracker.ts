@@ -169,6 +169,22 @@ export class HealthNotesTracker {
     await this.saveData();
   }
 
+  async editHabit(originalName: string, newName: string): Promise<void> {
+    const idx = this.data.habitTemplate.findIndex(h => h.name === originalName);
+    if (idx === -1) {
+      throw new Error(`Habit "${originalName}" not found`);
+    }
+    const newNameLower = newName.toLowerCase();
+    const hasDuplicate = this.data.habitTemplate.some(
+      (h, i) => i !== idx && h.name.toLowerCase() === newNameLower,
+    );
+    if (hasDuplicate) {
+      throw new Error(`Habit "${newName}" already exists`);
+    }
+    this.data.habitTemplate[idx] = { name: newName };
+    await this.saveData();
+  }
+
   async addEnvironmentField(name: string): Promise<void> {
     if (this.data.environmentTemplate.customFieldNames.some(f => f.toLowerCase() === name.toLowerCase())) {
       throw new Error(`Environment field "${name}" already exists`);
@@ -179,6 +195,21 @@ export class HealthNotesTracker {
 
   async removeEnvironmentField(name: string): Promise<void> {
     this.data.environmentTemplate.customFieldNames = this.data.environmentTemplate.customFieldNames.filter(f => f !== name);
+    await this.saveData();
+  }
+
+  async editEnvironmentField(originalName: string, newName: string): Promise<void> {
+    const fields = this.data.environmentTemplate.customFieldNames;
+    const idx = fields.findIndex(f => f === originalName);
+    if (idx === -1) {
+      throw new Error(`Environment field "${originalName}" not found`);
+    }
+    const newNameLower = newName.toLowerCase();
+    const hasDuplicate = fields.some((f, i) => i !== idx && f.toLowerCase() === newNameLower);
+    if (hasDuplicate) {
+      throw new Error(`Environment field "${newName}" already exists`);
+    }
+    fields[idx] = newName;
     await this.saveData();
   }
 
