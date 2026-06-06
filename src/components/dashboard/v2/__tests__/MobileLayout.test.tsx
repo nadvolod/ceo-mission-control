@@ -129,8 +129,14 @@ describe('<MobileLayout />', () => {
     expect(screen.queryByTestId('mobile-quick-amount-editor-wrap')).not.toBeInTheDocument();
   });
 
-  it('mobile quick log no longer offers Call or Demo', () => {
+  it('mobile quick log offers Moved/Generated/Deep/Train and no Call/Demo', () => {
     render(<MobileLayout {...defaultProps()} />);
+    // The four remaining quick actions are present...
+    expect(screen.getByTestId('mobile-quick-moved')).toBeInTheDocument();
+    expect(screen.getByTestId('mobile-quick-generated')).toBeInTheDocument();
+    expect(screen.getByTestId('mobile-quick-deep-0-5h')).toBeInTheDocument();
+    expect(screen.getByTestId('mobile-quick-train')).toBeInTheDocument();
+    // ...and Call / Demo are gone.
     expect(screen.queryByTestId('mobile-quick-call')).toBeNull();
     expect(screen.queryByTestId('mobile-quick-demo')).toBeNull();
   });

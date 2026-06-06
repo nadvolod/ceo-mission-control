@@ -44,7 +44,7 @@ describe('MetricCard', () => {
     expect(screen.getAllByText(/liabilities/i).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('uses stable preset test ids without leading punctuation from labels', () => {
+  it('pipeline presets: only + FU remains after removing Call and Demo', () => {
     const onLog = jest.fn();
     render(<MetricCard metric={SEED_METRICS.pipeline} onLog={onLog} />);
 
