@@ -498,6 +498,61 @@ test.describe('Mission Control v2 — mobile viewport', () => {
     await expect(page.getByTestId('reflection-drawer')).toBeVisible();
   });
 
+  test('bottom-nav Insights and Review tabs render real content (no placeholder copy)', async ({ page }) => {
+    // Flow 3: the pre-fix bug rendered a "Open the Insights/Review tab in the
+    // bottom nav" placeholder on mobile. After the fix, tapping the bottom-nav
+    // item swaps the body to the real InsightsTab / ReviewTab.
+    await page.goto('/dashboard');
+    await expect(page.getByTestId('mobile-layout')).toBeVisible();
+
+    // Insights: tap the bottom-nav item, assert the placeholder is gone and the
+    // real tab + its period selector render.
+    await page.getByTestId('mobile-nav-insights').click();
+    await expect(page.getByText(/open the Insights tab in the bottom nav/i)).toHaveCount(0);
+    await expect(page.getByTestId('insights-tab')).toBeVisible();
+    await expect(page.getByTestId('insights-period-selector')).toBeVisible();
+
+    // Review: the test user has no monthly reviews (global-setup wipes them),
+    // so the Review body shows its empty-state — NOT the bottom-nav placeholder.
+    await page.getByTestId('mobile-nav-review').click();
+    await expect(page.getByText(/Open the Review tab in the bottom nav/i)).toHaveCount(0);
+    // Either the populated tab or the empty-state renders depending on data.
+    const reviewTab = page.getByTestId('review-tab');
+    const reviewEmpty = page.getByTestId('review-tab-empty');
+    await expect(reviewTab.or(reviewEmpty)).toBeVisible();
+  });
+
+  test('Call/Demo quick actions are gone; + Train logs a training session', async ({ page, request }) => {
+    // Flow 5: the old mobile quick-log grid had Call/Demo buttons. They were
+    // removed. The remaining + Train button must actually persist (latch
+    // today's `trained` true via /api/weekly-tracker addToDay).
+    const today = await browserLocalDate(page);
+    // Clean slate for today's weekly-tracker row so the increment is unambiguous.
+    await request.post('/api/weekly-tracker', { data: { action: 'deleteDay', date: today } });
+
+    await page.goto('/dashboard');
+    await expect(page.getByTestId('mobile-quick-log')).toBeVisible();
+
+    // The removed buttons must not exist anymore.
+    await expect(page.getByTestId('mobile-quick-call')).toHaveCount(0);
+    await expect(page.getByTestId('mobile-quick-demo')).toHaveCount(0);
+
+    // Tap + Train and assert the server-side effect (mirrors the API-persistence
+    // assertion style of weekly-tracker-quick-add.spec.ts).
+    const trainPost = page.waitForResponse((res) =>
+      res.url().includes('/api/weekly-tracker') &&
+      res.request().method() === 'POST' &&
+      res.status() === 200,
+    );
+    await page.getByTestId('mobile-quick-train').click();
+    await trainPost;
+
+    await expect.poll(async () => {
+      const res = await (await request.get('/api/weekly-tracker')).json();
+      return res.todaysEntry?.trained ?? null;
+    }, { timeout: 10_000 }).toBe(true);
+  });
+
   test('quick-log + Moved opens the amount editor and submits the typed value', async ({ page }) => {
     // Same custom-amount behavior on mobile: tap the money button →
     // editor appears → type the amount → submit.
