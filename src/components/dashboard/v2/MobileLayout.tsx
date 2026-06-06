@@ -1,10 +1,13 @@
 'use client';
 
+import type React from 'react';
 import { useState } from 'react';
 import { Sparkles, Brain, Check, BarChart3, Pencil, NotebookPen } from 'lucide-react';
 import { Aurora } from './primitives/Aurora';
 import { OrbitStar } from './primitives/OrbitStar';
 import { ActivityFeed } from './ActivityFeed';
+import { InsightsTab } from './InsightsTab';
+import { ReviewTab } from './ReviewTab';
 import { AmountEditor } from './AmountEditor';
 import { InlineHoursEditor } from './InlineHoursEditor';
 import { MC_COLORS } from './palette';
@@ -27,6 +30,15 @@ type Props = {
     options?: { description?: string },
   ) => void;
   onUpdateTemporalGoal?: (newGoal: number) => void | Promise<void>;
+  insightsData?: {
+    focusDailyTrend?: React.ComponentProps<typeof InsightsTab>['focusDailyTrend'];
+    financialDailyTrend?: React.ComponentProps<typeof InsightsTab>['financialDailyTrend'];
+  };
+  reviewData?: {
+    currentMonthReview: React.ComponentProps<typeof ReviewTab>['currentMonthReview'];
+    recentReviews: React.ComponentProps<typeof ReviewTab>['recentReviews'];
+    ratingsTrend: React.ComponentProps<typeof ReviewTab>['ratingsTrend'];
+  };
 };
 
 function slugifyLabel(label: string): string {
@@ -51,6 +63,8 @@ export function MobileLayout({
   onOpenMorning,
   onLog,
   onUpdateTemporalGoal,
+  insightsData,
+  reviewData,
 }: Props) {
   return (
     <div
@@ -84,15 +98,21 @@ export function MobileLayout({
         )}
 
         {tab === 'insights' && (
-          <div style={{ padding: '12px 18px', fontSize: 13, color: 'var(--color-mc-fg-dim)' }}>
-            Insights renders inside the desktop tab on small screens too — open the
-            Insights tab in the bottom nav to switch between the four cards.
+          <div style={{ padding: '12px 16px' }}>
+            <InsightsTab
+              focusDailyTrend={insightsData?.focusDailyTrend}
+              financialDailyTrend={insightsData?.financialDailyTrend}
+            />
           </div>
         )}
 
         {tab === 'review' && (
-          <div style={{ padding: '12px 18px', fontSize: 13, color: 'var(--color-mc-fg-dim)' }}>
-            Open the Review tab in the bottom nav for monthly review history.
+          <div style={{ padding: '12px 16px' }}>
+            <ReviewTab
+              currentMonthReview={reviewData?.currentMonthReview ?? null}
+              recentReviews={reviewData?.recentReviews ?? []}
+              ratingsTrend={reviewData?.ratingsTrend ?? []}
+            />
           </div>
         )}
       </div>

@@ -180,13 +180,31 @@ describe('<MobileLayout />', () => {
     expect(onOpenReflection).toHaveBeenCalled();
   });
 
-  it('Insights / Review tabs swap the body for a hint pointing at the bottom nav', () => {
+  it('Insights / Review tabs swap the body away from the overview hero', () => {
     const { rerender } = render(<MobileLayout {...defaultProps({ tab: 'insights' })} />);
     // Hero is not visible when we leave overview.
     expect(screen.queryByTestId('mobile-hero-temporal')).not.toBeInTheDocument();
-    expect(screen.getByText(/Insights tab/i)).toBeInTheDocument();
 
     rerender(<MobileLayout {...defaultProps({ tab: 'review' })} />);
-    expect(screen.getByText(/Review tab/i)).toBeInTheDocument();
+    expect(screen.queryByTestId('mobile-hero-temporal')).not.toBeInTheDocument();
+  });
+
+  it('renders the Insights tab content on mobile (not a placeholder)', () => {
+    render(<MobileLayout {...defaultProps()} tab="insights" />);
+    // The dead-end placeholder copy must be gone...
+    expect(screen.queryByText(/open the Insights tab in the bottom nav/i)).toBeNull();
+    // ...and the real InsightsTab component must render (it always renders
+    // its root + period selector even with empty data).
+    expect(screen.getByTestId('insights-tab')).toBeInTheDocument();
+    expect(screen.getByTestId('insights-period-selector')).toBeInTheDocument();
+  });
+
+  it('renders the Review tab content on mobile (not a placeholder)', () => {
+    render(<MobileLayout {...defaultProps()} tab="review" />);
+    // The dead-end placeholder copy must be gone...
+    expect(screen.queryByText(/Open the Review tab in the bottom nav/i)).toBeNull();
+    // ...and the real ReviewTab component must render. With empty data it
+    // renders its empty-state surface (review-tab-empty).
+    expect(screen.getByTestId('review-tab-empty')).toBeInTheDocument();
   });
 });

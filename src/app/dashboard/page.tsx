@@ -147,6 +147,15 @@ export default function MissionControlV2Page() {
         onOpenMorning={() => setMorningOpen(true)}
         onLog={store.log}
         onUpdateTemporalGoal={onUpdateTemporalGoal}
+        insightsData={{
+          focusDailyTrend: focusData?.dailyTrend,
+          financialDailyTrend: financialData?.dailyFinancialTrend,
+        }}
+        reviewData={{
+          currentMonthReview: monthlyReviewData?.currentMonthReview ?? null,
+          recentReviews: monthlyReviewData?.recentReviews ?? [],
+          ratingsTrend: monthlyReviewData?.ratingsTrend ?? [],
+        }}
       />
     </div>
 
