@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Moon, Plus, X } from 'lucide-react';
+import { NotebookPen, Plus, X } from 'lucide-react';
 import { Aurora } from './primitives/Aurora';
 import { MC_COLORS } from './palette';
 import { useHealthData } from '@/hooks/useHealthData';
@@ -431,7 +431,7 @@ function MorningLogBody({ onClose }: { onClose: () => void }) {
             boxShadow: `0 0 18px ${MC_COLORS.uv}66`,
           }}
         >
-          <Moon size={18} color="#fff" aria-hidden />
+          <NotebookPen size={18} color="#fff" aria-hidden />
         </div>
         <div className="flex-1">
           <Dialog.Title style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-mc-ink)' }}>

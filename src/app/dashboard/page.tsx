@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Search } from 'lucide-react';
+import { NotebookPen, Plus, Search } from 'lucide-react';
 import { localDate } from '@/lib/dates';
 import { Aurora } from '@/components/dashboard/v2/primitives/Aurora';
 import { OrbitStar } from '@/components/dashboard/v2/primitives/OrbitStar';
@@ -302,7 +302,7 @@ export default function MissionControlV2Page() {
             }}
             data-testid="morning-log-trigger"
           >
-            Morning
+            <NotebookPen size={12} aria-hidden style={{ marginRight: 4, display: 'inline', verticalAlign: '-2px' }} /> Morning
           </button>
           <Link
             href="/dashboard/legacy"

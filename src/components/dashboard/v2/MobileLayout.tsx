@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Sparkles, Brain, Check, BarChart3, Pencil, Moon } from 'lucide-react';
+import { Sparkles, Brain, Check, BarChart3, Pencil, NotebookPen } from 'lucide-react';
 import { Aurora } from './primitives/Aurora';
 import { OrbitStar } from './primitives/OrbitStar';
 import { ActivityFeed } from './ActivityFeed';
@@ -163,7 +163,7 @@ function MobileHeader({ onOpenMorning }: { onOpenMorning: () => void }) {
         aria-label="Open morning log"
         data-testid="mobile-morning-trigger"
       >
-        <Moon size={18} aria-hidden />
+        <NotebookPen size={18} aria-hidden />
       </button>
     </div>
   );
