@@ -23,6 +23,7 @@ type Props = {
   onTab: (t: Tab) => void;
   onOpenReflection: () => void;
   onOpenMorning: () => void;
+  onOpenDetail?: (entry: ActivityEntry) => void;
   onLog: (
     metricId: MetricId,
     delta: number,
@@ -61,6 +62,7 @@ export function MobileLayout({
   onTab,
   onOpenReflection,
   onOpenMorning,
+  onOpenDetail,
   onLog,
   onUpdateTemporalGoal,
   insightsData,
@@ -93,7 +95,7 @@ export function MobileLayout({
             />
             <SnapshotStrip metrics={metrics} />
             <QuickLogGrid onLog={onLog} />
-            <RecentActivity activity={activity} onOpenReflection={onOpenReflection} />
+            <RecentActivity activity={activity} onOpenReflection={onOpenReflection} onOpenDetail={onOpenDetail} />
           </>
         )}
 
@@ -616,9 +618,11 @@ function QuickLogGrid({
 function RecentActivity({
   activity,
   onOpenReflection,
+  onOpenDetail,
 }: {
   activity: ActivityEntry[];
   onOpenReflection: () => void;
+  onOpenDetail?: (entry: ActivityEntry) => void;
 }) {
   return (
     <div style={{ padding: '0 18px 12px', flex: 1, minHeight: 0 }}>
@@ -650,7 +654,7 @@ function RecentActivity({
           Reflect ↑
         </button>
       </div>
-      <ActivityFeed entries={activity.slice(0, 5)} />
+      <ActivityFeed entries={activity.slice(0, 5)} onOpenDetail={onOpenDetail} />
     </div>
   );
 }

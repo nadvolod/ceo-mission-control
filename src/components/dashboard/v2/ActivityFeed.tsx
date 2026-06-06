@@ -2,7 +2,13 @@
 
 import type { ActivityEntry } from './types';
 
-export function ActivityFeed({ entries }: { entries: ActivityEntry[] }) {
+export function ActivityFeed({
+  entries,
+  onOpenDetail,
+}: {
+  entries: ActivityEntry[];
+  onOpenDetail?: (entry: ActivityEntry) => void;
+}) {
   return (
     <div
       className="flex flex-col overflow-hidden rounded-xl"
@@ -42,7 +48,7 @@ export function ActivityFeed({ entries }: { entries: ActivityEntry[] }) {
       </div>
       <div className="flex-1 overflow-auto">
         {entries.map((entry) => (
-          <ActivityRow key={entry.id} entry={entry} />
+          <ActivityRow key={entry.id} entry={entry} onOpenDetail={onOpenDetail} />
         ))}
         {entries.length === 0 && (
           <div
@@ -60,15 +66,37 @@ export function ActivityFeed({ entries }: { entries: ActivityEntry[] }) {
   );
 }
 
-function ActivityRow({ entry }: { entry: ActivityEntry }) {
+function ActivityRow({
+  entry,
+  onOpenDetail,
+}: {
+  entry: ActivityEntry;
+  onOpenDetail?: (entry: ActivityEntry) => void;
+}) {
   const isPositive = entry.delta.startsWith('+');
+  const clickable = !!onOpenDetail;
   return (
     <div
       className="flex items-start gap-2.5"
       style={{
         padding: '10px 14px',
         borderTop: '1px solid rgba(255,255,255,0.08)',
+        cursor: clickable ? 'pointer' : undefined,
       }}
+      {...(clickable
+        ? {
+            role: 'button',
+            tabIndex: 0,
+            'data-testid': `activity-row-${entry.id}`,
+            onClick: () => onOpenDetail(entry),
+            onKeyDown: (e: React.KeyboardEvent) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                onOpenDetail(entry);
+              }
+            },
+          }
+        : {})}
     >
       <span
         className="font-numerics"

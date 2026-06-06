@@ -13,6 +13,8 @@ import { CollapsiblePanel } from '@/components/dashboard/v2/CollapsiblePanel';
 import { CmdK } from '@/components/dashboard/v2/CmdK';
 import { ReflectionDrawer } from '@/components/dashboard/v2/ReflectionDrawer';
 import { MorningLogDrawer } from '@/components/dashboard/v2/MorningLogDrawer';
+import { ActivityDetailSheet, type ActivityDetail } from '@/components/dashboard/v2/ActivityDetailSheet';
+import type { ActivityEntry } from '@/components/dashboard/v2/types';
 import { useMissionStore } from '@/components/dashboard/v2/useMissionStore';
 import { deriveActivity, deriveChips, consecutiveStreak } from '@/components/dashboard/v2/derive';
 import { TrendsPanel, buildOverviewTrendSeries } from '@/components/dashboard/v2/TrendsPanel';
@@ -41,6 +43,8 @@ export default function MissionControlV2Page() {
   const [cmdOpen, setCmdOpen] = useState(false);
   const [reflectOpen, setReflectOpen] = useState(false);
   const [morningOpen, setMorningOpen] = useState(false);
+  const [detail, setDetail] = useState<ActivityDetail | null>(null);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [now, setNow] = useState<Date | null>(null);
 
   useEffect(() => {
@@ -138,6 +142,55 @@ export default function MissionControlV2Page() {
     [store],
   );
 
+  // Resolve a tapped activity row to a fully-typed detail object by looking
+  // up the full record from data the page already holds (lookup-by-reference
+  // via entry.source + entry.refKey). Source-less rows (e.g. optimistic) have
+  // no resolvable record — bail without opening the sheet.
+  const openDetail = useCallback(
+    (entry: ActivityEntry) => {
+      if (!entry.source) return;
+      const fmtWhen = (ms?: number) => (ms ? new Date(ms).toLocaleString() : '');
+      let resolved: ActivityDetail | null = null;
+      if (entry.source === 'morning') {
+        resolved = {
+          source: 'morning',
+          title: `Morning Log · ${entry.refKey ?? ''}`,
+          note: health.notes?.[entry.refKey ?? ''] ?? null,
+        };
+      } else if (entry.source === 'reflection') {
+        const found = store.threeToThrive?.history.find((e) => e.date === entry.refKey) ?? null;
+        resolved = { source: 'reflection', title: `Reflection · ${entry.refKey ?? ''}`, entry: found };
+      } else if (entry.source === 'money') {
+        const fin = financialData?.recentEntries?.find(
+          (e: { id: string }) => e.id === entry.refKey,
+        ) as { id: string; amount: number; category: string; description: string } | undefined;
+        resolved = {
+          source: 'money',
+          title: 'Money entry',
+          amount: fin?.amount ?? 0,
+          category: fin?.category ?? 'moved',
+          note: fin?.description ?? '',
+          when: fmtWhen(entry.tsMs),
+        };
+      } else if (entry.source === 'focus') {
+        const f = focusData?.recentSessions?.find(
+          (s: { id: string }) => s.id === entry.refKey,
+        ) as { id: string; category: string; hours: number; description: string } | undefined;
+        resolved = {
+          source: 'focus',
+          title: 'Focus session',
+          category: f?.category ?? 'Focus',
+          hours: f?.hours ?? 0,
+          description: f?.description ?? '',
+          when: fmtWhen(entry.tsMs),
+        };
+      }
+      setDetail(resolved);
+      setDetailOpen(true);
+    },
+    [health.notes, store.threeToThrive, financialData, focusData],
+  );
+
   return (
     <>
     {/* Mobile layout — hidden at md+ */}
@@ -149,6 +202,7 @@ export default function MissionControlV2Page() {
         onTab={setTab}
         onOpenReflection={() => setReflectOpen(true)}
         onOpenMorning={() => setMorningOpen(true)}
+        onOpenDetail={openDetail}
         onLog={store.log}
         onUpdateTemporalGoal={onUpdateTemporalGoal}
         insightsData={{
@@ -441,7 +495,7 @@ export default function MissionControlV2Page() {
             </CollapsiblePanel>
           </div>
 
-          <ActivityFeed entries={activity} />
+          <ActivityFeed entries={activity} onOpenDetail={openDetail} />
         </div>
         )}
 
@@ -498,6 +552,17 @@ export default function MissionControlV2Page() {
     />
 
     <MorningLogDrawer open={morningOpen} onOpenChange={setMorningOpen} />
+
+    <ActivityDetailSheet
+      open={detailOpen}
+      onOpenChange={setDetailOpen}
+      detail={detail}
+      onEdit={(d) => {
+        setDetailOpen(false);
+        if (d.source === 'morning') setMorningOpen(true);
+        else if (d.source === 'reflection') setReflectOpen(true);
+      }}
+    />
     </>
   );
 }
