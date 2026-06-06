@@ -193,7 +193,6 @@ export async function POST(request: NextRequest) {
               const message = err instanceof Error ? err.message : 'Failed to edit habit';
               return NextResponse.json({ success: false, error: message }, { status: 400 });
             }
-            console.log('Health note template updated:', { operation: 'editHabit', name });
             break;
           }
           case 'addEnvironmentField':
@@ -216,7 +215,6 @@ export async function POST(request: NextRequest) {
               const message = err instanceof Error ? err.message : 'Failed to edit environment field';
               return NextResponse.json({ success: false, error: message }, { status: 400 });
             }
-            console.log('Health note template updated:', { operation: 'editEnvironmentField', name });
             break;
           }
           default:
@@ -226,6 +224,7 @@ export async function POST(request: NextRequest) {
             );
         }
 
+        console.log('Health note template updated:', { operation, name });
         return NextResponse.json({
           success: true,
           templates: tracker.getTemplates(),

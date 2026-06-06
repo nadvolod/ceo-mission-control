@@ -164,11 +164,14 @@ export default function MissionControlV2Page() {
         const fin = financialData?.recentEntries?.find(
           (e: { id: string }) => e.id === entry.refKey,
         ) as { id: string; amount: number; category: string; description: string } | undefined;
+        const moneyCategory =
+          fin?.category === 'generated' ? 'Generated' :
+          fin?.category === 'cut' ? 'Cut' : 'Moved';
         resolved = {
           source: 'money',
           title: 'Money entry',
           amount: fin?.amount ?? 0,
-          category: fin?.category ?? 'moved',
+          category: moneyCategory,
           note: fin?.description ?? '',
           when: fmtWhen(entry.tsMs),
         };
