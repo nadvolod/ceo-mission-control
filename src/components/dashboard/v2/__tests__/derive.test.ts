@@ -330,6 +330,7 @@ describe('morningToActivity', () => {
       loggedAt: '2026-06-05T08:14:00.000Z',
     });
     expect(e.source).toBe('morning');
+    expect(e.kind).toBe('morning');
     expect(e.refKey).toBe('2026-06-05');
     expect(e.label).toBe('Morning Log');
     expect(e.meta).toContain('87');
@@ -349,6 +350,7 @@ describe('morningToActivity', () => {
       loggedAt: '2026-06-05T08:14:00.000Z',
     });
     expect(e.meta).not.toContain('Sleep ');
+    expect(e.meta).not.toMatch(/\dh\dm/);
     expect(e.meta).toContain('0 supplements');
     expect(e.meta).toContain('0 habits');
   });
@@ -365,6 +367,7 @@ describe('reflectionToActivity', () => {
       ],
     });
     expect(e.source).toBe('reflection');
+    expect(e.kind).toBe('reflection');
     expect(e.refKey).toBe('2026-06-05');
     expect(e.label).toBe('Reflection');
     expect(e.meta).toBe('1 of 3 answered');

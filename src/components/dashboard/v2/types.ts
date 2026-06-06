@@ -35,7 +35,7 @@ export type ActivityEntry = {
   // fixtures; missing/0 sorts to the bottom deterministically (insertion
   // order preserved among ties).
   tsMs?: number;
-  kind: MetricId | 'money' | 'cash' | 'deepwork';
+  kind: MetricId | 'money' | 'cash' | 'deepwork' | 'morning' | 'reflection';
   delta: string;    // '+1h', '+ Generated', 'sync', or '' for summary cards
   label: string;
   meta: string;

@@ -108,7 +108,9 @@ export function morningToActivity(note: DailyHealthNote): ActivityEntry {
   const doneHabits = note.habits.filter((h) => h.done).length;
   const parts: string[] = [];
   if (score != null) parts.push(`Sleep ${score}`);
-  parts.push(fmtDuration(sm?.durationMinutes));
+  if (sm?.durationMinutes != null && Number.isFinite(sm.durationMinutes) && sm.durationMinutes > 0) {
+    parts.push(fmtDuration(sm.durationMinutes));
+  }
   parts.push(pluralize(takenSupps, 'supplement'));
   parts.push(pluralize(doneHabits, 'habit'));
   const tsMs = parseTimestampMs(note.loggedAt) || parseTimestampMs(`${note.date}T08:00:00`);
@@ -116,7 +118,7 @@ export function morningToActivity(note: DailyHealthNote): ActivityEntry {
     id: `morning-${note.date}`,
     t: hhmm(note.loggedAt) === '--:--' ? '08:00' : hhmm(note.loggedAt),
     tsMs,
-    kind: 'deepwork',
+    kind: 'morning',
     delta: '',
     label: 'Morning Log',
     meta: parts.join(' · '),
@@ -136,7 +138,7 @@ export function reflectionToActivity(entry: ThreeToThriveEntry): ActivityEntry {
     id: `reflection-${entry.date}`,
     t: hhmm(lastAt ? new Date(lastAt).toISOString() : `${entry.date}T21:00:00`),
     tsMs,
-    kind: 'temporal',
+    kind: 'reflection',
     delta: '',
     label: 'Reflection',
     meta: `${answered} of ${total} answered`,
