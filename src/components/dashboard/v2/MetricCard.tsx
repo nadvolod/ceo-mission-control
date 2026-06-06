@@ -18,7 +18,7 @@ type Preset = { label: string; delta: number };
 const PRESETS: Partial<Record<MetricId, Preset[]>> = {
   temporal:   [{ label: '+0.5h', delta: 0.5 }, { label: '+1h', delta: 1 }, { label: '+2h', delta: 2 }],
   focus:      [{ label: '+0.5h', delta: 0.5 }, { label: '+1h', delta: 1 }, { label: '+2h', delta: 2 }],
-  pipeline:   [{ label: '+ Call', delta: 0.5 }, { label: '+ Demo', delta: 1 }, { label: '+ FU', delta: 0.5 }],
+  pipeline:   [{ label: '+ FU', delta: 0.5 }],
   deepWork:   [{ label: '+0.5h', delta: 0.5 }, { label: '+1h', delta: 1 }],
   trained:    [{ label: '+ Session', delta: 1 }],
   moneyMoved: [{ label: '+ Moved', delta: 0 }, { label: '+ Generated', delta: 0 }, { label: '+ Cut', delta: 0 }],

@@ -501,8 +501,6 @@ type QuickAction = {
 const QUICK_ACTIONS: QuickAction[] = [
   { label: '+ Moved',     metricId: 'moneyMoved', delta: null, color: MC_COLORS.green },
   { label: '+ Generated', metricId: 'moneyMoved', delta: null, color: MC_COLORS.green },
-  { label: '+ Call',      metricId: 'pipeline',   delta: 0.5,  color: MC_COLORS.amber },
-  { label: '+ Demo',      metricId: 'pipeline',   delta: 1,    color: MC_COLORS.amber },
   { label: '+ Deep 0.5h', metricId: 'deepWork',   delta: 0.5,  color: MC_COLORS.cyan },
   { label: '+ Train',     metricId: 'trained',    delta: 1,    color: MC_COLORS.pink },
 ];

@@ -119,14 +119,20 @@ describe('<MobileLayout />', () => {
     expect(onLog).toHaveBeenCalledWith('moneyMoved', 750, '+ Generated', { description: 'Benepass' });
   });
 
-  it('mobile non-money quick log (+Call) still logs the hardcoded delta directly', async () => {
+  it('mobile non-money quick log (+Deep 0.5h) still logs the hardcoded delta directly', async () => {
     const user = userEvent.setup();
     const onLog = jest.fn();
     render(<MobileLayout {...defaultProps({ onLog })} />);
-    await user.click(screen.getByTestId('mobile-quick-call'));
-    expect(onLog).toHaveBeenCalledWith('pipeline', 0.5, '+ Call');
+    await user.click(screen.getByTestId('mobile-quick-deep-0-5h'));
+    expect(onLog).toHaveBeenCalledWith('deepWork', 0.5, '+ Deep 0.5h');
     // No editor should appear for hour-based entries.
     expect(screen.queryByTestId('mobile-quick-amount-editor-wrap')).not.toBeInTheDocument();
+  });
+
+  it('mobile quick log no longer offers Call or Demo', () => {
+    render(<MobileLayout {...defaultProps()} />);
+    expect(screen.queryByTestId('mobile-quick-call')).toBeNull();
+    expect(screen.queryByTestId('mobile-quick-demo')).toBeNull();
   });
 
   it('snapshot strip renders the 5 expected mini-cards', () => {
