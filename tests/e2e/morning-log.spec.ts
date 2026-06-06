@@ -238,6 +238,7 @@ test.describe('Morning Log drawer', () => {
     const newIdx = (await page.getByTestId(/^supp-toggle-\d+$/).count()) - 1;
 
     // Rename via the inline edit control: pencil → input → save (check).
+    // newIdx is valid here (pre-reload; DOM hasn't changed since the add).
     await page.getByTestId(`supp-edit-${newIdx}`).click();
     const input = page.getByTestId(`supp-edit-input-${newIdx}`);
     await input.fill(renamed);
@@ -252,19 +253,16 @@ test.describe('Morning Log drawer', () => {
     await expect(page.getByText(renamed, { exact: true })).toBeVisible();
     await expect(page.getByText(original, { exact: true })).toHaveCount(0);
 
-    // Remove it. Recompute the index — order may differ after a reload.
-    const renamedRowIdx = await page.evaluate((name) => {
-      const spans = Array.from(document.querySelectorAll('span[title]'));
-      const match = spans.find((s) => (s as HTMLElement).getAttribute('title') === name);
-      if (!match) return -1;
-      // Walk up to the supplement row, then read the toggle's testid index.
-      const toggle = match.parentElement?.querySelector('[data-testid^="supp-toggle-"]');
-      const id = toggle?.getAttribute('data-testid') ?? '';
-      const m = id.match(/supp-toggle-(\d+)/);
-      return m ? Number(m[1]) : -1;
-    }, renamed);
-    expect(renamedRowIdx).toBeGreaterThanOrEqual(0);
-    await page.getByTestId(`supp-remove-${renamedRowIdx}`).click();
+    // Remove it. Locate the row by its unique name label + the presence of a
+    // supp-toggle control (distinguishes supplement rows from the AddRow and
+    // other sections). Because supplement names are unique in the template, this
+    // resolves to exactly one element without depending on the row's index or
+    // DOM nesting after a reload.
+    const suppRow = page
+      .locator('div', { hasText: renamed })
+      .filter({ has: page.locator('[data-testid^="supp-toggle-"]') })
+      .last(); // .last() guards against ancestor divs that also match hasText
+    await suppRow.getByTestId(/^supp-remove-\d+$/).click();
     await expect(page.getByText(renamed, { exact: true })).toHaveCount(0);
 
     // Reload + reopen → it stays gone (template delete persisted). This also
