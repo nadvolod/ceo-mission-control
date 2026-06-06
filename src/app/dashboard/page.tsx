@@ -19,6 +19,7 @@ import { TrendsPanel, buildOverviewTrendSeries } from '@/components/dashboard/v2
 import { InsightsTab } from '@/components/dashboard/v2/InsightsTab';
 import { ReviewTab } from '@/components/dashboard/v2/ReviewTab';
 import { MobileLayout } from '@/components/dashboard/v2/MobileLayout';
+import { useHealthData } from '@/hooks/useHealthData';
 
 type Tab = 'overview' | 'insights' | 'review';
 
@@ -33,6 +34,7 @@ function fmtHeaderDate(d: Date): string {
 
 export default function MissionControlV2Page() {
   const store = useMissionStore();
+  const health = useHealthData();
   const { focusData, financialData, weeklyTrackerData, monarchData, monthlyReviewData } = store;
 
   const [tab, setTab] = useState<Tab>('overview');
@@ -86,10 +88,12 @@ export default function MissionControlV2Page() {
     return deriveActivity({
       focus: focusData?.recentSessions,
       financial: financialData?.recentEntries,
+      morning: Object.values(health.notes ?? {}),
+      reflection: store.threeToThrive?.history ?? [],
       optimistic: store.activity,
       limit: 25,
     });
-  }, [focusData, financialData, store.activity]);
+  }, [focusData, financialData, health.notes, store.threeToThrive, store.activity]);
 
   // Derive chips.
   const chips = useMemo(() => {
