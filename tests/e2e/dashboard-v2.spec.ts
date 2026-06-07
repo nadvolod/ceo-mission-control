@@ -270,12 +270,16 @@ test.describe('Mission Control v2', () => {
     await page.goto('/dashboard');
     await page.getByTestId('tab-insights').click();
 
-    await expect(page.getByTestId('insights-tab')).toBeVisible();
-    await expect(page.getByTestId('insights-period-7')).toBeVisible();
-    await expect(page.getByTestId('insights-period-14')).toBeVisible();
-    await expect(page.getByTestId('insights-period-30')).toBeVisible();
-    await expect(page.getByTestId('insight-card-temporal')).toBeVisible();
-    await expect(page.getByTestId('insight-card-money moved')).toBeVisible();
+    // Scope content assertions to the desktop tree: the mobile InsightsTab
+    // now renders the same testids (CSS-hidden at desktop width but present
+    // in the DOM), so a bare getByTestId trips Playwright strict mode.
+    const desktop = page.getByTestId('desktop-layout');
+    await expect(desktop.getByTestId('insights-tab')).toBeVisible();
+    await expect(desktop.getByTestId('insights-period-7')).toBeVisible();
+    await expect(desktop.getByTestId('insights-period-14')).toBeVisible();
+    await expect(desktop.getByTestId('insights-period-30')).toBeVisible();
+    await expect(desktop.getByTestId('insight-card-temporal')).toBeVisible();
+    await expect(desktop.getByTestId('insight-card-money moved')).toBeVisible();
 
     // Overview panels not visible while Insights is active.
     await expect(page.getByText('Three to Thrive')).toHaveCount(0);
@@ -283,7 +287,7 @@ test.describe('Mission Control v2', () => {
     // Switch back to Overview restores the panels.
     await page.getByTestId('tab-overview').click();
     await expect(page.getByText('Three to Thrive')).toBeVisible();
-    await expect(page.getByTestId('insights-tab')).toHaveCount(0);
+    await expect(desktop.getByTestId('insights-tab')).toHaveCount(0);
   });
 
   test('Review tab renders monthly-review content (empty state when no data)', async ({ page }) => {
@@ -293,8 +297,12 @@ test.describe('Mission Control v2', () => {
     // nothing when clicked".
     await page.goto('/dashboard');
     await page.getByTestId('tab-review').click();
-    await expect(page.getByTestId('review-tab-empty')).toBeVisible();
-    await expect(page.getByText(/No monthly reviews yet/i)).toBeVisible();
+    // Scope to desktop: the mobile ReviewTab renders the same empty-state
+    // testid/copy (present in the DOM at desktop width), which would trip
+    // Playwright strict mode if matched unscoped.
+    const desktop = page.getByTestId('desktop-layout');
+    await expect(desktop.getByTestId('review-tab-empty')).toBeVisible();
+    await expect(desktop.getByText(/No monthly reviews yet/i)).toBeVisible();
   });
 
   test('Tasks panel was removed from the Overview body', async ({ page }) => {
