@@ -173,13 +173,13 @@ test.describe('Mission Control v2', () => {
     expect(body.todaysMetrics?.byCategory?.Temporal ?? 0).toBeGreaterThanOrEqual(1);
   });
 
-  test('hover preset on the Pipeline card logs +Call to focus-hours', async ({ page }) => {
+  test('hover preset on the Pipeline card logs +FU to focus-hours', async ({ page }) => {
     await page.goto('/dashboard');
 
     const card = page.getByTestId('metric-card-pipeline');
     await card.hover();
     const focusPost = waitForFocusHoursPost(page);
-    await page.getByTestId('preset-pipeline-call').click();
+    await page.getByTestId('preset-pipeline-fu').click();
     await focusPost;
 
     // Server-side: the Revenue category got 0.5h.
@@ -270,12 +270,16 @@ test.describe('Mission Control v2', () => {
     await page.goto('/dashboard');
     await page.getByTestId('tab-insights').click();
 
-    await expect(page.getByTestId('insights-tab')).toBeVisible();
-    await expect(page.getByTestId('insights-period-7')).toBeVisible();
-    await expect(page.getByTestId('insights-period-14')).toBeVisible();
-    await expect(page.getByTestId('insights-period-30')).toBeVisible();
-    await expect(page.getByTestId('insight-card-temporal')).toBeVisible();
-    await expect(page.getByTestId('insight-card-money moved')).toBeVisible();
+    // Scope content assertions to the desktop tree: the mobile InsightsTab
+    // now renders the same testids (CSS-hidden at desktop width but present
+    // in the DOM), so a bare getByTestId trips Playwright strict mode.
+    const desktop = page.getByTestId('desktop-layout');
+    await expect(desktop.getByTestId('insights-tab')).toBeVisible();
+    await expect(desktop.getByTestId('insights-period-7')).toBeVisible();
+    await expect(desktop.getByTestId('insights-period-14')).toBeVisible();
+    await expect(desktop.getByTestId('insights-period-30')).toBeVisible();
+    await expect(desktop.getByTestId('insight-card-temporal')).toBeVisible();
+    await expect(desktop.getByTestId('insight-card-money moved')).toBeVisible();
 
     // Overview panels not visible while Insights is active.
     await expect(page.getByText('Three to Thrive')).toHaveCount(0);
@@ -283,7 +287,7 @@ test.describe('Mission Control v2', () => {
     // Switch back to Overview restores the panels.
     await page.getByTestId('tab-overview').click();
     await expect(page.getByText('Three to Thrive')).toBeVisible();
-    await expect(page.getByTestId('insights-tab')).toHaveCount(0);
+    await expect(desktop.getByTestId('insights-tab')).toHaveCount(0);
   });
 
   test('Review tab renders monthly-review content (empty state when no data)', async ({ page }) => {
@@ -293,8 +297,12 @@ test.describe('Mission Control v2', () => {
     // nothing when clicked".
     await page.goto('/dashboard');
     await page.getByTestId('tab-review').click();
-    await expect(page.getByTestId('review-tab-empty')).toBeVisible();
-    await expect(page.getByText(/No monthly reviews yet/i)).toBeVisible();
+    // Scope to desktop: the mobile ReviewTab renders the same empty-state
+    // testid/copy (present in the DOM at desktop width), which would trip
+    // Playwright strict mode if matched unscoped.
+    const desktop = page.getByTestId('desktop-layout');
+    await expect(desktop.getByTestId('review-tab-empty')).toBeVisible();
+    await expect(desktop.getByText(/No monthly reviews yet/i)).toBeVisible();
   });
 
   test('Tasks panel was removed from the Overview body', async ({ page }) => {
@@ -496,6 +504,68 @@ test.describe('Mission Control v2 — mobile viewport', () => {
     await page.goto('/dashboard');
     await page.getByTestId('mobile-nav-reflect').click();
     await expect(page.getByTestId('reflection-drawer')).toBeVisible();
+  });
+
+  test('bottom-nav Insights and Review tabs render real content (no placeholder copy)', async ({ page }) => {
+    // Flow 3: the pre-fix bug rendered a "Open the Insights/Review tab in the
+    // bottom nav" placeholder on mobile. After the fix, tapping the bottom-nav
+    // item swaps the body to the real InsightsTab / ReviewTab.
+    await page.goto('/dashboard');
+    // Both mobile-layout and desktop-layout render these content testids
+    // (desktop is CSS-hidden but still in the DOM), so scope every content
+    // assertion to the mobile layout to avoid strict-mode dual matches.
+    const mobile = page.getByTestId('mobile-layout');
+    await expect(mobile).toBeVisible();
+
+    // Insights: tap the bottom-nav item, assert the placeholder is gone and the
+    // real tab + its period selector render.
+    await page.getByTestId('mobile-nav-insights').click();
+    await expect(mobile.getByText(/open the Insights tab in the bottom nav/i)).toHaveCount(0);
+    await expect(mobile.getByTestId('insights-tab')).toBeVisible();
+    await expect(mobile.getByTestId('insights-period-selector')).toBeVisible();
+
+    // Review: the test user has no monthly reviews (global-setup wipes them),
+    // so the Review body shows its empty-state — NOT the bottom-nav placeholder.
+    await page.getByTestId('mobile-nav-review').click();
+    await expect(mobile.getByText(/Open the Review tab in the bottom nav/i)).toHaveCount(0);
+    // Either the populated tab or the empty-state renders depending on data.
+    const reviewTab = mobile.getByTestId('review-tab');
+    const reviewEmpty = mobile.getByTestId('review-tab-empty');
+    await expect(reviewTab.or(reviewEmpty)).toBeVisible();
+  });
+
+  test('Call/Demo quick actions are gone; + Train logs a training session', async ({ page, request }) => {
+    // Flow 5: the old mobile quick-log grid had Call/Demo buttons. They were
+    // removed. The remaining + Train button must actually persist (latch
+    // today's `trained` true via /api/weekly-tracker addToDay).
+    const today = await browserLocalDate(page);
+    // Clean slate for today's weekly-tracker row so the increment is unambiguous.
+    // Assert the cleanup succeeded — a failed delete must not let the test pass
+    // on a stale `trained=true` from a prior run.
+    const del = await request.post('/api/weekly-tracker', { data: { action: 'deleteDay', date: today } });
+    expect(del.ok()).toBeTruthy();
+
+    await page.goto('/dashboard');
+    await expect(page.getByTestId('mobile-quick-log')).toBeVisible();
+
+    // The removed buttons must not exist anymore.
+    await expect(page.getByTestId('mobile-quick-call')).toHaveCount(0);
+    await expect(page.getByTestId('mobile-quick-demo')).toHaveCount(0);
+
+    // Tap + Train and assert the server-side effect (mirrors the API-persistence
+    // assertion style of weekly-tracker-quick-add.spec.ts).
+    const trainPost = page.waitForResponse((res) =>
+      res.url().includes('/api/weekly-tracker') &&
+      res.request().method() === 'POST' &&
+      res.status() === 200,
+    );
+    await page.getByTestId('mobile-quick-train').click();
+    await trainPost;
+
+    await expect.poll(async () => {
+      const res = await (await request.get('/api/weekly-tracker')).json();
+      return res.todaysEntry?.trained ?? null;
+    }, { timeout: 10_000 }).toBe(true);
   });
 
   test('quick-log + Moved opens the amount editor and submits the typed value', async ({ page }) => {

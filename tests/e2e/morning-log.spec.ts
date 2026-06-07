@@ -146,6 +146,136 @@ test.describe('Morning Log drawer', () => {
     await expect(page.getByText(fieldName)).toBeVisible();
   });
 
+  // --- Unified activity feed flows (Task 9) ------------------------------
+
+  test('morning log appears in the activity feed and opens a detail sheet with the sleep score', async ({ page }) => {
+    // Flow 1: save a morning log, then verify it surfaces as a row in the
+    // unified Activity feed and that clicking it opens the read-only detail
+    // sheet showing the entered sleep score.
+    await openMorningLog(page);
+
+    const score = 80 + (Date.now() % 15); // 80–94, in range
+    await page.getByTestId('metric-sleep-score').fill(String(score));
+    await page.getByTestId('metric-duration-hours').fill('7');
+    await page.getByTestId('metric-duration-minutes').fill('15');
+    await page.getByTestId('morning-log-save').click();
+    await expect(page.getByTestId('morning-log-status')).toHaveText(/SAVED/i, { timeout: 5_000 });
+
+    // Round-trip: confirm the note really persisted before asserting the feed.
+    const note = await readNote(page, todayKey());
+    expect(note?.sleepMetrics?.sleepScore).toBe(score);
+
+    // Close the drawer so the activity feed underneath is interactable.
+    await page.getByTestId('morning-log-done').click();
+    await expect(page.getByTestId('morning-log-drawer')).not.toBeVisible();
+
+    // The derived row id is `morning-${date}` (derive.ts). Scope to the
+    // desktop tree — the mobile ActivityFeed also renders (CSS-hidden) and a
+    // bare getByTestId would hit both under Playwright strict mode.
+    const desktop = page.getByTestId('desktop-layout');
+    const row = desktop.getByTestId(`activity-row-morning-${todayKey()}`);
+    await expect(row).toBeVisible({ timeout: 5_000 });
+    await expect(row).toContainText('Morning Log');
+    await expect(row).toContainText(`Sleep ${score}`);
+
+    // Click it → the read-only detail sheet opens and shows the sleep score.
+    await row.click();
+    const sheet = page.getByTestId('activity-detail-sheet');
+    await expect(sheet).toBeVisible();
+    await expect(sheet).toContainText('Sleep score');
+    await expect(sheet).toContainText(String(score));
+  });
+
+  test('a saved reflection appears in the activity feed', async ({ page }) => {
+    // Flow 2: answer one reflection question (autosaves), then verify a
+    // "Reflection" row surfaces in the unified Activity feed.
+    await page.goto('/dashboard');
+    await page.getByTestId('open-reflection').click();
+    await expect(page.getByTestId('reflection-drawer')).toBeVisible();
+
+    const phrase = `e2e reflection feed ${Date.now()}`;
+    await page.getByTestId('reflection-input-0').fill(phrase);
+
+    // Reflection autosaves (debounced). Wait for the server to record the EXACT
+    // phrase we typed — matching only "any non-empty answer" could pass on a
+    // stale answer even if this phrase never persisted.
+    await expect.poll(async () => {
+      return page.evaluate(async (expected) => {
+        const res = await fetch('/api/three-to-thrive');
+        if (!res.ok) return false;
+        const body = await res.json();
+        return (body.todaysEntry?.answers ?? []).some(
+          (a: { answer: string }) => a.answer.includes(expected),
+        );
+      }, phrase);
+    }, { timeout: 8_000 }).toBe(true);
+
+    // Close the drawer and confirm the derived `reflection-${date}` row shows
+    // in the desktop activity feed.
+    await page.getByTestId('reflection-close').click();
+    const desktop = page.getByTestId('desktop-layout');
+    const row = desktop.getByTestId(`activity-row-reflection-${todayKey()}`);
+    await expect(row).toBeVisible({ timeout: 5_000 });
+    await expect(row).toContainText('Reflection');
+  });
+
+  test('edit then remove a supplement persists across reloads', async ({ page }) => {
+    // Flow 4: add a uniquely-named supplement, rename it via the inline edit
+    // control, reload + reopen to confirm the rename persisted to the template,
+    // then remove it and confirm it's gone after another reload. Each step is a
+    // real /api/health-notes template round-trip (updateTemplate).
+    const original = `E2EMag-${Date.now()}`;
+    const renamed = `${original}-RN`;
+
+    await openMorningLog(page);
+
+    // Add the supplement (template add). The add row needs a name + a dosage.
+    await page.getByTestId('supp-add-name').fill(original);
+    await page.getByTestId('supp-add-dosage').fill('200');
+    await page.getByTestId('supp-add-button').click();
+
+    // The new supplement renders as the last supp row. Compute its index from
+    // the rendered toggles rather than hard-coding it.
+    await expect(page.getByText(original, { exact: true })).toBeVisible();
+    const newIdx = (await page.getByTestId(/^supp-toggle-\d+$/).count()) - 1;
+
+    // Rename via the inline edit control: pencil → input → save (check).
+    // newIdx is valid here (pre-reload; DOM hasn't changed since the add).
+    await page.getByTestId(`supp-edit-${newIdx}`).click();
+    const input = page.getByTestId(`supp-edit-input-${newIdx}`);
+    await input.fill(renamed);
+    await page.getByTestId(`supp-edit-save-${newIdx}`).click();
+    await expect(page.getByText(renamed, { exact: true })).toBeVisible();
+
+    // Reload + reopen → the rename survived (persisted to the template).
+    await page.reload();
+    await page.getByTestId('morning-log-trigger').click();
+    await expect(page.getByTestId('morning-log-drawer')).toBeVisible();
+    await expect(page.getByTestId('morning-log-date')).toHaveValue(todayKey());
+    await expect(page.getByText(renamed, { exact: true })).toBeVisible();
+    await expect(page.getByText(original, { exact: true })).toHaveCount(0);
+
+    // Remove it. Locate the row by its unique name label + the presence of a
+    // supp-toggle control (distinguishes supplement rows from the AddRow and
+    // other sections). Because supplement names are unique in the template, this
+    // resolves to exactly one element without depending on the row's index or
+    // DOM nesting after a reload.
+    const suppRow = page
+      .locator('div', { hasText: renamed })
+      .filter({ has: page.locator('[data-testid^="supp-toggle-"]') })
+      .last(); // .last() guards against ancestor divs that also match hasText
+    await suppRow.getByTestId(/^supp-remove-\d+$/).click();
+    await expect(page.getByText(renamed, { exact: true })).toHaveCount(0);
+
+    // Reload + reopen → it stays gone (template delete persisted). This also
+    // serves as cleanup so the added template item leaves no residue.
+    await page.reload();
+    await page.getByTestId('morning-log-trigger').click();
+    await expect(page.getByTestId('morning-log-drawer')).toBeVisible();
+    await expect(page.getByTestId('morning-log-date')).toHaveValue(todayKey());
+    await expect(page.getByText(renamed, { exact: true })).toHaveCount(0);
+  });
+
   test('exposes a morning-log command in the command palette', async ({ page }) => {
     // Mirrors the suite's other CmdK tests: assert the command surfaces and
     // that running it dismisses the palette. (The drawer-opens flow is covered

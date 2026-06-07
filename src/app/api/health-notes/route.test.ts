@@ -108,6 +108,95 @@ describe('/api/health-notes', () => {
       expect(response.status).toBe(200);
       expect(data.success).toBe(true);
     });
+
+    it('editHabit renames an existing habit', async () => {
+      const response = await POST(makeRequest('POST', {
+        action: 'update-templates',
+        operation: 'editHabit',
+        name: 'Red light therapy',
+        newName: 'Cold plunge',
+      }, { 'x-sync-api-key': 'test-key' }));
+
+      const data = await response.json();
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.templates.habitTemplate).toEqual(
+        expect.arrayContaining([{ name: 'Cold plunge' }]),
+      );
+      expect(data.templates.habitTemplate).not.toEqual(
+        expect.arrayContaining([{ name: 'Red light therapy' }]),
+      );
+    });
+
+    it('editHabit rejects an empty newName with 400', async () => {
+      const response = await POST(makeRequest('POST', {
+        action: 'update-templates',
+        operation: 'editHabit',
+        name: 'Red light therapy',
+        newName: '   ',
+      }, { 'x-sync-api-key': 'test-key' }));
+
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.success).toBe(false);
+      expect(data.error).toMatch(/newName/);
+    });
+
+    it('editHabit returns 400 when the habit does not exist', async () => {
+      const response = await POST(makeRequest('POST', {
+        action: 'update-templates',
+        operation: 'editHabit',
+        name: 'Nonexistent habit',
+        newName: 'Cold plunge',
+      }, { 'x-sync-api-key': 'test-key' }));
+
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.success).toBe(false);
+      expect(data.error).toMatch(/not found/);
+    });
+
+    it('editEnvironmentField renames a custom field', async () => {
+      // Seed a custom environment field by stubbing loadJSON, then rename it.
+      // (A separate addEnvironmentField POST would not persist because each POST
+      // builds a fresh tracker from the mocked loadJSON.)
+      mockLoadJSON.mockResolvedValueOnce({
+        ...defaultNotesData(),
+        environmentTemplate: { customFieldNames: ['Blackout curtains'] },
+      });
+
+      const response = await POST(makeRequest('POST', {
+        action: 'update-templates',
+        operation: 'editEnvironmentField',
+        name: 'Blackout curtains',
+        newName: 'White noise machine',
+      }, { 'x-sync-api-key': 'test-key' }));
+
+      const data = await response.json();
+      expect(response.status).toBe(200);
+      expect(data.success).toBe(true);
+      expect(data.templates.environmentTemplate.customFieldNames).toContain('White noise machine');
+      expect(data.templates.environmentTemplate.customFieldNames).not.toContain('Blackout curtains');
+    });
+
+    it('editEnvironmentField rejects an empty newName with 400', async () => {
+      mockLoadJSON.mockResolvedValueOnce({
+        ...defaultNotesData(),
+        environmentTemplate: { customFieldNames: ['Blackout curtains'] },
+      });
+
+      const response = await POST(makeRequest('POST', {
+        action: 'update-templates',
+        operation: 'editEnvironmentField',
+        name: 'Blackout curtains',
+        newName: '',
+      }, { 'x-sync-api-key': 'test-key' }));
+
+      expect(response.status).toBe(400);
+      const data = await response.json();
+      expect(data.success).toBe(false);
+      expect(data.error).toMatch(/newName/);
+    });
   });
 
   describe('POST log input validation', () => {

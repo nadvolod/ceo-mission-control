@@ -60,7 +60,6 @@ describe('useMissionStore.log', () => {
     const cases = [
       ['temporal',   '/api/focus-hours',  1,    '+1h']        as const,
       ['deepWork',   '/api/focus-hours',  0.5,  '+0.5h']      as const,
-      ['pipeline',   '/api/focus-hours',  0.5,  '+ Call']     as const,
       ['moneyMoved', '/api/financial',    500,  '+ Moved']    as const,
       ['trained',    '/api/weekly-tracker', 1,  '+ Session']  as const,
     ];

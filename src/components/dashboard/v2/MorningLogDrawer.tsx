@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { Moon, Plus, X } from 'lucide-react';
+import { NotebookPen, Plus, X } from 'lucide-react';
 import { Aurora } from './primitives/Aurora';
+import { EditableItemControls } from './EditableItemList';
 import { MC_COLORS } from './palette';
 import { useHealthData } from '@/hooks/useHealthData';
 import type { DailyHealthNote, SleepMetrics } from '@/lib/types';
@@ -63,23 +64,39 @@ function buildSupplements(
   template: Array<{ name: string; defaultDosageMg: number }>,
   existing?: DailyHealthNote,
 ): SupplementState[] {
-  return template.map((t) => {
+  const fromTemplate = template.map((t) => {
     const found = existing?.supplements.find((s) => s.name === t.name);
     return { name: t.name, dosageMg: found?.dosageMg ?? t.defaultDosageMg, taken: found?.taken ?? false };
   });
+  // Preserve items the note recorded that are no longer in the template
+  // (e.g. a supplement removed from the template after this note was logged) —
+  // template changes must never rewrite history.
+  const extras = (existing?.supplements ?? [])
+    .filter((s) => !template.some((t) => t.name === s.name))
+    .map((s) => ({ name: s.name, dosageMg: s.dosageMg, taken: s.taken }));
+  return [...fromTemplate, ...extras];
 }
 
 function buildHabits(template: Array<{ name: string }>, existing?: DailyHealthNote): HabitState[] {
-  return template.map((t) => {
+  const fromTemplate = template.map((t) => {
     const found = existing?.habits.find((h) => h.name === t.name);
     return { name: t.name, done: found?.done ?? false };
   });
+  // Preserve habits the note recorded that are no longer in the template.
+  const extras = (existing?.habits ?? [])
+    .filter((h) => !template.some((t) => t.name === h.name))
+    .map((h) => ({ name: h.name, done: h.done }));
+  return [...fromTemplate, ...extras];
 }
 
 function buildEnv(customFieldNames: string[], existing?: DailyHealthNote): EnvState {
   const customFields: Record<string, boolean> = {};
   for (const name of customFieldNames) {
     customFields[name] = existing?.sleepEnvironment.customFields[name] ?? false;
+  }
+  // Preserve custom fields the note recorded that are no longer in the template.
+  for (const [name, val] of Object.entries(existing?.sleepEnvironment.customFields ?? {})) {
+    if (!(name in customFields)) customFields[name] = val;
   }
   return {
     temperatureF: existing?.sleepEnvironment.temperatureF ?? null,
@@ -401,6 +418,62 @@ function MorningLogBody({ onClose }: { onClose: () => void }) {
     }
   }, [newHabitName, updateTemplate]);
 
+  const handleRemoveSupplement = useCallback(async (name: string) => {
+    const result = await updateTemplate('removeSupplement', name);
+    if (result?.success) {
+      setSupplements((prev) => prev.filter((s) => s.name !== name));
+    }
+  }, [updateTemplate]);
+  const handleRenameSupplement = useCallback(async (originalName: string, newName: string) => {
+    // Prefer the TEMPLATE dosage; if the template lookup is briefly stale (e.g.
+    // right after an add), fall back to the supplement's CURRENT LOCAL dosage
+    // before defaulting to 1 — never clobber a real dosage to 1mg.
+    const tmpl = templates.supplementTemplate.find((s) => s.name === originalName);
+    const local = supplements.find((s) => s.name === originalName);
+    const newDosageMg =
+      tmpl?.defaultDosageMg && tmpl.defaultDosageMg > 0 ? tmpl.defaultDosageMg :
+      local?.dosageMg && local.dosageMg > 0 ? local.dosageMg :
+      1;
+    const result = await updateTemplate('editSupplement', originalName, undefined, { newName, newDosageMg });
+    if (result?.success) {
+      setSupplements((prev) => prev.map((s) => (s.name === originalName ? { ...s, name: newName } : s)));
+    }
+  }, [updateTemplate, templates, supplements]);
+  const handleRemoveHabit = useCallback(async (name: string) => {
+    const result = await updateTemplate('removeHabit', name);
+    if (result?.success) {
+      setHabits((prev) => prev.filter((h) => h.name !== name));
+    }
+  }, [updateTemplate]);
+  const handleRenameHabit = useCallback(async (originalName: string, newName: string) => {
+    const result = await updateTemplate('editHabit', originalName, undefined, { newName });
+    if (result?.success) {
+      setHabits((prev) => prev.map((h) => (h.name === originalName ? { ...h, name: newName } : h)));
+    }
+  }, [updateTemplate]);
+  const handleRemoveEnvField = useCallback(async (name: string) => {
+    const result = await updateTemplate('removeEnvironmentField', name);
+    if (result?.success) {
+      setEnv((prev) => {
+        const next = { ...prev.customFields };
+        delete next[name];
+        return { ...prev, customFields: next };
+      });
+    }
+  }, [updateTemplate]);
+  const handleRenameEnvField = useCallback(async (originalName: string, newName: string) => {
+    const result = await updateTemplate('editEnvironmentField', originalName, undefined, { newName });
+    if (result?.success) {
+      setEnv((prev) => {
+        const next = { ...prev.customFields };
+        const v = next[originalName];
+        delete next[originalName];
+        next[newName] = v ?? false;
+        return { ...prev, customFields: next };
+      });
+    }
+  }, [updateTemplate]);
+
   const recentEntries = useMemo(
     () =>
       Object.entries(notes)
@@ -431,7 +504,7 @@ function MorningLogBody({ onClose }: { onClose: () => void }) {
             boxShadow: `0 0 18px ${MC_COLORS.uv}66`,
           }}
         >
-          <Moon size={18} color="#fff" aria-hidden />
+          <NotebookPen size={18} color="#fff" aria-hidden />
         </div>
         <div className="flex-1">
           <Dialog.Title style={{ fontSize: 15, fontWeight: 600, color: 'var(--color-mc-ink)' }}>
@@ -595,11 +668,18 @@ function MorningLogBody({ onClose }: { onClose: () => void }) {
               testId="env-dog"
             />
           </div>
-          {Object.keys(env.customFields).map((name) => (
+          {Object.keys(env.customFields).map((name, idx) => (
             <div key={name} className="flex items-center gap-3">
               <span style={rowLabelStyle} title={name}>
                 {name}
               </span>
+              <EditableItemControls
+                name={name}
+                idx={idx}
+                testIdBase="env"
+                onRemove={handleRemoveEnvField}
+                onRename={handleRenameEnvField}
+              />
               <Toggle
                 checked={env.customFields[name]}
                 onChange={(v) =>
@@ -641,6 +721,13 @@ function MorningLogBody({ onClose }: { onClose: () => void }) {
               >
                 {supp.name}
               </span>
+              <EditableItemControls
+                name={supp.name}
+                idx={idx}
+                testIdBase="supp"
+                onRemove={handleRemoveSupplement}
+                onRename={handleRenameSupplement}
+              />
               <input
                 type="number"
                 inputMode="decimal"
@@ -699,11 +786,20 @@ function MorningLogBody({ onClose }: { onClose: () => void }) {
               <span
                 style={{
                   fontSize: 13,
+                  flex: 1,
+                  minWidth: 0,
                   color: habit.done ? 'var(--color-mc-fg)' : 'var(--color-mc-fg-muted)',
                 }}
               >
                 {habit.name}
               </span>
+              <EditableItemControls
+                name={habit.name}
+                idx={idx}
+                testIdBase="habit"
+                onRemove={handleRemoveHabit}
+                onRename={handleRenameHabit}
+              />
             </div>
           ))}
           <AddRow

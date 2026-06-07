@@ -44,12 +44,13 @@ describe('MetricCard', () => {
     expect(screen.getAllByText(/liabilities/i).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('uses stable preset test ids without leading punctuation from labels', () => {
+  it('pipeline presets: only + FU remains after removing Call and Demo', () => {
     const onLog = jest.fn();
     render(<MetricCard metric={SEED_METRICS.pipeline} onLog={onLog} />);
 
-    expect(screen.getByTestId('preset-pipeline-call')).toBeInTheDocument();
-    expect(screen.getByTestId('preset-pipeline-demo')).toBeInTheDocument();
+    // Call and Demo have been removed; only FU remains.
+    expect(screen.queryByTestId('preset-pipeline-call')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('preset-pipeline-demo')).not.toBeInTheDocument();
     expect(screen.getByTestId('preset-pipeline-fu')).toBeInTheDocument();
   });
 
@@ -58,11 +59,11 @@ describe('MetricCard', () => {
     render(<MetricCard metric={SEED_METRICS.pipeline} onLog={onLog} />);
 
     const card = screen.getByTestId('metric-card-pipeline');
-    const call = screen.getByTestId('preset-pipeline-call');
-    expect(call).toHaveAttribute('tabindex', '-1');
+    const fu = screen.getByTestId('preset-pipeline-fu');
+    expect(fu).toHaveAttribute('tabindex', '-1');
 
     fireEvent.focus(card);
-    expect(call).toHaveAttribute('tabindex', '0');
+    expect(fu).toHaveAttribute('tabindex', '0');
   });
 
   describe('Money Moved — custom amount input', () => {

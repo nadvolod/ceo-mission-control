@@ -32,8 +32,6 @@ function actionsFor({ onLog, onOpenReflection, onOpenMorning, onSwitchTab }: Pic
     { kw: '+gen generated gen 2000 generated 2000', label: '+ Generated $2,000', hint: '$ gen', icon: '$', accent: MC_COLORS.green, run: () => onLog('moneyMoved', 2000, '+ Generated') },
     { kw: '+moved',         label: '+ Moved $500',        hint: '$ moved',  icon: '$', accent: MC_COLORS.green, run: () => onLog('moneyMoved', 500, '+ Moved') },
     { kw: '+cut',           label: '+ Cut $250',          hint: '$ cut',    icon: '$', accent: MC_COLORS.green, run: () => onLog('moneyMoved', 250, '+ Cut') },
-    { kw: '+call pipeline', label: '+ Pipeline call',     hint: 'pipe',     icon: '☎', accent: MC_COLORS.amber, run: () => onLog('pipeline', 0.5, '+ Call') },
-    { kw: '+demo pipeline', label: '+ Pipeline demo',     hint: 'pipe',     icon: '☎', accent: MC_COLORS.amber, run: () => onLog('pipeline', 1, '+ Demo') },
     { kw: '+0.5h deep',     label: '+0.5h Deep work',     hint: 'deep',     icon: '◆', accent: MC_COLORS.cyan,  run: () => onLog('deepWork', 0.5, '+0.5h') },
     { kw: '+1h deep',       label: '+1h Deep work',       hint: 'deep 1',   icon: '◆', accent: MC_COLORS.cyan,  run: () => onLog('deepWork', 1, '+1h') },
     { kw: '+train session', label: '+ Training session',  hint: 'train',    icon: '△', accent: MC_COLORS.amber, run: () => onLog('trained', 1, '+ Session') },
@@ -226,7 +224,7 @@ export function CmdK({ open, onOpenChange, onLog, onOpenReflection, onOpenMornin
             ))}
             {filtered.length === 0 && (
               <div style={{ padding: '18px 16px', color: 'var(--color-mc-fg-dim)', fontSize: 13 }}>
-                No match. Try &ldquo;temp&rdquo;, &ldquo;gen&rdquo;, &ldquo;call&rdquo;, &ldquo;train&rdquo;, &ldquo;reflect&rdquo;.
+                No match. Try &ldquo;temp&rdquo;, &ldquo;gen&rdquo;, &ldquo;deep&rdquo;, &ldquo;train&rdquo;, &ldquo;reflect&rdquo;.
               </div>
             )}
           </div>
