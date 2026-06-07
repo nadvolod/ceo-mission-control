@@ -74,7 +74,11 @@ function ActivityRow({
   onOpenDetail?: (entry: ActivityEntry) => void;
 }) {
   const isPositive = entry.delta.startsWith('+');
-  const clickable = !!onOpenDetail;
+  // Only make the row interactive when it can actually resolve to a detail
+  // view. Optimistic/local store entries have no `source`/`refKey`, so the
+  // page's openDetail early-returns for them — gating on `entry.source`
+  // prevents rows that look clickable but do nothing (a11y/UX defect).
+  const clickable = !!onOpenDetail && !!entry.source;
   return (
     <div
       className="flex items-start gap-2.5"

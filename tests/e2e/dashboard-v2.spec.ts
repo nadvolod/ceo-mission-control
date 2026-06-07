@@ -173,13 +173,13 @@ test.describe('Mission Control v2', () => {
     expect(body.todaysMetrics?.byCategory?.Temporal ?? 0).toBeGreaterThanOrEqual(1);
   });
 
-  test('hover preset on the Pipeline card logs +Call to focus-hours', async ({ page }) => {
+  test('hover preset on the Pipeline card logs +FU to focus-hours', async ({ page }) => {
     await page.goto('/dashboard');
 
     const card = page.getByTestId('metric-card-pipeline');
     await card.hover();
     const focusPost = waitForFocusHoursPost(page);
-    await page.getByTestId('preset-pipeline-call').click();
+    await page.getByTestId('preset-pipeline-fu').click();
     await focusPost;
 
     // Server-side: the Revenue category got 0.5h.
@@ -503,22 +503,26 @@ test.describe('Mission Control v2 — mobile viewport', () => {
     // bottom nav" placeholder on mobile. After the fix, tapping the bottom-nav
     // item swaps the body to the real InsightsTab / ReviewTab.
     await page.goto('/dashboard');
-    await expect(page.getByTestId('mobile-layout')).toBeVisible();
+    // Both mobile-layout and desktop-layout render these content testids
+    // (desktop is CSS-hidden but still in the DOM), so scope every content
+    // assertion to the mobile layout to avoid strict-mode dual matches.
+    const mobile = page.getByTestId('mobile-layout');
+    await expect(mobile).toBeVisible();
 
     // Insights: tap the bottom-nav item, assert the placeholder is gone and the
     // real tab + its period selector render.
     await page.getByTestId('mobile-nav-insights').click();
-    await expect(page.getByText(/open the Insights tab in the bottom nav/i)).toHaveCount(0);
-    await expect(page.getByTestId('insights-tab')).toBeVisible();
-    await expect(page.getByTestId('insights-period-selector')).toBeVisible();
+    await expect(mobile.getByText(/open the Insights tab in the bottom nav/i)).toHaveCount(0);
+    await expect(mobile.getByTestId('insights-tab')).toBeVisible();
+    await expect(mobile.getByTestId('insights-period-selector')).toBeVisible();
 
     // Review: the test user has no monthly reviews (global-setup wipes them),
     // so the Review body shows its empty-state — NOT the bottom-nav placeholder.
     await page.getByTestId('mobile-nav-review').click();
-    await expect(page.getByText(/Open the Review tab in the bottom nav/i)).toHaveCount(0);
+    await expect(mobile.getByText(/Open the Review tab in the bottom nav/i)).toHaveCount(0);
     // Either the populated tab or the empty-state renders depending on data.
-    const reviewTab = page.getByTestId('review-tab');
-    const reviewEmpty = page.getByTestId('review-tab-empty');
+    const reviewTab = mobile.getByTestId('review-tab');
+    const reviewEmpty = mobile.getByTestId('review-tab-empty');
     await expect(reviewTab.or(reviewEmpty)).toBeVisible();
   });
 

@@ -71,6 +71,25 @@ describe('ActivityFeed clickable rows', () => {
     expect(screen.getByTestId('activity-row-e2')).toBeInTheDocument();
   });
 
+  it('is NOT interactive for a source-less entry even when onOpenDetail is provided', async () => {
+    // Optimistic/local store entries have no `source` — the page's openDetail
+    // can't resolve them, so the row must render as a plain, non-interactive div.
+    const onOpenDetail = jest.fn();
+    const localEntry: ActivityEntry = {
+      ...entry,
+      id: 'local-1',
+      source: undefined,
+      refKey: undefined,
+    };
+    render(<ActivityFeed entries={[localEntry]} onOpenDetail={onOpenDetail} />);
+    // No testid / role=button applied.
+    expect(screen.queryByTestId('activity-row-local-1')).toBeNull();
+    expect(screen.queryByRole('button')).toBeNull();
+    // Content still renders, and clicking it does nothing.
+    await userEvent.click(screen.getByText('Morning Log'));
+    expect(onOpenDetail).not.toHaveBeenCalled();
+  });
+
   it('shows empty state message when entries is empty', () => {
     render(<ActivityFeed entries={[]} />);
     expect(screen.getByText('No activity yet today.')).toBeInTheDocument();

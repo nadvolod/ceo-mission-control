@@ -390,6 +390,22 @@ describe('deriveActivity with morning + reflection', () => {
     expect(out.some(e => e.source === 'morning')).toBe(true);
     expect(out.some(e => e.source === 'reflection')).toBe(true);
   });
+
+  it('drops e2e-authored morning notes and reflections from the feed', () => {
+    const out = deriveActivity({
+      morning: [{
+        date: '2026-06-05',
+        sleepEnvironment: { temperatureF: null, fanRunning: false, dogInRoom: false, customFields: {} },
+        sleepMetrics: { sleepScore: 80, durationMinutes: 420, bodyBattery: null, restingHeartRate: null, hrv: null },
+        supplements: [], habits: [], freeformNote: 'e2e-foo', loggedAt: '2026-06-05T08:00:00.000Z',
+      }],
+      reflection: [{
+        date: '2026-06-05', questions: ['q1'], answers: [{ id: '1', date: '2026-06-05', question: 'q1', answer: 'e2e-bar', answeredAt: '2026-06-05T21:00:00.000Z' }],
+      }],
+    });
+    expect(out.some(e => e.source === 'morning')).toBe(false);
+    expect(out.some(e => e.source === 'reflection')).toBe(false);
+  });
 });
 
 describe('deriveChips', () => {

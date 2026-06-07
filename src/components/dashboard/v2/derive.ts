@@ -164,12 +164,16 @@ export function deriveActivity(opts: {
   // under R5 ("derive.ts filters e2e-authored rows from the activity feed").
   const liveFocus = focus.filter((s) => !isE2EDescription(s.description));
   const liveFinancial = financial.filter((e) => !isE2EDescription(e.description));
+  const liveMorning = morning.filter((n) => !isE2EDescription(n.freeformNote));
+  const liveReflection = reflection.filter(
+    (e) => !e.answers.some((a) => isE2EDescription(a.answer)),
+  );
   const merged: ActivityEntry[] = [
     ...optimistic,
     ...liveFocus.map(focusToActivity),
     ...liveFinancial.map(financialToActivity),
-    ...morning.map(morningToActivity),
-    ...reflection.map(reflectionToActivity),
+    ...liveMorning.map(morningToActivity),
+    ...liveReflection.map(reflectionToActivity),
   ];
   // Stable de-dup by id (optimistic entries land first and win).
   const seen = new Set<string>();

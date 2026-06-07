@@ -64,23 +64,39 @@ function buildSupplements(
   template: Array<{ name: string; defaultDosageMg: number }>,
   existing?: DailyHealthNote,
 ): SupplementState[] {
-  return template.map((t) => {
+  const fromTemplate = template.map((t) => {
     const found = existing?.supplements.find((s) => s.name === t.name);
     return { name: t.name, dosageMg: found?.dosageMg ?? t.defaultDosageMg, taken: found?.taken ?? false };
   });
+  // Preserve items the note recorded that are no longer in the template
+  // (e.g. a supplement removed from the template after this note was logged) —
+  // template changes must never rewrite history.
+  const extras = (existing?.supplements ?? [])
+    .filter((s) => !template.some((t) => t.name === s.name))
+    .map((s) => ({ name: s.name, dosageMg: s.dosageMg, taken: s.taken }));
+  return [...fromTemplate, ...extras];
 }
 
 function buildHabits(template: Array<{ name: string }>, existing?: DailyHealthNote): HabitState[] {
-  return template.map((t) => {
+  const fromTemplate = template.map((t) => {
     const found = existing?.habits.find((h) => h.name === t.name);
     return { name: t.name, done: found?.done ?? false };
   });
+  // Preserve habits the note recorded that are no longer in the template.
+  const extras = (existing?.habits ?? [])
+    .filter((h) => !template.some((t) => t.name === h.name))
+    .map((h) => ({ name: h.name, done: h.done }));
+  return [...fromTemplate, ...extras];
 }
 
 function buildEnv(customFieldNames: string[], existing?: DailyHealthNote): EnvState {
   const customFields: Record<string, boolean> = {};
   for (const name of customFieldNames) {
     customFields[name] = existing?.sleepEnvironment.customFields[name] ?? false;
+  }
+  // Preserve custom fields the note recorded that are no longer in the template.
+  for (const [name, val] of Object.entries(existing?.sleepEnvironment.customFields ?? {})) {
+    if (!(name in customFields)) customFields[name] = val;
   }
   return {
     temperatureF: existing?.sleepEnvironment.temperatureF ?? null,

@@ -554,7 +554,16 @@ export default function MissionControlV2Page() {
       onSave={store.saveThreeToThriveAnswer}
     />
 
-    <MorningLogDrawer open={morningOpen} onOpenChange={setMorningOpen} />
+    <MorningLogDrawer
+      open={morningOpen}
+      onOpenChange={(open) => {
+        setMorningOpen(open);
+        // The drawer holds its own useHealthData() instance, so the page's
+        // copy (which feeds the activity feed via deriveActivity) is stale
+        // after a save. Reload the page's health notes when the drawer closes.
+        if (!open) void health.loadData();
+      }}
+    />
 
     <ActivityDetailSheet
       open={detailOpen}
