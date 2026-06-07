@@ -55,7 +55,7 @@ rendered by `ActivityFeed` (desktop) and `RecentActivity` (mobile).
 
 `deriveActivity()` additionally folds in **morning logs** and **reflections**:
 
-```
+```text
 deriveActivity({ focus, financial, morning, reflection, optimistic, limit })
   → [...optimistic, focus→, financial→, morning→, reflection→]
   → dedup by id → sort by tsMs desc → filter E2E rows → slice(limit)

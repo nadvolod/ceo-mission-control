@@ -129,7 +129,9 @@ export function morningToActivity(note: DailyHealthNote): ActivityEntry {
 
 export function reflectionToActivity(entry: ThreeToThriveEntry): ActivityEntry {
   const total = entry.questions.length;
-  const answered = entry.answers.filter((a) => a.answer.trim().length > 0).length;
+  const answered = entry.questions.filter((q) =>
+    entry.answers.some((a) => a.question === q && a.answer.trim().length > 0),
+  ).length;
   const lastAt = entry.answers
     .map((a) => parseTimestampMs(a.answeredAt))
     .reduce((max, t) => (t > max ? t : max), 0);

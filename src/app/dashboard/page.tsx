@@ -164,27 +164,29 @@ export default function MissionControlV2Page() {
         const fin = financialData?.recentEntries?.find(
           (e: { id: string }) => e.id === entry.refKey,
         ) as { id: string; amount: number; category: string; description: string } | undefined;
+        if (!fin) return; // fail closed: don't show synthetic values for a row we can't resolve
         const moneyCategory =
-          fin?.category === 'generated' ? 'Generated' :
-          fin?.category === 'cut' ? 'Cut' : 'Moved';
+          fin.category === 'generated' ? 'Generated' :
+          fin.category === 'cut' ? 'Cut' : 'Moved';
         resolved = {
           source: 'money',
           title: 'Money entry',
-          amount: fin?.amount ?? 0,
+          amount: fin.amount ?? 0,
           category: moneyCategory,
-          note: fin?.description ?? '',
+          note: fin.description ?? '',
           when: fmtWhen(entry.tsMs),
         };
       } else if (entry.source === 'focus') {
         const f = focusData?.recentSessions?.find(
           (s: { id: string }) => s.id === entry.refKey,
         ) as { id: string; category: string; hours: number; description: string } | undefined;
+        if (!f) return; // fail closed: don't show synthetic values for a row we can't resolve
         resolved = {
           source: 'focus',
           title: 'Focus session',
-          category: f?.category ?? 'Focus',
-          hours: f?.hours ?? 0,
-          description: f?.description ?? '',
+          category: f.category ?? 'Focus',
+          hours: f.hours ?? 0,
+          description: f.description ?? '',
           when: fmtWhen(entry.tsMs),
         };
       }

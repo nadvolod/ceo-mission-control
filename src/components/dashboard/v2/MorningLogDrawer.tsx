@@ -425,15 +425,20 @@ function MorningLogBody({ onClose }: { onClose: () => void }) {
     }
   }, [updateTemplate]);
   const handleRenameSupplement = useCallback(async (originalName: string, newName: string) => {
-    // Read the real dosage from the TEMPLATE, not local state (local dosage is
-    // 0 when the supplement isn't "taken", which would clobber the template).
+    // Prefer the TEMPLATE dosage; if the template lookup is briefly stale (e.g.
+    // right after an add), fall back to the supplement's CURRENT LOCAL dosage
+    // before defaulting to 1 — never clobber a real dosage to 1mg.
     const tmpl = templates.supplementTemplate.find((s) => s.name === originalName);
-    const newDosageMg = tmpl?.defaultDosageMg && tmpl.defaultDosageMg > 0 ? tmpl.defaultDosageMg : 1;
+    const local = supplements.find((s) => s.name === originalName);
+    const newDosageMg =
+      tmpl?.defaultDosageMg && tmpl.defaultDosageMg > 0 ? tmpl.defaultDosageMg :
+      local?.dosageMg && local.dosageMg > 0 ? local.dosageMg :
+      1;
     const result = await updateTemplate('editSupplement', originalName, undefined, { newName, newDosageMg });
     if (result?.success) {
       setSupplements((prev) => prev.map((s) => (s.name === originalName ? { ...s, name: newName } : s)));
     }
-  }, [updateTemplate, templates]);
+  }, [updateTemplate, templates, supplements]);
   const handleRemoveHabit = useCallback(async (name: string) => {
     const result = await updateTemplate('removeHabit', name);
     if (result?.success) {

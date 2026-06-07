@@ -70,7 +70,7 @@ to:
 ```tsx
 import { NotebookPen, Plus, X } from 'lucide-react';
 ```
-Then replace every `<Moon ` with `<NotebookPen ` in this file (keep the same size/props).
+Then replace every `<Moon` occurrence with `<NotebookPen` in this file (keep the same size/props).
 
 - [ ] **Step 3: Replace in MobileLayout.tsx**
 

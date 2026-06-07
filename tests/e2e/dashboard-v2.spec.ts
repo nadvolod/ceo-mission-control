@@ -532,7 +532,10 @@ test.describe('Mission Control v2 — mobile viewport', () => {
     // today's `trained` true via /api/weekly-tracker addToDay).
     const today = await browserLocalDate(page);
     // Clean slate for today's weekly-tracker row so the increment is unambiguous.
-    await request.post('/api/weekly-tracker', { data: { action: 'deleteDay', date: today } });
+    // Assert the cleanup succeeded — a failed delete must not let the test pass
+    // on a stale `trained=true` from a prior run.
+    const del = await request.post('/api/weekly-tracker', { data: { action: 'deleteDay', date: today } });
+    expect(del.ok()).toBeTruthy();
 
     await page.goto('/dashboard');
     await expect(page.getByTestId('mobile-quick-log')).toBeVisible();

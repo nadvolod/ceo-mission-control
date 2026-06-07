@@ -196,16 +196,18 @@ test.describe('Morning Log drawer', () => {
     const phrase = `e2e reflection feed ${Date.now()}`;
     await page.getByTestId('reflection-input-0').fill(phrase);
 
-    // Reflection autosaves (debounced). Wait for the server to record it.
+    // Reflection autosaves (debounced). Wait for the server to record the EXACT
+    // phrase we typed — matching only "any non-empty answer" could pass on a
+    // stale answer even if this phrase never persisted.
     await expect.poll(async () => {
-      return page.evaluate(async () => {
+      return page.evaluate(async (expected) => {
         const res = await fetch('/api/three-to-thrive');
         if (!res.ok) return false;
         const body = await res.json();
         return (body.todaysEntry?.answers ?? []).some(
-          (a: { answer: string }) => a.answer.trim().length > 0,
+          (a: { answer: string }) => a.answer.includes(expected),
         );
-      });
+      }, phrase);
     }, { timeout: 8_000 }).toBe(true);
 
     // Close the drawer and confirm the derived `reflection-${date}` row shows
