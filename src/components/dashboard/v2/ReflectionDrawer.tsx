@@ -43,8 +43,17 @@ export function ReflectionDrawer({ open, onOpenChange, data, onSave }: Reflectio
   // Local edit buffer per question so typing isn't latency-bound on saves.
   const [drafts, setDrafts] = useState<Record<string, string>>({});
   const [saveStatus, setSaveStatus] = useState<Record<string, 'idle' | 'saving' | 'saved' | 'error'>>({});
+  const hasLocalEditsRef = useRef(false);
+  const wasOpenRef = useRef(false);
   useEffect(() => {
-    if (!open) return;
+    if (!open) {
+      hasLocalEditsRef.current = false;
+      wasOpenRef.current = false;
+      return;
+    }
+    const shouldHydrateFromServer = !wasOpenRef.current || !hasLocalEditsRef.current;
+    wasOpenRef.current = true;
+    if (!shouldHydrateFromServer) return;
     // Defer via rAF so the setState is treated as an external-event callback,
     // not a synchronous effect-body setter (React 19 lint rule).
     const id = requestAnimationFrame(() => {
@@ -65,6 +74,7 @@ export function ReflectionDrawer({ open, onOpenChange, data, onSave }: Reflectio
   // Per-question debounced save. The hook stores the last typed value
   // and fires the server save 600ms after the last keystroke.
   const timers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
+  const saveChains = useRef<Record<string, Promise<void>>>({});
   useEffect(() => {
     const t = timers.current;
     return () => {
@@ -72,29 +82,42 @@ export function ReflectionDrawer({ open, onOpenChange, data, onSave }: Reflectio
     };
   }, []);
 
+  const enqueueSave = useCallback(
+    (question: string, value: string) => {
+      const chain = saveChains.current[question] ?? Promise.resolve();
+      const save = chain
+        .catch(() => {})
+        .then(async () => {
+          setSaveStatus((prev) => ({ ...prev, [question]: value.trim() ? 'saving' : 'idle' }));
+          await onSave(todayKey(), question, value);
+          setSaveStatus((prev) => ({ ...prev, [question]: value.trim() ? 'saved' : 'idle' }));
+        })
+        .catch((err) => {
+          setSaveStatus((prev) => ({ ...prev, [question]: 'error' }));
+          console.error('Reflection save failed', err);
+          throw err;
+        });
+      saveChains.current[question] = save.catch(() => {});
+      return save;
+    },
+    [onSave],
+  );
+
   const onChange = (question: string, value: string) => {
+    hasLocalEditsRef.current = true;
     setDrafts((prev) => ({ ...prev, [question]: value }));
     setSaveStatus((prev) => ({ ...prev, [question]: value.trim() ? 'saving' : 'idle' }));
     const t = timers.current;
     if (t[question]) clearTimeout(t[question]);
     t[question] = setTimeout(() => {
-      void onSave(todayKey(), question, value)
-        .then(() => {
-          delete t[question];
-          setSaveStatus((prev) => ({ ...prev, [question]: value.trim() ? 'saved' : 'idle' }));
-        })
-        .catch((err) => {
-          delete t[question];
-          setSaveStatus((prev) => ({ ...prev, [question]: 'error' }));
-          console.error('Reflection save failed', err);
-        });
+      delete t[question];
+      void enqueueSave(question, value);
     }, 600);
   };
 
   const answeredCount = questions.filter((q) => (drafts[q] ?? '').trim()).length;
 
   const flushAndClose = useCallback(async () => {
-    const date = todayKey();
     const pending = questions.map(async (q) => {
       const timer = timers.current[q];
       if (timer) {
@@ -102,22 +125,15 @@ export function ReflectionDrawer({ open, onOpenChange, data, onSave }: Reflectio
         delete timers.current[q];
       }
       const answer = drafts[q] ?? '';
-      setSaveStatus((prev) => ({ ...prev, [q]: answer.trim() ? 'saving' : 'idle' }));
-      try {
-        await onSave(date, q, answer);
-        setSaveStatus((prev) => ({ ...prev, [q]: answer.trim() ? 'saved' : 'idle' }));
-      } catch (err) {
-        setSaveStatus((prev) => ({ ...prev, [q]: 'error' }));
-        console.error('Reflection save failed', err);
-        throw err;
-      }
+      await enqueueSave(q, answer);
     });
 
     const results = await Promise.allSettled(pending);
     if (results.every((r) => r.status === 'fulfilled')) {
+      hasLocalEditsRef.current = false;
       onOpenChange(false);
     }
-  }, [drafts, onOpenChange, onSave, questions]);
+  }, [drafts, enqueueSave, onOpenChange, questions]);
 
   // Yesterday's first answer to surface in the bottom card.
   const yesterdayCopy = useMemo(() => {
