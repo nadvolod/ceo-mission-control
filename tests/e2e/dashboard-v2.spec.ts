@@ -164,12 +164,17 @@ test.describe('Mission Control v2', () => {
 
     // Open palette, filter to "+1h temporal", press Enter.
     await page.getByTestId('cmdk-trigger').click();
-    await page.getByTestId('cmdk-input').fill('+1h temporal');
-    // CRITICAL: wait for the filtered list to settle on the +1h action BEFORE
-    // pressing Enter. Without this, React's setQuery from the fill's onChange
-    // may not have flushed yet, so `filtered[0]` is still the empty-query
-    // default — the +0.5h Temporal action — and the test logs 0.5h instead.
-    // (CI caught this; matches the wait pattern in the other ⌘K test above.)
+    const input = page.getByTestId('cmdk-input');
+    // CRITICAL: the open handler resets the query and focuses the input inside
+    // a requestAnimationFrame callback. If we fill BEFORE that rAF runs, the
+    // rAF's `setQuery('')` clobbers our typed query back to empty — so
+    // `filtered[0]` stays the default +0.5h Temporal action and Enter logs
+    // 0.5h. Waiting for the input to be focused proves the rAF (focus +
+    // reset) has executed, so the fill below sticks. (CI flake: the assertion
+    // kept reading "+0.5h Temporal" because the query never registered.)
+    await expect(input).toBeFocused();
+    await input.fill('+1h temporal');
+    // Now wait for the filtered list to settle on the +1h action before Enter.
     await expect(page.getByTestId('cmdk-action-0')).toContainText('+1h Temporal');
     const focusPost = waitForFocusHoursPost(page);
     await page.keyboard.press('Enter');
