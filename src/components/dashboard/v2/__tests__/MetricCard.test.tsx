@@ -44,26 +44,78 @@ describe('MetricCard', () => {
     expect(screen.getAllByText(/liabilities/i).length).toBeGreaterThanOrEqual(1);
   });
 
-  it('pipeline presets: only + FU remains after removing Call and Demo', () => {
-    const onLog = jest.fn();
-    render(<MetricCard metric={SEED_METRICS.pipeline} onLog={onLog} />);
-
-    // Call and Demo have been removed; only FU remains.
-    expect(screen.queryByTestId('preset-pipeline-call')).not.toBeInTheDocument();
-    expect(screen.queryByTestId('preset-pipeline-demo')).not.toBeInTheDocument();
-    expect(screen.getByTestId('preset-pipeline-fu')).toBeInTheDocument();
-  });
-
   it('reveals preset buttons for keyboard focus and hides them from tab order otherwise', () => {
     const onLog = jest.fn();
-    render(<MetricCard metric={SEED_METRICS.pipeline} onLog={onLog} />);
+    render(<MetricCard metric={SEED_METRICS.deepWork} onLog={onLog} />);
 
-    const card = screen.getByTestId('metric-card-pipeline');
-    const fu = screen.getByTestId('preset-pipeline-fu');
-    expect(fu).toHaveAttribute('tabindex', '-1');
+    const card = screen.getByTestId('metric-card-deepWork');
+    const preset = screen.getByTestId('preset-deepWork-0-5h');
+    expect(preset).toHaveAttribute('tabindex', '-1');
 
     fireEvent.focus(card);
-    expect(fu).toHaveAttribute('tabindex', '0');
+    expect(preset).toHaveAttribute('tabindex', '0');
+  });
+
+  describe('Battles Won', () => {
+    it('headlines the weekly count, shows the swords badge, and renders the all-time note', () => {
+      render(
+        <MetricCard
+          metric={{ ...SEED_METRICS.battles, today: 1, week: 2, note: '47 total · $12.5K won' }}
+        />,
+      );
+      // Big number is the WEEKLY count (2), not today (1).
+      expect(screen.getByTestId('metric-card-battles-value')).toHaveTextContent('2');
+      expect(screen.getByText('THIS WEEK')).toBeInTheDocument();
+      // Swords badge present.
+      expect(screen.getByTestId('metric-card-battles-icon')).toBeInTheDocument();
+      // All-time note in the sub-line.
+      expect(screen.getByText('47 total · $12.5K won')).toBeInTheDocument();
+    });
+
+    it('logging a battle requires a name and forwards value + count delta', async () => {
+      const user = userEvent.setup();
+      const onLog = jest.fn();
+      render(<MetricCard metric={SEED_METRICS.battles} onLog={onLog} />);
+
+      fireEvent.focus(screen.getByTestId('metric-card-battles'));
+      await user.click(screen.getByTestId('preset-battles-battle'));
+
+      // Editor open, nothing logged yet.
+      expect(onLog).not.toHaveBeenCalled();
+      const amount = screen.getByTestId('battles-amount-input');
+      const submit = screen.getByTestId('battles-amount-submit');
+
+      // Amount alone is not enough — the battle name (note) is required.
+      await user.type(amount, '2500');
+      expect(submit).toBeDisabled();
+
+      await user.type(screen.getByTestId('battles-amount-note'), 'Closed Acme renewal');
+      expect(submit).toBeEnabled();
+      await user.click(submit);
+
+      // delta is the count increment (1); the $ value travels in options.value.
+      expect(onLog).toHaveBeenCalledWith('battles', 1, '+ Battle', {
+        description: 'Closed Acme renewal',
+        value: 2500,
+      });
+    });
+
+    it('allows a $0 (non-monetary) battle win as long as a name is given', async () => {
+      const user = userEvent.setup();
+      const onLog = jest.fn();
+      render(<MetricCard metric={SEED_METRICS.battles} onLog={onLog} />);
+
+      fireEvent.focus(screen.getByTestId('metric-card-battles'));
+      await user.click(screen.getByTestId('preset-battles-battle'));
+      await user.type(screen.getByTestId('battles-amount-input'), '0');
+      await user.type(screen.getByTestId('battles-amount-note'), 'Shipped the migration');
+      await user.click(screen.getByTestId('battles-amount-submit'));
+
+      expect(onLog).toHaveBeenCalledWith('battles', 1, '+ Battle', {
+        description: 'Shipped the migration',
+        value: 0,
+      });
+    });
   });
 
   describe('Money Moved — custom amount input', () => {
@@ -291,17 +343,17 @@ describe('MetricCard', () => {
     it('pencil does NOT render on non-temporal metrics even when callback present', () => {
       const onLog = jest.fn();
       const onUpdateGoal = jest.fn();
-      // Pipeline has a goal; ensure the pencil is gated on metric.id.
-      const pipeline = { ...SEED_METRICS.pipeline };
+      // Deep work has a goal; ensure the pencil is gated on metric.id.
+      const deepWork = { ...SEED_METRICS.deepWork };
       render(
         <MetricCard
-          metric={pipeline}
+          metric={deepWork}
           onLog={onLog}
           onUpdateGoal={onUpdateGoal}
         />,
       );
-      fireEvent.focus(screen.getByTestId('metric-card-pipeline'));
-      expect(screen.queryByTestId('pipeline-edit-goal')).not.toBeInTheDocument();
+      fireEvent.focus(screen.getByTestId('metric-card-deepWork'));
+      expect(screen.queryByTestId('deepWork-edit-goal')).not.toBeInTheDocument();
       expect(screen.queryByTestId('temporal-edit-goal')).not.toBeInTheDocument();
     });
 

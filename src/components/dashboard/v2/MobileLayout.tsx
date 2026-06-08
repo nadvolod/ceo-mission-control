@@ -28,7 +28,7 @@ type Props = {
     metricId: MetricId,
     delta: number,
     label: string,
-    options?: { description?: string },
+    options?: { description?: string; value?: number },
   ) => void;
   onUpdateTemporalGoal?: (newGoal: number) => void | Promise<void>;
   insightsData?: {
@@ -214,7 +214,7 @@ function HeroTemporal({
     metricId: MetricId,
     delta: number,
     label: string,
-    options?: { description?: string },
+    options?: { description?: string; value?: number },
   ) => void;
   onUpdateGoal?: (newGoal: number) => void | Promise<void>;
 }) {
@@ -425,7 +425,7 @@ function HeroTemporal({
 const SNAPSHOT_IDS: Array<{ id: MetricId; color: string }> = [
   { id: 'cash',       color: MC_COLORS.uv },
   { id: 'netWorth',   color: MC_COLORS.cyan },
-  { id: 'pipeline',   color: MC_COLORS.amber },
+  { id: 'battles',    color: MC_COLORS.amber },
   { id: 'moneyMoved', color: MC_COLORS.green },
   { id: 'deepWork',   color: MC_COLORS.cyan },
 ];
@@ -523,6 +523,7 @@ type QuickAction = {
 const QUICK_ACTIONS: QuickAction[] = [
   { label: '+ Moved',     metricId: 'moneyMoved', delta: null, color: MC_COLORS.green },
   { label: '+ Generated', metricId: 'moneyMoved', delta: null, color: MC_COLORS.green },
+  { label: '+ Battle',    metricId: 'battles',    delta: null, color: MC_COLORS.amber },
   { label: '+ Deep 0.5h', metricId: 'deepWork',   delta: 0.5,  color: MC_COLORS.cyan },
   { label: '+ Train',     metricId: 'trained',    delta: 1,    color: MC_COLORS.pink },
 ];
@@ -534,7 +535,7 @@ function QuickLogGrid({
     metricId: MetricId,
     delta: number,
     label: string,
-    options?: { description?: string },
+    options?: { description?: string; value?: number },
   ) => void;
 }) {
   // Track an open amount editor for money entries. When `editing` is set,
@@ -562,12 +563,20 @@ function QuickLogGrid({
             label={editing.label}
             accent={editing.color}
             idPrefix="mobile-quick-amount"
-            // All current mobile editor uses are for money, so the note
-            // field is always on. If a future non-money metric needs the
-            // editor, gate on metricId.
-            withNote={editing.metricId === 'moneyMoved'}
+            // Money and battles both attach a note. Battles require it (the
+            // battle name) and label the fields accordingly.
+            withNote={editing.metricId === 'moneyMoved' || editing.metricId === 'battles'}
+            requireNote={editing.metricId === 'battles'}
+            allowZero={editing.metricId === 'battles'}
+            notePlaceholder={editing.metricId === 'battles' ? 'Battle name' : undefined}
+            amountPlaceholder={editing.metricId === 'battles' ? '$ won' : undefined}
             onSubmit={(amount, note) => {
-              onLog(editing.metricId, amount, editing.label.trim(), { description: note });
+              if (editing.metricId === 'battles') {
+                // Battles: $ value in options.value, count delta is 1.
+                onLog(editing.metricId, 1, editing.label.trim(), { description: note, value: amount });
+              } else {
+                onLog(editing.metricId, amount, editing.label.trim(), { description: note });
+              }
               setEditing(null);
             }}
             onCancel={() => setEditing(null)}

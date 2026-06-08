@@ -27,7 +27,7 @@ export const METRIC_ACCENTS: Record<MetricId, string> = {
   temporal:   MC_COLORS.pink,
   focus:      MC_COLORS.cyan,
   moneyMoved: MC_COLORS.green,
-  pipeline:   MC_COLORS.amber,
+  battles:    MC_COLORS.amber,
   deepWork:   MC_COLORS.cyan,
   trained:    MC_COLORS.amber,
 };

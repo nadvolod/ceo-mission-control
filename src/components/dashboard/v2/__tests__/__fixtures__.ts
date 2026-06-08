@@ -41,7 +41,7 @@ export const __FIXTURE_METRICS: Record<MetricId, MetricSnapshot> = {
   temporal:   { id: 'temporal',   label: 'Temporal',    today: 0,      week: 6.5,    goal: 5,   unit: 'h', fmt: 'hours', note: 'this week', color: MC_COLORS.pink },
   focus:      { id: 'focus',      label: 'Focus hours', today: 0,      week: 0,      goal: 15,  unit: 'h', fmt: 'hours', note: 'this week', color: MC_COLORS.cyan },
   moneyMoved: { id: 'moneyMoved', label: 'Money moved', today: 0,      week: 0,                 unit: '$', fmt: 'money', note: 'this week', color: MC_COLORS.green },
-  pipeline:   { id: 'pipeline',   label: 'Pipeline',    today: 0,      week: 0,      goal: 3,   unit: 'h', fmt: 'hours', note: 'this week', color: MC_COLORS.amber },
+  battles:    { id: 'battles',    label: 'Battles Won', today: 0,      week: 0,                 unit: '×', fmt: 'int',   note: '0 total', color: MC_COLORS.amber, headline: 'week', icon: 'swords' },
   deepWork:   { id: 'deepWork',   label: 'Deep work',   today: 0,      week: 0,      goal: 10,  unit: 'h', fmt: 'hours', note: 'this week', color: MC_COLORS.cyan },
   trained:    { id: 'trained',    label: 'Trained',     today: 0,      week: 0,      goal: 4,   unit: '×', fmt: 'count', note: 'this week', color: MC_COLORS.amber },
 };
@@ -50,7 +50,7 @@ export const __FIXTURE_SPARKS = {
   cash:       [28100, 27600, 28400, 30100, 29800, 31200, 30700, 32400, 31500, 32800, 33400, 34100, 34800, 35300],
   netWorth:   [951000, 952500, 954100, 955800, 958200, 960100, 962700, 965300, 968400, 971200, 973900, 976200, 978900, 982000],
   temporal:   [0.5, 1, 0.5, 1.5, 2, 1, 0.5, 1.5, 2, 1, 0, 1, 1.5, 0],
-  pipeline:   [1, 0.5, 1.5, 1, 2, 0.5, 1, 0.5, 1.5, 2, 1, 0, 0.5, 0],
+  battles:    [1, 0, 2, 1, 0, 1, 0, 2, 1, 0, 1, 0, 1, 0],
   deepWork:   [2, 1.5, 2, 1, 1.5, 2.5, 2, 1.5, 1, 2, 1.5, 1, 0.5, 0],
   moneyMoved: [250, 500, 0, 750, 250, 1000, 500, 250, 0, 500, 1000, 750, 250, 0],
 } as const;
@@ -58,7 +58,7 @@ export const __FIXTURE_SPARKS = {
 export const __FIXTURE_ACTIVITY: ActivityEntry[] = [
   { id: 'a1', t: '09:12', kind: 'temporal',   delta: '+1h',         label: 'Temporal',  meta: 'Brief read · investor deck' },
   { id: 'a2', t: '09:15', kind: 'money',      delta: '+ Generated', label: '$2,000',    meta: 'Annual contract · Vega' },
-  { id: 'a3', t: '09:20', kind: 'pipeline',   delta: '+ Lead',      label: 'Pipeline',  meta: 'Outbound · Northway' },
+  { id: 'a3', t: '09:20', kind: 'battles',    delta: '+ Won',       label: '$2,500',    meta: 'Closed Northway renewal', icon: 'swords' },
   { id: 'a4', t: '08:48', kind: 'cash',       delta: 'sync',        label: 'Cash',      meta: 'Monarch · $35.3K' },
   { id: 'a5', t: '08:30', kind: 'deepwork',   delta: '+0.5h',       label: 'Deep work', meta: 'Architecture doc' },
 ];

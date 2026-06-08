@@ -92,12 +92,13 @@ export default function MissionControlV2Page() {
     return deriveActivity({
       focus: focusData?.recentSessions,
       financial: financialData?.recentEntries,
+      battles: store.battlesData?.recentEntries,
       morning: Object.values(health.notes ?? {}),
       reflection: store.threeToThrive?.history ?? [],
       optimistic: store.activity,
       limit: 25,
     });
-  }, [focusData, financialData, health.notes, store.threeToThrive, store.activity]);
+  }, [focusData, financialData, store.battlesData, health.notes, store.threeToThrive, store.activity]);
 
   // Derive chips.
   const chips = useMemo(() => {
@@ -176,6 +177,18 @@ export default function MissionControlV2Page() {
           note: fin.description ?? '',
           when: fmtWhen(entry.tsMs),
         };
+      } else if (entry.source === 'battle') {
+        const b = store.battlesData?.recentEntries?.find(
+          (e: { id: string }) => e.id === entry.refKey,
+        ) as { id: string; name: string; value: number } | undefined;
+        if (!b) return; // fail closed: don't show synthetic values for a row we can't resolve
+        resolved = {
+          source: 'battle',
+          title: 'Battle won',
+          value: b.value ?? 0,
+          name: b.name ?? '',
+          when: fmtWhen(entry.tsMs),
+        };
       } else if (entry.source === 'focus') {
         const f = focusData?.recentSessions?.find(
           (s: { id: string }) => s.id === entry.refKey,
@@ -193,7 +206,7 @@ export default function MissionControlV2Page() {
       setDetail(resolved);
       setDetailOpen(true);
     },
-    [health.notes, store.threeToThrive, financialData, focusData],
+    [health.notes, store.threeToThrive, store.battlesData, financialData, focusData],
   );
 
   return (
@@ -405,7 +418,7 @@ export default function MissionControlV2Page() {
             onLog={store.log}
             onUpdateGoal={onUpdateTemporalGoal}
           />
-          <MetricCard metric={store.metrics.pipeline}   onLog={store.log} />
+          <MetricCard metric={store.metrics.battles}    onLog={store.log} />
           <MetricCard metric={store.metrics.deepWork}   onLog={store.log} />
           <MetricCard metric={store.metrics.moneyMoved} onLog={store.log} />
         </div>
@@ -494,7 +507,7 @@ export default function MissionControlV2Page() {
               <TrendsPanel
                 series={buildOverviewTrendSeries(
                   focusData?.dailyTrend,
-                  { temporalWeekly: 5, deepWorkWeekly: 10, pipelineWeekly: 3 },
+                  { temporalWeekly: 5, deepWorkWeekly: 10 },
                 )}
               />
             </CollapsiblePanel>

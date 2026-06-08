@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { useDashboardData } from '@/hooks/useDashboardData';
 import { localDate } from '@/lib/dates';
 import { METRIC_ACCENTS } from './palette';
+import { fmtMetric } from './format';
 import type { ActivityEntry, MetricId, MetricSnapshot } from './types';
 
 // Display labels for the activity feed. These are presentational and
@@ -16,7 +17,7 @@ const METRIC_LABELS: Record<MetricId, string> = {
   temporal:   'Temporal Focus',
   focus:      'Focus hours',
   moneyMoved: 'Money moved',
-  pipeline:   'Pipeline',
+  battles:    'Battles Won',
   deepWork:   'Deep work',
   trained:    'Trained',
 };
@@ -30,9 +31,14 @@ const METRIC_LABELS: Record<MetricId, string> = {
 type LogResult = { ok: true } | { ok: false; error: string };
 
 type LogOptions = {
-  // Optional user-supplied description (e.g. "Benepass" for a money entry).
+  // Optional user-supplied description (e.g. "Benepass" for a money entry,
+  // or the battle name for a battles entry).
   // When omitted we fall back to the auto-generated string per metric.
   description?: string;
+  // Battles only: the dollar value won in this battle. The `delta` arg for
+  // battles is the count increment (1); the money value travels here so the
+  // overlay can increment the weekly count by 1 regardless of the $ amount.
+  value?: number;
 };
 
 async function postLog(
@@ -110,21 +116,22 @@ async function postLog(
       return { ok: true };
     }
 
-    if (metricId === 'pipeline') {
-      const res = await fetch('/api/focus-hours', {
+    if (metricId === 'battles') {
+      // For battles the $ value travels in options.value and the name in
+      // options.description. The `delta` arg is the count increment (1).
+      const res = await fetch('/api/battles', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          action: 'addSession',
-          category: 'Revenue',
-          hours: delta,
-          description: `${label.trim()} Pipeline · Mission Control`,
+          action: 'addBattle',
+          name: userDescription || label.trim(),
+          value: options.value ?? 0,
           date: today,
         }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        return { ok: false, error: body.error || `Pipeline log failed (${res.status})` };
+        return { ok: false, error: body.error || `Battle log failed (${res.status})` };
       }
       return { ok: true };
     }
@@ -228,7 +235,7 @@ function hhmm(d: Date = new Date()): string {
 
 export function useMissionStore() {
   const dashboard = useDashboardData();
-  const { monarchData, focusData, financialData, threeToThriveData, monthlyReviewData, weeklyTrackerData } = dashboard;
+  const { monarchData, focusData, financialData, battlesData, threeToThriveData, monthlyReviewData, weeklyTrackerData } = dashboard;
 
   const [local, dispatch] = useReducer(localReducer, initialLocal);
   const refreshRef = useRef(dashboard.loadAllData);
@@ -272,7 +279,9 @@ export function useMissionStore() {
       }),
       focus:      make('focus',      'h', 'hours', { goal: 15, note: 'this week' }),
       moneyMoved: make('moneyMoved', '$', 'money', { note: 'this week' }),
-      pipeline:   make('pipeline',   'h', 'hours', { goal: 3,  note: 'this week' }),
+      // Battles Won: the big number is the weekly count (integer); the
+      // sub-line shows all-time count + total $ won. No goal/progress bar.
+      battles:    make('battles',    '×', 'int',   { headline: 'week', icon: 'swords', note: '0 total' }),
       deepWork:   make('deepWork',   'h', 'hours', { goal: 10, note: 'this week' }),
       trained:    make('trained',    '×', 'count', { goal: 4,  note: 'this week' }),
     };
@@ -290,8 +299,6 @@ export function useMissionStore() {
     const weeklyByCat = focusData?.weeklyTotals ?? {};
     base.temporal.today = todayByCat.Temporal ?? 0;
     base.temporal.week = weeklyByCat.Temporal;
-    base.pipeline.today = todayByCat.Revenue ?? 0;
-    base.pipeline.week = weeklyByCat.Revenue;
     // Deep work = focus-hours category "Other" + Temporal. The user's working
     // model: Temporal hours ARE deep work (just additionally tagged as the
     // strategic project). Without this, logging +1h Temporal would not
@@ -317,8 +324,22 @@ export function useMissionStore() {
       base.moneyMoved.week = (finWeek.moved ?? 0) + (finWeek.generated ?? 0) + (finWeek.cut ?? 0);
     }
 
+    // Battles: today = today's count, week = weekly count (the headline),
+    // note = all-time count + total $ won (the card sub-line). Leave today/week
+    // at their empty defaults (0 / undefined) until real data arrives so the
+    // empty-state contract holds (see baseMetrics comment).
+    if (battlesData) {
+      base.battles.today = battlesData.todaysMetrics?.totals?.count ?? 0;
+      base.battles.week = battlesData.weeklyTotals?.count ?? 0;
+      const allTime = battlesData.allTimeTotals;
+      if (allTime) {
+        const wonStr = allTime.value > 0 ? ` · ${fmtMetric(allTime.value, 'money')} won` : '';
+        base.battles.note = `${allTime.count} total${wonStr}`;
+      }
+    }
+
     return base;
-  }, [monarchData, focusData, financialData, weeklyTrackerData]);
+  }, [monarchData, focusData, financialData, battlesData, weeklyTrackerData]);
 
   const metrics: Record<MetricId, MetricSnapshot> = useMemo(() => {
     const out = { ...baseMetrics };
@@ -347,11 +368,18 @@ export function useMissionStore() {
       // entry shows "+ Moved $500 | Benepass" once the refresh resolves;
       // we mirror that shape on the optimistic row so there's no flash.)
       const isMoney = metricId === 'moneyMoved';
+      const isBattle = metricId === 'battles';
       const userDescription = options.description?.trim();
-      const optimisticLabel = isMoney
+      // Battles: show the $ value won and the battle name on the optimistic
+      // row so it matches the server-side shape (no flash on refresh).
+      const optimisticLabel = isBattle
+        ? `$${(options.value ?? 0).toLocaleString()}`
+        : isMoney
         ? `$${delta.toLocaleString()}`
         : METRIC_LABELS[metricId];
-      const optimisticMeta = userDescription || (isMoney ? `${label.trim()} via Mission Control` : 'Quick log');
+      const optimisticMeta = isBattle
+        ? userDescription || label.trim()
+        : userDescription || (isMoney ? `${label.trim()} via Mission Control` : 'Quick log');
 
       // Use Date.now() for tsMs so deriveActivity's sort places this row
       // above any older server-side entry, even if that server entry's
@@ -363,9 +391,12 @@ export function useMissionStore() {
         t: hhmm(new Date(nowMs)),
         tsMs: nowMs,
         kind: metricId,
-        delta: label,
+        // Battles render a "+ Won" verb (matches the server-derived row) and
+        // a ⚔️ badge, regardless of the preset label used to open the editor.
+        delta: isBattle ? '+ Won' : label,
         label: optimisticLabel,
         meta: optimisticMeta,
+        ...(isBattle ? { icon: 'swords' as const } : {}),
       };
       dispatch({ type: 'optimistic', metricId, delta, entry });
 
@@ -417,6 +448,7 @@ export function useMissionStore() {
     toast: local.toast,
     focusData,
     financialData,
+    battlesData,
     weeklyTrackerData: dashboard.weeklyTrackerData,
     monarchData,
     threeToThrive: threeToThriveData,

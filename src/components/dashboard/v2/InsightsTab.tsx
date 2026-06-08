@@ -232,7 +232,6 @@ function buildInsightCards(
   const fin = (financialDailyTrend ?? []).slice(-period);
 
   const temporal = focus.map((d) => d.byCategory?.Temporal ?? 0);
-  const pipeline = focus.map((d) => d.byCategory?.Revenue ?? 0);
   // Deep Work = "Other" + Temporal. Temporal hours ARE deep work, just
   // additionally tagged as the strategic project — without this addition,
   // +1h Temporal wouldn't contribute to the Deep Work card. The same
@@ -249,7 +248,6 @@ function buildInsightCards(
   const focus14 = (focusDailyTrend ?? []).slice(-14);
   const fin14 = (financialDailyTrend ?? []).slice(-14);
   const temporal14 = focus14.map((d) => d.byCategory?.Temporal ?? 0);
-  const pipeline14 = focus14.map((d) => d.byCategory?.Revenue ?? 0);
   const deepWork14 = focus14.map((d) =>
     (d.byCategory?.Other ?? 0) + (d.byCategory?.Temporal ?? 0),
   );
@@ -273,14 +271,6 @@ function buildInsightCards(
       total: sumOf(deepWork),
       fmt: 'hours',
       deltaPct: weekOverWeekDelta(deepWork14),
-    },
-    {
-      label: 'Pipeline',
-      data: pipeline,
-      color: MC_COLORS.amber,
-      total: sumOf(pipeline),
-      fmt: 'hours',
-      deltaPct: weekOverWeekDelta(pipeline14),
     },
     {
       label: 'Money moved',

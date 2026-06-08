@@ -31,6 +31,17 @@ async function readThreeToThriveFromPage(page: Page) {
   });
 }
 
+async function readBattlesFromPage(page: Page) {
+  const date = await browserLocalDate(page);
+  return page.evaluate(async (today) => {
+    const res = await fetch(`/api/battles?date=${today}`);
+    if (!res.ok) {
+      throw new Error(`GET /api/battles failed: ${res.status}`);
+    }
+    return res.json();
+  }, date);
+}
+
 function waitForFocusHoursPost(page: Page) {
   return page.waitForResponse((response) =>
     response.url().includes('/api/focus-hours') &&
@@ -85,7 +96,7 @@ test.describe('Mission Control v2', () => {
     await expect(page.getByTestId('tab-insights')).toBeVisible();
     await expect(page.getByTestId('tab-review')).toBeVisible();
     // 6-card metric grid
-    for (const id of ['cash', 'netWorth', 'temporal', 'pipeline', 'deepWork', 'moneyMoved']) {
+    for (const id of ['cash', 'netWorth', 'temporal', 'battles', 'deepWork', 'moneyMoved']) {
       await expect(page.getByTestId(`metric-card-${id}`)).toBeVisible();
     }
 
@@ -153,12 +164,17 @@ test.describe('Mission Control v2', () => {
 
     // Open palette, filter to "+1h temporal", press Enter.
     await page.getByTestId('cmdk-trigger').click();
-    await page.getByTestId('cmdk-input').fill('+1h temporal');
-    // CRITICAL: wait for the filtered list to settle on the +1h action BEFORE
-    // pressing Enter. Without this, React's setQuery from the fill's onChange
-    // may not have flushed yet, so `filtered[0]` is still the empty-query
-    // default — the +0.5h Temporal action — and the test logs 0.5h instead.
-    // (CI caught this; matches the wait pattern in the other ⌘K test above.)
+    const input = page.getByTestId('cmdk-input');
+    // CRITICAL: the open handler resets the query and focuses the input inside
+    // a requestAnimationFrame callback. If we fill BEFORE that rAF runs, the
+    // rAF's `setQuery('')` clobbers our typed query back to empty — so
+    // `filtered[0]` stays the default +0.5h Temporal action and Enter logs
+    // 0.5h. Waiting for the input to be focused proves the rAF (focus +
+    // reset) has executed, so the fill below sticks. (CI flake: the assertion
+    // kept reading "+0.5h Temporal" because the query never registered.)
+    await expect(input).toBeFocused();
+    await input.fill('+1h temporal');
+    // Now wait for the filtered list to settle on the +1h action before Enter.
     await expect(page.getByTestId('cmdk-action-0')).toContainText('+1h Temporal');
     const focusPost = waitForFocusHoursPost(page);
     await page.keyboard.press('Enter');
@@ -173,18 +189,55 @@ test.describe('Mission Control v2', () => {
     expect(body.todaysMetrics?.byCategory?.Temporal ?? 0).toBeGreaterThanOrEqual(1);
   });
 
-  test('hover preset on the Pipeline card logs +FU to focus-hours', async ({ page }) => {
+  test('Battles Won card: log a battle (name + value) → persists + shows ⚔️ Activity row', async ({ page }) => {
     await page.goto('/dashboard');
 
-    const card = page.getByTestId('metric-card-pipeline');
-    await card.hover();
-    const focusPost = waitForFocusHoursPost(page);
-    await page.getByTestId('preset-pipeline-fu').click();
-    await focusPost;
+    const name = `Closed deal ${Date.now()}`;
 
-    // Server-side: the Revenue category got 0.5h.
-    const body = await readFocusHoursFromPage(page);
-    expect(body.todaysMetrics?.byCategory?.Revenue ?? 0).toBeGreaterThanOrEqual(0.5);
+    const card = page.getByTestId('metric-card-battles');
+    await card.hover();
+
+    const battlePost = page.waitForRequest((req) =>
+      req.url().includes('/api/battles') && req.method() === 'POST',
+    );
+
+    // Click the "+ Battle" preset → enter the $ value and the battle name.
+    await page.getByTestId('preset-battles-battle').click();
+    await expect(page.getByTestId('battles-amount-editor')).toBeVisible();
+    await page.getByTestId('battles-amount-input').fill('2500');
+    await page.getByTestId('battles-amount-note').fill(name);
+    await page.keyboard.press('Enter');
+
+    // The POST body carries the count action, the $ value, and the name.
+    const body = (await battlePost).postDataJSON();
+    expect(body.action).toBe('addBattle');
+    expect(body.value).toBe(2500);
+    expect(body.name).toBe(name);
+
+    // Server-side: the battle persisted (all-time count >= 1, value >= 2500).
+    const battles = await readBattlesFromPage(page);
+    expect(battles.allTimeTotals?.count ?? 0).toBeGreaterThanOrEqual(1);
+    expect(battles.allTimeTotals?.value ?? 0).toBeGreaterThanOrEqual(2500);
+
+    // The activity feed shows the battle row (scope to desktop tree to avoid
+    // the strict-mode clash with the CSS-hidden mobile feed).
+    const desktop = page.getByTestId('desktop-layout');
+    await expect(desktop.getByText(name)).toBeVisible({ timeout: 5_000 });
+  });
+
+  test('Battles Won card: submit is blocked until a battle name is entered', async ({ page }) => {
+    await page.goto('/dashboard');
+
+    const card = page.getByTestId('metric-card-battles');
+    await card.hover();
+    await page.getByTestId('preset-battles-battle').click();
+
+    // Amount only — the submit button stays disabled until the name is filled.
+    await page.getByTestId('battles-amount-input').fill('1000');
+    await expect(page.getByTestId('battles-amount-submit')).toBeDisabled();
+
+    await page.getByTestId('battles-amount-note').fill('Won the negotiation');
+    await expect(page.getByTestId('battles-amount-submit')).toBeEnabled();
   });
 
   test('reflection drawer opens, autosaves an answer, and the answer survives reload', async ({ page }) => {

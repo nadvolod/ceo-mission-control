@@ -62,6 +62,7 @@ describe('useMissionStore.log', () => {
       ['deepWork',   '/api/focus-hours',  0.5,  '+0.5h']      as const,
       ['moneyMoved', '/api/financial',    500,  '+ Moved']    as const,
       ['trained',    '/api/weekly-tracker', 1,  '+ Session']  as const,
+      ['battles',    '/api/battles',       1,   '+ Battle']   as const,
     ];
     it.each(cases)('%s → %s POST body has date YYYY-MM-DD', async (metricId, endpoint, delta, label) => {
       const { result } = renderHook(() => useMissionStore());
@@ -330,6 +331,48 @@ describe('useMissionStore.log', () => {
       // Server requires non-empty description; the auto string keeps the
       // POST valid even when the user skipped the note input.
       expect(body.description).toBe('+ Moved via Mission Control');
+    });
+  });
+
+  describe('battles optimistic entry + POST', () => {
+    it('shows the $ value as the label, the name as meta, "+ Won" delta, and a swords badge', async () => {
+      let releaseRefresh!: () => void;
+      mockLoadAllData.mockImplementationOnce(
+        () => new Promise<void>((res) => { releaseRefresh = () => res(); }),
+      );
+      const { result } = renderHook(() => useMissionStore());
+      let p!: Promise<void>;
+      act(() => {
+        p = result.current.log('battles', 1, '+ Battle', { description: 'Closed Acme', value: 2500 });
+      });
+      await waitFor(() => {
+        expect(result.current.activity).toHaveLength(1);
+      });
+      const row = result.current.activity[0];
+      expect(row.kind).toBe('battles');
+      expect(row.delta).toBe('+ Won');
+      expect(row.label).toBe('$2,500');
+      expect(row.meta).toBe('Closed Acme');
+      expect(row.icon).toBe('swords');
+
+      await act(async () => {
+        releaseRefresh();
+        await p;
+      });
+    });
+
+    it('forwards name + value to the /api/battles POST body (delta is the count, not the $)', async () => {
+      const { result } = renderHook(() => useMissionStore());
+      await act(async () => {
+        await result.current.log('battles', 1, '+ Battle', { description: 'Won pricing fight', value: 1800 });
+      });
+      const call = (global.fetch as jest.Mock).mock.calls.find(([url]) => url === '/api/battles');
+      expect(call).toBeDefined();
+      const body = JSON.parse(call![1].body);
+      expect(body.action).toBe('addBattle');
+      expect(body.name).toBe('Won pricing fight');
+      expect(body.value).toBe(1800);
+      expect(body.date).toMatch(/^\d{4}-\d{2}-\d{2}$/);
     });
   });
 

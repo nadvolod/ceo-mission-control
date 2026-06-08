@@ -1,12 +1,18 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Check, Pencil } from 'lucide-react';
+import { Check, Pencil, Swords } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import { AmountEditor } from './AmountEditor';
 import { InlineHoursEditor } from './InlineHoursEditor';
 import { Sparkline } from './primitives/Sparkline';
 import { fmtMetric, clamp } from './format';
-import type { MetricId, MetricSnapshot } from './types';
+import type { MetricIcon, MetricId, MetricSnapshot } from './types';
+
+// Presentational badge icons keyed by the snapshot's `icon` field.
+const METRIC_ICONS: Record<MetricIcon, LucideIcon> = {
+  swords: Swords,
+};
 
 type Preset = { label: string; delta: number };
 
@@ -18,16 +24,16 @@ type Preset = { label: string; delta: number };
 const PRESETS: Partial<Record<MetricId, Preset[]>> = {
   temporal:   [{ label: '+0.5h', delta: 0.5 }, { label: '+1h', delta: 1 }, { label: '+2h', delta: 2 }],
   focus:      [{ label: '+0.5h', delta: 0.5 }, { label: '+1h', delta: 1 }, { label: '+2h', delta: 2 }],
-  pipeline:   [{ label: '+ FU', delta: 0.5 }],
   deepWork:   [{ label: '+0.5h', delta: 0.5 }, { label: '+1h', delta: 1 }],
   trained:    [{ label: '+ Session', delta: 1 }],
   moneyMoved: [{ label: '+ Moved', delta: 0 }, { label: '+ Generated', delta: 0 }, { label: '+ Cut', delta: 0 }],
+  battles:    [{ label: '+ Battle', delta: 1 }],
 };
 
 // Metrics whose preset buttons act as a CATEGORY selector, with the
 // amount typed by the user. Adding a metric here turns its preset row
 // into a two-step flow: click category → input amount → submit.
-const REQUIRES_AMOUNT_INPUT: ReadonlySet<MetricId> = new Set(['moneyMoved']);
+const REQUIRES_AMOUNT_INPUT: ReadonlySet<MetricId> = new Set(['moneyMoved', 'battles']);
 
 type MetricCardProps = {
   metric: MetricSnapshot;
@@ -39,7 +45,7 @@ type MetricCardProps = {
     metricId: MetricId,
     delta: number,
     label: string,
-    options?: { description?: string },
+    options?: { description?: string; value?: number },
   ) => void;
   // When provided AND `metric.id === 'temporal'`, a ✎ pencil button
   // renders next to the goal text in the eyebrow row. Clicking it opens
@@ -70,27 +76,33 @@ export function MetricCard({ metric, big = false, onLog, onUpdateGoal }: MetricC
   const [goalError, setGoalError] = useState<string | null>(null);
   const prevRef = useRef<number | undefined>(undefined);
 
-  // Flash the border when the metric.today value changes. The setState is
+  // The big number is `today` for most cards; battles (headline === 'week')
+  // headline the weekly count instead.
+  const headline = metric.headline ?? 'today';
+  const headlineValue = headline === 'week' ? (metric.week ?? 0) : metric.today;
+
+  // Flash the border when the headline value changes. The setState is
   // deferred via setTimeout so the lint rule sees it as an external-event
   // callback rather than a synchronous effect-body setter.
   useEffect(() => {
     if (prevRef.current === undefined) {
-      prevRef.current = metric.today;
+      prevRef.current = headlineValue;
       return;
     }
-    if (prevRef.current === metric.today) return;
-    prevRef.current = metric.today;
+    if (prevRef.current === headlineValue) return;
+    prevRef.current = headlineValue;
     const on = setTimeout(() => setFlash(true), 0);
     const off = setTimeout(() => setFlash(false), 900);
     return () => {
       clearTimeout(on);
       clearTimeout(off);
     };
-  }, [metric.today]);
+  }, [headlineValue]);
 
   const accent = metric.color;
   const week = metric.week;
   const goal = metric.goal;
+  const Icon = metric.icon ? METRIC_ICONS[metric.icon] : null;
   const goalPct = goal != null && week != null ? clamp(week / goal, 0, 1) : null;
   const ahead = goal != null && week != null && week >= goal;
   const presets = PRESETS[metric.id] ?? [];
@@ -121,8 +133,13 @@ export function MetricCard({ metric, big = false, onLog, onUpdateGoal }: MetricC
     }
   };
 
+  // When the card already headlines the weekly value (battles), the sub-line
+  // carries the contextual note (all-time count + $ won) rather than repeating
+  // "N this week". Otherwise the sub-line shows weekly progress.
   const subLine =
-    week != null && week !== 0
+    headline === 'week'
+      ? metric.note || ''
+      : week != null && week !== 0
       ? `${fmtMetric(week, metric.fmt)} this week`
       : metric.note || '';
 
@@ -164,7 +181,7 @@ export function MetricCard({ metric, big = false, onLog, onUpdateGoal }: MetricC
 
       <div className="relative flex items-baseline justify-between gap-2">
         <span
-          className="font-numerics uppercase"
+          className="inline-flex items-center gap-1 font-numerics uppercase"
           style={{
             fontSize: 10,
             letterSpacing: '0.1em',
@@ -172,6 +189,14 @@ export function MetricCard({ metric, big = false, onLog, onUpdateGoal }: MetricC
             fontWeight: 500,
           }}
         >
+          {Icon && (
+            <Icon
+              size={11}
+              aria-hidden
+              style={{ color: accent }}
+              data-testid={`metric-card-${metric.id}-icon`}
+            />
+          )}
           {metric.label}
         </span>
         {goal != null && week != null && (
@@ -293,7 +318,7 @@ export function MetricCard({ metric, big = false, onLog, onUpdateGoal }: MetricC
           }}
           data-testid={`metric-card-${metric.id}-value`}
         >
-          {fmtMetric(metric.today, metric.fmt)}
+          {fmtMetric(headlineValue, metric.fmt)}
         </span>
         {metric.fmt !== 'pct' && metric.id !== 'cashMoM' && (
           <span
@@ -304,7 +329,7 @@ export function MetricCard({ metric, big = false, onLog, onUpdateGoal }: MetricC
               letterSpacing: '0.06em',
             }}
           >
-            TODAY
+            {headline === 'week' ? 'THIS WEEK' : 'TODAY'}
           </span>
         )}
       </div>
@@ -349,6 +374,10 @@ export function MetricCard({ metric, big = false, onLog, onUpdateGoal }: MetricC
                 }}
               />
             </div>
+          ) : headline === 'week' ? (
+            // The note already renders in the sub-line for week-headline cards
+            // (battles); don't duplicate it in the footer.
+            null
           ) : (
             <div
               className="font-numerics uppercase"
@@ -409,9 +438,19 @@ export function MetricCard({ metric, big = false, onLog, onUpdateGoal }: MetricC
               label={editingLabel}
               accent={accent}
               idPrefix={`${metric.id}-amount`}
-              withNote={metric.id === 'moneyMoved'}
+              withNote={metric.id === 'moneyMoved' || metric.id === 'battles'}
+              requireNote={metric.id === 'battles'}
+              allowZero={metric.id === 'battles'}
+              notePlaceholder={metric.id === 'battles' ? 'Battle name' : undefined}
+              amountPlaceholder={metric.id === 'battles' ? '$ won' : undefined}
               onSubmit={(amount, note) => {
-                onLog(metric.id, amount, editingLabel, { description: note });
+                if (metric.id === 'battles') {
+                  // Battles: the $ value travels in options.value; the delta is
+                  // the count increment (1); the name is the note.
+                  onLog(metric.id, 1, editingLabel, { description: note, value: amount });
+                } else {
+                  onLog(metric.id, amount, editingLabel, { description: note });
+                }
                 setEditingLabel(null);
               }}
               onCancel={() => setEditingLabel(null)}
