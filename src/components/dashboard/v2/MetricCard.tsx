@@ -440,6 +440,7 @@ export function MetricCard({ metric, big = false, onLog, onUpdateGoal }: MetricC
               idPrefix={`${metric.id}-amount`}
               withNote={metric.id === 'moneyMoved' || metric.id === 'battles'}
               requireNote={metric.id === 'battles'}
+              allowZero={metric.id === 'battles'}
               notePlaceholder={metric.id === 'battles' ? 'Battle name' : undefined}
               amountPlaceholder={metric.id === 'battles' ? '$ won' : undefined}
               onSubmit={(amount, note) => {

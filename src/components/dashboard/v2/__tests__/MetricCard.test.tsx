@@ -99,6 +99,23 @@ describe('MetricCard', () => {
         value: 2500,
       });
     });
+
+    it('allows a $0 (non-monetary) battle win as long as a name is given', async () => {
+      const user = userEvent.setup();
+      const onLog = jest.fn();
+      render(<MetricCard metric={SEED_METRICS.battles} onLog={onLog} />);
+
+      fireEvent.focus(screen.getByTestId('metric-card-battles'));
+      await user.click(screen.getByTestId('preset-battles-battle'));
+      await user.type(screen.getByTestId('battles-amount-input'), '0');
+      await user.type(screen.getByTestId('battles-amount-note'), 'Shipped the migration');
+      await user.click(screen.getByTestId('battles-amount-submit'));
+
+      expect(onLog).toHaveBeenCalledWith('battles', 1, '+ Battle', {
+        description: 'Shipped the migration',
+        value: 0,
+      });
+    });
   });
 
   describe('Money Moved — custom amount input', () => {

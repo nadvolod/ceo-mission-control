@@ -30,6 +30,9 @@ type AmountEditorProps = {
   requireNote?: boolean;
   // Placeholder shown in the amount input. Defaults to "$".
   amountPlaceholder?: string;
+  // When true, an amount of exactly 0 is accepted (e.g. a non-monetary
+  // battle win that still counts). Money entries keep the strict > 0 rule.
+  allowZero?: boolean;
 };
 
 // Inline category + amount [+ optional note] + save/cancel form. Used by:
@@ -48,6 +51,7 @@ export function AmountEditor({
   notePlaceholder = 'Note (e.g. Benepass)',
   requireNote = false,
   amountPlaceholder = '$',
+  allowZero = false,
 }: AmountEditorProps) {
   const [value, setValue] = useState('');
   const [note, setNote] = useState('');
@@ -71,7 +75,10 @@ export function AmountEditor({
       return;
     }
     const amount = parseFloat(cleaned);
-    if (!Number.isFinite(amount) || amount <= 0) {
+    // The regex above never yields a negative, so the only question is whether
+    // 0 is acceptable. Battles allow a $0 (non-monetary) win; money requires >0.
+    const amountOk = Number.isFinite(amount) && (allowZero ? amount >= 0 : amount > 0);
+    if (!amountOk) {
       amountRef.current?.focus();
       return;
     }

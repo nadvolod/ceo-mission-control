@@ -19,7 +19,7 @@ describe('fmtMetric', () => {
     expect(fmtMetric(0, 'int')).toBe('0');
     expect(fmtMetric(3, 'int')).toBe('3');
     expect(fmtMetric(47, 'int')).toBe('47');
-    // Defensive: a fractional count is floored to an integer string.
+    // Defensive: a fractional value is rounded (toFixed(0)) to an integer string.
     expect(fmtMetric(2.7, 'int')).toBe('3');
   });
 

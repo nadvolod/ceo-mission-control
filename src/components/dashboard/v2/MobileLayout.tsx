@@ -567,6 +567,7 @@ function QuickLogGrid({
             // battle name) and label the fields accordingly.
             withNote={editing.metricId === 'moneyMoved' || editing.metricId === 'battles'}
             requireNote={editing.metricId === 'battles'}
+            allowZero={editing.metricId === 'battles'}
             notePlaceholder={editing.metricId === 'battles' ? 'Battle name' : undefined}
             amountPlaceholder={editing.metricId === 'battles' ? '$ won' : undefined}
             onSubmit={(amount, note) => {
