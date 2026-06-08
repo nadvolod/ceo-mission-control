@@ -42,6 +42,7 @@ export interface DashboardData {
   initiatives: Initiative[];
   scorecard: DailyScorecard | null;
   financialData: any;
+  battlesData: any;
   focusData: any;
   monarchData: MonarchFinancialSnapshot | null;
   monarchError: string | null;
@@ -91,6 +92,7 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
   const [initiatives, setInitiatives] = useState<Initiative[]>([]);
   const [scorecard, setScorecard] = useState<DailyScorecard | null>(null);
   const [financialData, setFinancialData] = useState<any>(null);
+  const [battlesData, setBattlesData] = useState<any>(null);
   const [focusData, setFocusData] = useState<any>(null);
   const [monarchData, setMonarchData] = useState<MonarchFinancialSnapshot | null>(null);
   const [monarchError, setMonarchError] = useState<string | null>(null);
@@ -153,6 +155,15 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
             setFinancialData(data);
           }
         } catch (e) { console.error('Error loading financial:', e); }
+      },
+      async () => {
+        try {
+          const res = await fetch(`/api/battles?date=${today}`);
+          if (res.ok) {
+            const data = await res.json();
+            setBattlesData(data);
+          }
+        } catch (e) { console.error('Error loading battles:', e); }
       },
       async () => {
         try {
@@ -525,7 +536,7 @@ export function useDashboardData(): DashboardData & DashboardHandlers {
   }, []);
 
   return {
-    aiTasks, taskStats, initiatives, scorecard, financialData, focusData,
+    aiTasks, taskStats, initiatives, scorecard, financialData, battlesData, focusData,
     monarchData, monarchError, monarchLoading, projectionData, weeklyTrackerData,
     monthlyReviewData, threeToThriveData, hasGarminData, isLoading,
     loadAllData, loadWeeklyTracker, handleCreateTask, handleUpdateTask, handleDeleteTask,

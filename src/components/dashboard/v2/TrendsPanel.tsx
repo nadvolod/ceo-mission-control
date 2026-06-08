@@ -126,11 +126,10 @@ function weekOverWeekDelta(series: number[]): number | undefined {
 
 export function buildOverviewTrendSeries(
   focusDailyTrend: DailyFocusEntry[] | undefined,
-  goals: { temporalWeekly: number; deepWorkWeekly: number; pipelineWeekly: number },
+  goals: { temporalWeekly: number; deepWorkWeekly: number },
 ): TrendSeries[] {
   const focus14 = lastNDays(focusDailyTrend ?? [], 14);
   const temporal = focus14.map((d) => d.byCategory?.Temporal ?? 0);
-  const pipelineHours = focus14.map((d) => d.byCategory?.Revenue ?? 0);
   // Deep work = "Other" + Temporal. Temporal IS deep work, just additionally
   // tagged as the strategic project. Without this, +1h Temporal wouldn't
   // contribute to the Deep Work goal — see useMissionStore for the snapshot
@@ -155,13 +154,6 @@ export function buildOverviewTrendSeries(
       color: MC_COLORS.cyan,
       subText: `${fmtHours(meanOf(deepWork.slice(-7)))} · goal ${goals.deepWorkWeekly}h`,
       deltaPct: weekOverWeekDelta(deepWork),
-    },
-    {
-      label: 'PIPELINE',
-      data: pipelineHours,
-      color: MC_COLORS.amber,
-      subText: `${fmtHours(meanOf(pipelineHours.slice(-7)))} · goal ${goals.pipelineWeekly}h`,
-      deltaPct: weekOverWeekDelta(pipelineHours),
     },
   ];
 }

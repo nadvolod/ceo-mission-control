@@ -143,7 +143,7 @@ describe('<MobileLayout />', () => {
 
   it('snapshot strip renders the 5 expected mini-cards', () => {
     render(<MobileLayout {...defaultProps()} />);
-    for (const id of ['cash', 'netWorth', 'pipeline', 'moneyMoved', 'deepWork']) {
+    for (const id of ['cash', 'netWorth', 'battles', 'moneyMoved', 'deepWork']) {
       expect(screen.getByTestId(`mobile-snapshot-${id}`)).toBeInTheDocument();
     }
   });

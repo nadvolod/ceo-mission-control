@@ -75,6 +75,41 @@ describe('deriveActivity', () => {
     expect(result[2].label).toBe('$2,000');
   });
 
+  it('maps battle entries to "+ Won" rows with the $ value, name, and swords badge', () => {
+    const result = deriveActivity({
+      battles: [
+        { id: 'b1', name: 'Closed Acme renewal', value: 2500, timestamp: '2026-05-27T09:30:00' },
+      ],
+    });
+    expect(result).toHaveLength(1);
+    expect(result[0].kind).toBe('battles');
+    expect(result[0].delta).toBe('+ Won');
+    expect(result[0].label).toBe('$2,500');
+    expect(result[0].meta).toBe('Closed Acme renewal');
+    expect(result[0].icon).toBe('swords');
+    expect(result[0].source).toBe('battle');
+    expect(result[0].refKey).toBe('b1');
+  });
+
+  it('folds legacy Revenue focus sessions into the deepWork kind (pipeline metric removed)', () => {
+    const result = deriveActivity({
+      focus: [
+        { id: 'rev', category: 'Revenue', hours: 1, description: 'old pipeline session', timestamp: '2026-05-27T09:00:00' },
+      ],
+    });
+    expect(result[0].kind).toBe('deepWork');
+  });
+
+  it('drops battle entries whose name matches the e2e prefix', () => {
+    const result = deriveActivity({
+      battles: [
+        { id: 'real', name: 'Won renewal', value: 100, timestamp: '2026-05-27T09:00:00' },
+        { id: 'leak', name: 'e2e-battle-fixture', value: 999, timestamp: '2026-05-27T09:01:00' },
+      ],
+    });
+    expect(result.map((e) => e.id)).toEqual(['real']);
+  });
+
   it('sorts newest-first while preserving insertion order for unparseable times', () => {
     const result = deriveActivity({
       optimistic: [

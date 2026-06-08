@@ -46,9 +46,9 @@ describe('Insights internals', () => {
 });
 
 describe('buildInsightCards', () => {
-  it('returns 4 cards always (Temporal, Deep work, Pipeline, Money moved)', () => {
+  it('returns 3 cards always (Temporal, Deep work, Money moved)', () => {
     const cards = buildInsightCards(7, undefined, undefined);
-    expect(cards.map((c) => c.label)).toEqual(['Temporal', 'Deep work', 'Pipeline', 'Money moved']);
+    expect(cards.map((c) => c.label)).toEqual(['Temporal', 'Deep work', 'Money moved']);
     cards.forEach((c) => {
       expect(c.data).toEqual([]);
       expect(c.total).toBe(0);
@@ -112,12 +112,12 @@ describe('buildInsightCards', () => {
 });
 
 describe('<InsightsTab />', () => {
-  it('renders the 4 insight cards with the default 14d period', () => {
+  it('renders the 3 insight cards with the default 14d period', () => {
     render(<InsightsTab />);
     expect(screen.getByTestId('insights-tab')).toBeInTheDocument();
     expect(screen.getByTestId('insight-card-temporal')).toBeInTheDocument();
     expect(screen.getByTestId('insight-card-deep work')).toBeInTheDocument();
-    expect(screen.getByTestId('insight-card-pipeline')).toBeInTheDocument();
+    expect(screen.queryByTestId('insight-card-pipeline')).not.toBeInTheDocument();
     expect(screen.getByTestId('insight-card-money moved')).toBeInTheDocument();
   });
 

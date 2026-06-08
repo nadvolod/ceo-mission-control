@@ -2,12 +2,12 @@ import { render, screen } from '@testing-library/react';
 import { TrendsPanel, buildOverviewTrendSeries } from '../TrendsPanel';
 
 describe('buildOverviewTrendSeries', () => {
-  const goals = { temporalWeekly: 5, deepWorkWeekly: 10, pipelineWeekly: 3 };
+  const goals = { temporalWeekly: 5, deepWorkWeekly: 10 };
 
-  it('returns 3 series (Temporal / Deep Work / Pipeline) even with empty inputs', () => {
+  it('returns 2 series (Temporal / Deep Work) even with empty inputs', () => {
     const series = buildOverviewTrendSeries(undefined, goals);
-    expect(series).toHaveLength(3);
-    expect(series.map((s) => s.label)).toEqual(['TEMPORAL', 'DEEP WORK', 'PIPELINE']);
+    expect(series).toHaveLength(2);
+    expect(series.map((s) => s.label)).toEqual(['TEMPORAL', 'DEEP WORK']);
     expect(series[0].data).toEqual([]);
     expect(series[0].deltaPct).toBeUndefined(); // can't compute delta with no data
   });
@@ -24,7 +24,6 @@ describe('buildOverviewTrendSeries', () => {
     const series = buildOverviewTrendSeries(focus, goals);
     expect(series[0].data.every((v) => v === 1)).toBe(true);   // Temporal
     expect(series[1].data.every((v) => v === 3)).toBe(true);   // Deep work = Other (2) + Temporal (1)
-    expect(series[2].data.every((v) => v === 0.5)).toBe(true); // Pipeline via Revenue
   });
 
   it('Deep Work falls back to Temporal alone when there are no Other hours', () => {
@@ -72,15 +71,15 @@ describe('<TrendsPanel />', () => {
     expect(screen.getByText(/No trend data/i)).toBeInTheDocument();
   });
 
-  it('renders 3 trend cells when given 3 series, even all-zero', () => {
+  it('renders 2 trend cells when given 2 series, even all-zero', () => {
     const series = buildOverviewTrendSeries(
-      Array.from({ length: 14 }, () => ({ date: 'd', byCategory: { Temporal: 0, Revenue: 0, Other: 0 } })),
-      { temporalWeekly: 5, deepWorkWeekly: 10, pipelineWeekly: 3 },
+      Array.from({ length: 14 }, () => ({ date: 'd', byCategory: { Temporal: 0, Other: 0 } })),
+      { temporalWeekly: 5, deepWorkWeekly: 10 },
     );
     render(<TrendsPanel series={series} />);
     expect(screen.getByTestId('trends-panel')).toBeInTheDocument();
     expect(screen.getByTestId('trend-temporal')).toBeInTheDocument();
     expect(screen.getByTestId('trend-deep work')).toBeInTheDocument();
-    expect(screen.getByTestId('trend-pipeline')).toBeInTheDocument();
+    expect(screen.queryByTestId('trend-pipeline')).not.toBeInTheDocument();
   });
 });

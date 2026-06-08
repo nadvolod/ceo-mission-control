@@ -21,6 +21,13 @@ type FinancialEntryLike = {
   category?: 'moved' | 'generated' | 'cut';
 };
 
+type BattleEntryLike = {
+  id?: string;
+  name?: string;
+  value?: number;
+  timestamp?: string;
+};
+
 function hhmm(iso?: string): string {
   if (!iso) return '--:--';
   const d = new Date(iso);
@@ -39,7 +46,9 @@ function parseTimestampMs(iso?: string): number {
 
 function metricForCategory(category?: string): MetricId {
   if (category === 'Temporal') return 'temporal';
-  if (category === 'Revenue') return 'pipeline';
+  // The v2 "Pipeline" metric (focus category "Revenue") was removed. Legacy
+  // Revenue focus sessions still exist in stored data, so fold them into the
+  // Deep work bucket for activity-feed display rather than dropping the rows.
   return 'deepWork';
 }
 
@@ -87,6 +96,22 @@ function financialToActivity(e: FinancialEntryLike): ActivityEntry {
     meta: e.description?.slice(0, 70) || '—',
     source: 'money',
     refKey: e.id ?? `fin-${e.timestamp ?? ''}`,
+  };
+}
+
+function battleToActivity(b: BattleEntryLike): ActivityEntry {
+  const value = b.value ?? 0;
+  return {
+    id: b.id ?? `battle-${b.timestamp ?? Math.random()}`,
+    t: hhmm(b.timestamp),
+    tsMs: parseTimestampMs(b.timestamp),
+    kind: 'battles',
+    delta: '+ Won',
+    label: `$${value.toLocaleString()}`,
+    meta: b.name?.slice(0, 70) || '—',
+    icon: 'swords',
+    source: 'battle',
+    refKey: b.id ?? `battle-${b.timestamp ?? ''}`,
   };
 }
 
@@ -154,18 +179,20 @@ export function reflectionToActivity(entry: ThreeToThriveEntry): ActivityEntry {
 export function deriveActivity(opts: {
   focus?: FocusSessionLike[];
   financial?: FinancialEntryLike[];
+  battles?: BattleEntryLike[];
   morning?: DailyHealthNote[];
   reflection?: ThreeToThriveEntry[];
   optimistic?: ActivityEntry[];
   limit?: number;
 }): ActivityEntry[] {
-  const { focus = [], financial = [], morning = [], reflection = [], optimistic = [], limit = 25 } = opts;
+  const { focus = [], financial = [], battles = [], morning = [], reflection = [], optimistic = [], limit = 25 } = opts;
   // Drop e2e-test-authored rows before mapping. Belt-and-suspenders for
   // when stale rows survive in the DB despite global-setup wiping the
   // test user; the rule is documented in docs/dashboard-v2-architecture.md
   // under R5 ("derive.ts filters e2e-authored rows from the activity feed").
   const liveFocus = focus.filter((s) => !isE2EDescription(s.description));
   const liveFinancial = financial.filter((e) => !isE2EDescription(e.description));
+  const liveBattles = battles.filter((b) => !isE2EDescription(b.name));
   const liveMorning = morning.filter((n) => !isE2EDescription(n.freeformNote));
   const liveReflection = reflection.filter(
     (e) => !e.answers.some((a) => isE2EDescription(a.answer)),
@@ -174,6 +201,7 @@ export function deriveActivity(opts: {
     ...optimistic,
     ...liveFocus.map(focusToActivity),
     ...liveFinancial.map(financialToActivity),
+    ...liveBattles.map(battleToActivity),
     ...liveMorning.map(morningToActivity),
     ...liveReflection.map(reflectionToActivity),
   ];

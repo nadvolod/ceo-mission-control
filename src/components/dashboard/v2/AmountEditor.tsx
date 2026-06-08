@@ -25,6 +25,11 @@ type AmountEditorProps = {
   withNote?: boolean;
   // Placeholder shown in the note input. Defaults to "Note".
   notePlaceholder?: string;
+  // When true (and withNote), the note becomes REQUIRED: submit is blocked
+  // until it's non-empty. Used by battles, where the battle name is mandatory.
+  requireNote?: boolean;
+  // Placeholder shown in the amount input. Defaults to "$".
+  amountPlaceholder?: string;
 };
 
 // Inline category + amount [+ optional note] + save/cancel form. Used by:
@@ -41,10 +46,13 @@ export function AmountEditor({
   idPrefix = 'amount',
   withNote = false,
   notePlaceholder = 'Note (e.g. Benepass)',
+  requireNote = false,
+  amountPlaceholder = '$',
 }: AmountEditorProps) {
   const [value, setValue] = useState('');
   const [note, setNote] = useState('');
   const amountRef = useRef<HTMLInputElement>(null);
+  const noteRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const id = requestAnimationFrame(() => amountRef.current?.focus());
@@ -68,10 +76,16 @@ export function AmountEditor({
       return;
     }
     const trimmedNote = note.trim();
+    // When the note is required (battles), block submit until it's filled.
+    if (requireNote && trimmedNote.length === 0) {
+      noteRef.current?.focus();
+      return;
+    }
     onSubmit(amount, trimmedNote.length > 0 ? trimmedNote : undefined);
   };
 
-  const disabled = value.trim().length === 0;
+  const disabled =
+    value.trim().length === 0 || (requireNote && note.trim().length === 0);
 
   return (
     <div
@@ -108,7 +122,7 @@ export function AmountEditor({
             onCancel();
           }
         }}
-        placeholder="$"
+        placeholder={amountPlaceholder}
         aria-label={`${label} amount`}
         className="font-numerics rounded-md"
         style={{
@@ -127,6 +141,7 @@ export function AmountEditor({
       />
       {withNote && (
         <input
+          ref={noteRef}
           type="text"
           value={note}
           onChange={(e) => setNote(e.target.value)}

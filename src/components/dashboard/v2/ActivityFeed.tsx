@@ -1,6 +1,13 @@
 'use client';
 
-import type { ActivityEntry } from './types';
+import { Swords } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import type { ActivityEntry, MetricIcon } from './types';
+
+// Presentational badge icons keyed by an activity row's `icon` field.
+const ROW_ICONS: Record<MetricIcon, LucideIcon> = {
+  swords: Swords,
+};
 
 export function ActivityFeed({
   entries,
@@ -74,6 +81,7 @@ function ActivityRow({
   onOpenDetail?: (entry: ActivityEntry) => void;
 }) {
   const isPositive = entry.delta.startsWith('+');
+  const RowIcon = entry.icon ? ROW_ICONS[entry.icon] : null;
   // Only make the row interactive when it can actually resolve to a detail
   // view. Optimistic/local store entries have no `source`/`refKey`, so the
   // page's openDetail early-returns for them — gating on `entry.source`
@@ -115,6 +123,14 @@ function ActivityRow({
       </span>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-1.5">
+          {RowIcon && (
+            <RowIcon
+              size={11}
+              aria-hidden
+              style={{ color: 'var(--color-mc-amber)', alignSelf: 'center' }}
+              data-testid={`activity-row-icon-${entry.id}`}
+            />
+          )}
           <span
             className="font-numerics"
             style={{

@@ -8,7 +8,8 @@ export type ActivityDetail =
   | { source: 'morning'; title: string; note: DailyHealthNote | null }
   | { source: 'reflection'; title: string; entry: ThreeToThriveEntry | null }
   | { source: 'money'; title: string; amount: number; category: string; note: string; when: string }
-  | { source: 'focus'; title: string; category: string; hours: number; description: string; when: string };
+  | { source: 'focus'; title: string; category: string; hours: number; description: string; when: string }
+  | { source: 'battle'; title: string; value: number; name: string; when: string };
 
 function fmtDuration(min: number | null | undefined): string {
   if (min == null || !Number.isFinite(min) || min <= 0) return '—';
@@ -79,6 +80,15 @@ function Body({ detail }: { detail: ActivityDetail }) {
         <Row label="Category" value={detail.category} />
         <Row label="When" value={detail.when} />
         {detail.note && <p style={{ marginTop: 12, fontSize: 13 }}>{detail.note}</p>}
+      </div>
+    );
+  }
+  if (detail.source === 'battle') {
+    return (
+      <div>
+        <Row label="Value won" value={`$${detail.value.toLocaleString()}`} />
+        <Row label="Battle" value={detail.name || '—'} />
+        <Row label="When" value={detail.when} />
       </div>
     );
   }
