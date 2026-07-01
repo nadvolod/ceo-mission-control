@@ -1,5 +1,6 @@
 'use client';
 
+import { MonthlyReviewTracker } from '@/components/MonthlyReviewTracker';
 import { Sparkline } from './primitives/Sparkline';
 import { MC_COLORS } from './palette';
 import type { MonthlyReview, MonthlyReviewRatings } from '@/lib/types';
@@ -10,15 +11,19 @@ type Props = {
   currentMonthReview: MonthlyReview | null;
   recentReviews: MonthlyReview[];
   ratingsTrend: RatingsTrendEntry[];
+  onSubmitReview?: (review: Omit<MonthlyReview, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
+  onDeleteReview?: (month: string) => Promise<void>;
 };
 
-// Review body. Renders the current-month status, a 5-rating trend strip,
-// and a compact list of recent monthly reviews. Read-only — full review
-// editing stays in /dashboard for now (calls back to the same data).
-
-export function ReviewTab({ currentMonthReview, recentReviews, ratingsTrend }: Props) {
+export function ReviewTab({
+  currentMonthReview,
+  recentReviews,
+  ratingsTrend,
+  onSubmitReview,
+  onDeleteReview,
+}: Props) {
   const noData = !currentMonthReview && recentReviews.length === 0 && ratingsTrend.length === 0;
-  if (noData) {
+  if (noData && (!onSubmitReview || !onDeleteReview)) {
     return (
       <div
         className="rounded-xl"
@@ -32,13 +37,22 @@ export function ReviewTab({ currentMonthReview, recentReviews, ratingsTrend }: P
         }}
         data-testid="review-tab-empty"
       >
-        No monthly reviews yet. Submit one from the legacy dashboard — it&apos;ll surface here.
+        No monthly reviews yet.
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-4" data-testid="review-tab">
+      {onSubmitReview && onDeleteReview && (
+        <MonthlyReviewTracker
+          currentMonthReview={currentMonthReview}
+          recentReviews={recentReviews}
+          ratingsTrend={ratingsTrend}
+          onSubmitReview={onSubmitReview}
+          onDeleteReview={onDeleteReview}
+        />
+      )}
       <CurrentMonthCard review={currentMonthReview} />
       <RatingsTrend trend={ratingsTrend} />
       <RecentReviewsList reviews={recentReviews} />
