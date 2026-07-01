@@ -59,9 +59,16 @@ test.describe('Auth flows (authenticated as test user)', () => {
   });
 
   test('test user weekly tracker starts empty on a fresh run', async ({ request }) => {
-    // global-setup wipes the test user's rows before each run, so this
-    // should return an empty payload — anything else means we are reading
-    // someone else's data (defense in depth check).
+    // Other E2E specs use the same real test user and may have already
+    // logged today's row by the time this file runs. Clean this assertion's
+    // own row first so it proves user isolation without depending on spec
+    // order.
+    const today = new Date().toISOString().slice(0, 10);
+    const cleanup = await request.post('/api/weekly-tracker', {
+      data: { action: 'deleteDay', date: today },
+    });
+    expect(cleanup.status()).toBe(200);
+
     const res = await request.get('/api/weekly-tracker');
     expect(res.status()).toBe(200);
     const body = await res.json();
