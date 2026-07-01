@@ -79,6 +79,154 @@ jobs:
 
       - run: npx tsc --noEmit
 
+  graph-ui-test-policy:
+    name: Graph UI Test Policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require component + desktop/mobile Playwright visual tests for graph UI changes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+          fi
+
+          if [ -z "$base" ] || [[ "$base" =~ ^0+$ ]]; then
+            base="$(git rev-parse "$head^")"
+          fi
+
+          changed="$(git diff --name-only "$base" "$head")"
+          echo "$changed" > changed-files.txt
+
+          graph_changes="$(grep -Ei '(^src/.*/[^/]*(chart|graph|sparkline|trend|trends|visualization)[^/]*\.(ts|tsx|js|jsx)$)' changed-files.txt | grep -Evi '(^src/.*/__tests__/|[./][^/]+\.(test|spec)\.(ts|tsx|js|jsx)$)' || true)"
+
+          if [ -z "$graph_changes" ]; then
+            echo "No graph UI visualization source changes detected."
+            exit 0
+          fi
+
+          component_tests="$(grep -Ei '(^src/.*/(__tests__/.*|[^/]+\.(test|spec))\.(ts|tsx|js|jsx)$)' changed-files.txt || true)"
+          playwright_tests="$(grep -Ei '(^tests/e2e/.*\.(spec|test)\.ts$)' changed-files.txt || true)"
+          graph_baselines="$(grep -Ei '(^tests/e2e/.*-snapshots/.*\.(png|jpg|jpeg|webp)$|^tests/e2e/.*(snapshot|baseline|visual).*\.(png|jpg|jpeg|webp)$)' changed-files.txt || true)"
+
+          missing=()
+          if [ -z "$component_tests" ]; then
+            missing+=("component test under src/**/__tests__ or src/**/*.{test,spec}.{ts,tsx,js,jsx}")
+          fi
+          if [ -z "$playwright_tests" ]; then
+            missing+=("two Playwright visual tests under tests/e2e/**/*.spec.ts: one desktop resolution and one iPhone/mobile resolution")
+          else
+            playwright_diff="$(git diff --unified=0 "$base" "$head" -- $playwright_tests || true)"
+            if ! grep -Eiq '^\+.*Graph visual.*desktop' <<< "$playwright_diff"; then
+              missing+=("added Playwright graph visual test for a desktop resolution")
+            fi
+            if ! grep -Eiq '^\+.*Graph visual.*(iPhone|mobile)' <<< "$playwright_diff"; then
+              missing+=("added Playwright graph visual test for an iPhone/mobile resolution")
+            fi
+            if ! grep -Eiq '^\+.*toHaveScreenshot\(' <<< "$playwright_diff"; then
+              missing+=("Playwright graph visual tests must use toHaveScreenshot(...) snapshot assertions")
+            fi
+          fi
+          if [ -z "$graph_baselines" ]; then
+            missing+=("committed Playwright PNG screenshot baselines for the graph visual tests")
+          fi
+
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Graph UI visualization files changed without required test coverage."
+            echo "Graph UI changes detected:"
+            echo "$graph_changes"
+            echo
+            echo "Missing:"
+            printf -- '- %s\n' "${missing[@]}"
+            echo
+            echo "AGENTS.md requires graph/chart/sparkline/trend UI changes to include component tests plus two Playwright screenshot snapshot tests: desktop and iPhone/mobile."
+            exit 1
+          fi
+
+          echo "Graph UI visualization changes include component and Playwright visual test updates."
+
+  page-visual-baseline-policy:
+    name: Page Visual Baseline Policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Require desktop + mobile visual baselines for page changes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            base="${{ github.event.pull_request.base.sha }}"
+            head="${{ github.event.pull_request.head.sha }}"
+          else
+            base="${{ github.event.before }}"
+            head="${{ github.sha }}"
+          fi
+
+          if [ -z "$base" ] || [[ "$base" =~ ^0+$ ]]; then
+            base="$(git rev-parse "$head^")"
+          fi
+
+          changed="$(git diff --name-only "$base" "$head")"
+          echo "$changed" > changed-files.txt
+
+          page_changes="$(grep -Ei '(^src/app/.*/page\.(ts|tsx|js|jsx)$|^src/app/page\.(ts|tsx|js|jsx)$)' changed-files.txt || true)"
+
+          if [ -z "$page_changes" ]; then
+            echo "No page source changes detected."
+            exit 0
+          fi
+
+          visual_tests="$(grep -Ei '(^tests/e2e/.*(visual|baseline).*\.(spec|test)\.ts$)' changed-files.txt || true)"
+          visual_baselines="$(grep -Ei '(^tests/e2e/.*(snapshot|baseline|visual).*\.(png|jpg|jpeg|webp)$|^tests/e2e/.*-snapshots/.*\.(png|jpg|jpeg|webp)$)' changed-files.txt || true)"
+
+          missing=()
+          if [ -z "$visual_tests" ]; then
+            missing+=("Playwright page visual/baseline spec under tests/e2e/**")
+          fi
+          if [ -z "$visual_baselines" ]; then
+            missing+=("committed desktop and iPhone/mobile visual baseline image snapshots")
+          fi
+
+          if [ -n "$visual_tests" ]; then
+            visual_diff="$(git diff --unified=0 "$base" "$head" -- $visual_tests || true)"
+            if ! grep -Eiq '^\+.*(desktop|1440|1280)' <<< "$visual_diff"; then
+              missing+=("added/updated desktop page visual baseline test")
+            fi
+            if ! grep -Eiq '^\+.*(iPhone|mobile|390|375)' <<< "$visual_diff"; then
+              missing+=("added/updated iPhone/mobile page visual baseline test")
+            fi
+            if ! grep -Eiq '^\+.*toHaveScreenshot\(' <<< "$visual_diff"; then
+              missing+=("page visual baseline tests must use toHaveScreenshot(...) snapshot assertions")
+            fi
+          fi
+
+          if [ ${#missing[@]} -gt 0 ]; then
+            echo "::error::Page files changed without required visual baseline coverage."
+            echo "Page changes detected:"
+            echo "$page_changes"
+            echo
+            echo "Missing:"
+            printf -- '- %s\n' "${missing[@]}"
+            echo
+            echo "AGENTS.md requires every page to have desktop and iPhone/mobile Playwright visual baselines, and page changes must update the correct baseline snapshots."
+            exit 1
+          fi
+
+          echo "Page changes include desktop and iPhone/mobile visual baseline updates."
+
   test:
     name: Test & Coverage
     runs-on: ubuntu-latest

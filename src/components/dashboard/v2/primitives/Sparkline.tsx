@@ -45,10 +45,9 @@ export function Sparkline({
       viewBox={`0 0 ${width} ${height}`}
       preserveAspectRatio="none"
       // Stretch to fill the parent container. The `width` attribute and
-      // viewBox define the COORDINATE space; the CSS width here makes the
-      // SVG element itself shrink/grow with the layout. Without this, fixed
-      // pixel widths could overflow narrow cells (caught by Copilot).
-      style={{ width: '100%', maxWidth: width, display: 'block' }}
+      // viewBox define the coordinate space; CSS width lets the SVG shrink
+      // and grow with the trend cell so labels and lines stay aligned.
+      style={{ width: '100%', display: 'block' }}
       aria-hidden
     >
       {fill && (

@@ -24,6 +24,8 @@ jobs:
               { pattern: /Was evidence included/, label: 'Was evidence included (screenshot, recording, or CLI output)?' },
               { pattern: /Was an architectural review completed/, label: 'Was an architectural review completed (areas of weakness identified)?' },
               { pattern: /Were edge cases identified and tested\?/, label: 'Were edge cases identified and tested?' },
+              { pattern: /Were graph UI visualization changes covered by component tests and two Playwright visual tests/, label: 'Were graph UI visualization changes covered by component tests and two Playwright visual tests (desktop + iPhone/mobile, or marked N/A)?' },
+              { pattern: /Were page visual baselines updated and checked with Playwright at desktop and iPhone\/mobile sizes/, label: 'Were page visual baselines updated and checked with Playwright at desktop and iPhone/mobile sizes (or marked N/A)?' },
               { pattern: /Was monitoring and logging addressed\?/, label: 'Was monitoring and logging addressed?' },
             ];
 

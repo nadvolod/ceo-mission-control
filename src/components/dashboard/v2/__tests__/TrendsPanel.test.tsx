@@ -82,4 +82,31 @@ describe('<TrendsPanel />', () => {
     expect(screen.getByTestId('trend-deep work')).toBeInTheDocument();
     expect(screen.queryByTestId('trend-pipeline')).not.toBeInTheDocument();
   });
+
+  it('uses responsive trend columns instead of leaving a fixed empty third slot', () => {
+    const series = buildOverviewTrendSeries(
+      Array.from({ length: 14 }, () => ({ date: 'd', byCategory: { Temporal: 1, Other: 1 } })),
+      { temporalWeekly: 5, deepWorkWeekly: 10 },
+    );
+    render(<TrendsPanel series={series} />);
+
+    expect(screen.getByTestId('trends-panel')).toHaveStyle({
+      gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
+    });
+  });
+
+  it('lets non-empty sparklines fill their trend cell width', () => {
+    const series = buildOverviewTrendSeries(
+      Array.from({ length: 14 }, (_, i) => ({
+        date: `2026-05-${String(i + 1).padStart(2, '0')}`,
+        byCategory: { Temporal: i % 4, Other: 1 },
+      })),
+      { temporalWeekly: 5, deepWorkWeekly: 10 },
+    );
+    render(<TrendsPanel series={series} />);
+
+    const temporalSparkline = screen.getByTestId('trend-temporal').querySelector('svg');
+    expect(temporalSparkline).toHaveStyle({ width: '100%' });
+    expect(temporalSparkline).not.toHaveStyle({ maxWidth: '260px' });
+  });
 });
