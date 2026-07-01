@@ -259,23 +259,48 @@ describe('Dashboard Page - Phase 1: Component removal & reorder', () => {
       ...baseDashboardData,
       monarchData: {
         cashPosition: 10000,
+        cashMoMDelta: 19440,
+        cashMoMPct: 75.2,
+        cashMoMLabel: 'last month',
         netWorth: 150000,
         totalAssets: 200000,
         totalLiabilities: 50000,
         runwayMonths: 18,
-        // currentNet = +2000 → previousCashPosition = 8000 → growth = +25.0%
         monthlyIncome: 5000,
         monthlyExpenses: 3000,
       },
     } as any);
     render(<HomePage />);
-    // Compact formatting: $10K, $150K, $50K, +25.0%, 6.5h, $1.2K
+    // Compact formatting: $10K, $150K, $50K, +75.2%, 6.5h, $1.2K
     expect(screen.getByTestId('metric-cash')).toHaveTextContent('$10.0K');
-    expect(screen.getByTestId('metric-cash-mom')).toHaveTextContent('+25.0%');
+    expect(screen.getByTestId('metric-cash-mom')).toHaveTextContent('+75.2%');
+    expect(screen.getByTestId('metric-cash-mom')).toHaveTextContent('+$19.4K last month');
     expect(screen.getByTestId('metric-net-worth')).toHaveTextContent('$150.0K');
     expect(screen.getByTestId('metric-total-debt')).toHaveTextContent('$50.0K');
     expect(screen.getByTestId('metric-temporal')).toHaveTextContent('6.5h');
     expect(screen.getByTestId('metric-money-moved')).toHaveTextContent('$1.2K');
+  });
+
+  it('does not re-normalize already-percent Cash MoM values from Monarch snapshots', () => {
+    mockUseDashboardData.mockReturnValue({
+      ...baseDashboardData,
+      monarchData: {
+        cashPosition: 10000,
+        cashMoMDelta: 104,
+        cashMoMPct: 0.4,
+        cashMoMLabel: 'last month',
+        netWorth: 150000,
+        totalAssets: 200000,
+        totalLiabilities: 50000,
+        runwayMonths: 18,
+        monthlyIncome: 5000,
+        monthlyExpenses: 3000,
+      },
+    } as any);
+    render(<HomePage />);
+
+    expect(screen.getByTestId('metric-cash-mom')).toHaveTextContent('+0.4%');
+    expect(screen.getByTestId('metric-cash-mom')).not.toHaveTextContent('+40.0%');
   });
 
   it('renders cash growth dash when previous cash balance was 0 and current net is non-zero', () => {

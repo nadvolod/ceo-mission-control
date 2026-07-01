@@ -78,63 +78,37 @@ describe('formatRunway', () => {
 });
 
 describe('computeCashGrowthMoM', () => {
-  // Args: (cashPosition, monthlyIncome, monthlyExpenses).
-  // Internally derives previousCashPosition = cashPosition − (income − expenses)
-  // and reports the % change in account balance over the current month, to
-  // match Monarch's "1 month" view.
+  // Args: (monthlyIncome, monthlyExpenses, optional savingsRate).
+  // Reports Monarch cashflow growth percent. savingsRate may arrive as a
+  // ratio (0.752) or already-normalized percent (75.2).
 
-  it('returns 0 when current net is 0 and balance is non-zero (flat month)', () => {
-    expect(computeCashGrowthMoM(10_000, 0, 0)).toBe(0);
+  it('returns 0 when income and expenses are both 0', () => {
+    expect(computeCashGrowthMoM(0, 0)).toBe(0);
   });
 
-  it('returns 0 when cashPosition and current net are both 0', () => {
-    expect(computeCashGrowthMoM(0, 0, 0)).toBe(0);
+  it('normalizes Monarch savingsRate ratios to percent', () => {
+    expect(computeCashGrowthMoM(25_851, 6_411, 0.752)).toBeCloseTo(75.2);
   });
 
-  it('returns null when derived previous balance is 0 and current net is positive', () => {
+  it('passes through Monarch savingsRate values that are already percent', () => {
+    expect(computeCashGrowthMoM(25_851, 6_411, 75.2)).toBeCloseTo(75.2);
+  });
+
+  it('returns null when income is 0 and expenses are non-zero', () => {
     const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    // cashPosition=5000, currentNet=5000 → previousCashPosition=0
-    expect(computeCashGrowthMoM(5000, 5000, 0)).toBeNull();
+    expect(computeCashGrowthMoM(0, 2000)).toBeNull();
     expect(warnSpy).toHaveBeenCalledTimes(1);
     warnSpy.mockRestore();
   });
 
-  it('returns null when derived previous balance is 0 and current net is negative', () => {
-    const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
-    // cashPosition=-2000, currentNet=-2000 → previousCashPosition=0
-    expect(computeCashGrowthMoM(-2000, 0, 2000)).toBeNull();
-    expect(warnSpy).toHaveBeenCalledTimes(1);
-    warnSpy.mockRestore();
+  it('falls back to net cashflow divided by income when savingsRate is absent', () => {
+    expect(computeCashGrowthMoM(10_000, 2_480)).toBeCloseTo(75.2);
   });
 
-  it('computes +10% when cash grew by 10% of the starting balance', () => {
-    // Start of month: 10,000. Net for month: +1,000. End: 11,000.
-    expect(computeCashGrowthMoM(11_000, 1_000, 0)).toBeCloseTo(10);
-  });
-
-  it('computes negative growth when this month is a burn', () => {
-    // Start: 10,000. Net: -1,000. End: 9,000. Growth: -10%.
-    expect(computeCashGrowthMoM(9_000, 0, 1_000)).toBeCloseTo(-10);
-  });
-
-  it('handles a recovery month while still in debt (negative starting balance)', () => {
-    // Start: -5,000. Net: +2,000. End: -3,000. (2000 / 5000) * 100 = +40%.
-    expect(computeCashGrowthMoM(-3_000, 2_000, 0)).toBeCloseTo(40);
-  });
-
-  it('handles a deeper-debt month (negative starting balance, more burn)', () => {
-    // Start: -5,000. Net: -1,000. End: -6,000. (-1000 / 5000) * 100 = -20%.
-    expect(computeCashGrowthMoM(-6_000, 0, 1_000)).toBeCloseTo(-20);
-  });
-
-  it('matches the Monarch worked example (≈15.9%) from the original bug report', () => {
-    // Reported example: Monarch shows ~+15.9% MoM cash growth. With a starting
-    // balance of ~$50,000 and a net for the month of ~+$7,950, the formula
-    // should report ≈+15.9%, not the spurious −211.9% the old MoM-of-net
-    // formula produced.
-    const result = computeCashGrowthMoM(57_950, 7_950, 0);
+  it('matches the Monarch worked example: $19,440 growth at 75.2%', () => {
+    const result = computeCashGrowthMoM(25_851, 6_411, 0.752);
     expect(result).not.toBeNull();
-    expect(result!).toBeCloseTo(15.9, 1);
+    expect(result!).toBeCloseTo(75.2, 1);
   });
 });
 
@@ -142,8 +116,12 @@ describe('computeCashMoMDelta', () => {
   // Args: (monthlyIncome, monthlyExpenses). Returns the dollar change in cash
   // position for the month (i.e. income − expenses).
 
-  it('returns positive delta for a profitable month', () => {
+  it('returns positive delta for a profitable month when savings is absent', () => {
     expect(computeCashMoMDelta(5_000, 3_000)).toBe(2_000);
+  });
+
+  it('uses Monarch savings when provided', () => {
+    expect(computeCashMoMDelta(25_851, 6_411, 19_440)).toBe(19_440);
   });
 
   it('returns negative delta for a burn month', () => {

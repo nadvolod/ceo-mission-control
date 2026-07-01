@@ -162,6 +162,9 @@ export interface MonarchCashflowSummary {
 export interface MonarchFinancialSnapshot {
   accounts: MonarchAccount[];
   cashPosition: number;
+  cashMoMDelta?: number;
+  cashMoMPct?: number | null;
+  cashMoMLabel?: string;
   totalAssets: number;
   totalLiabilities: number;
   netWorth: number;

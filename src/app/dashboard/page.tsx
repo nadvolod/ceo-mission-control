@@ -103,16 +103,9 @@ export default function MissionControlV2Page() {
   // Derive chips.
   const chips = useMemo(() => {
     const streak = consecutiveStreak(weeklyTrackerData);
-    const cashMoM =
-      monarchData && monarchData.previousMonthIncome && monarchData.previousMonthIncome > 0
-        ? ((monarchData.monthlyIncome - monarchData.previousMonthIncome) /
-            monarchData.previousMonthIncome) *
-          100
-        : null;
     return deriveChips({
       streakDays: streak,
       monarchSyncedAt: monarchData?.lastSynced ?? null,
-      cashMoMPct: cashMoM,
       deepWorkPace: 'flat',
     });
   }, [weeklyTrackerData, monarchData]);

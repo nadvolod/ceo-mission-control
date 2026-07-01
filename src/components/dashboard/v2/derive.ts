@@ -257,10 +257,9 @@ export function consecutiveStreak(weekly: WeeklyTrackerLike | null | undefined):
 export function deriveChips(opts: {
   streakDays: number;
   monarchSyncedAt?: string | null;
-  cashMoMPct?: number | null;
   deepWorkPace?: 'up' | 'down' | 'flat';
 }): Chip[] {
-  const { streakDays, monarchSyncedAt, cashMoMPct, deepWorkPace } = opts;
+  const { streakDays, monarchSyncedAt, deepWorkPace } = opts;
   const chips: Chip[] = [];
 
   if (streakDays >= 3) {
@@ -270,23 +269,6 @@ export function deriveChips(opts: {
       icon: 'flame',
       body: `${streakDays}-day work streak`,
       meta: 'consecutive days',
-    });
-  }
-
-  if (typeof cashMoMPct === 'number' && cashMoMPct > 5) {
-    chips.push({
-      id: 'cashmom',
-      kind: 'positive',
-      icon: 'arrow-up',
-      body: 'Cash MoM',
-      emphasis: `${cashMoMPct > 0 ? '+' : ''}${cashMoMPct.toFixed(0)}%`,
-    });
-  } else if (typeof cashMoMPct === 'number' && cashMoMPct < -5) {
-    chips.push({
-      id: 'cashmom-down',
-      kind: 'warning',
-      icon: 'zap',
-      body: `Cash MoM ${cashMoMPct.toFixed(0)}%`,
     });
   }
 
@@ -310,7 +292,7 @@ export function deriveChips(opts: {
     chips.push({
       id: 'sync',
       kind: 'sync',
-      body: `SYNC · monarch · ${human}`,
+      body: `Monarch ${human}`,
     });
   }
 

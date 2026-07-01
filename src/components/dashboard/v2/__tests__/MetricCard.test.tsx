@@ -34,6 +34,22 @@ describe('MetricCard', () => {
     expect(screen.getByText('TODAY')).toBeInTheDocument();
   });
 
+  it('renders Cash MoM as a trend inside the Cash tile', () => {
+    const metric = {
+      ...SEED_METRICS.cash,
+      today: 45_291,
+      trend: {
+        value: '+$19.4K · +75.2%',
+        label: 'Jun 2026',
+        tone: 'positive' as const,
+      },
+    };
+    render(<MetricCard metric={metric} />);
+
+    expect(screen.getByTestId('metric-card-cash-trend')).toHaveTextContent('+$19.4K · +75.2%');
+    expect(screen.getByTestId('metric-card-cash-trend')).toHaveTextContent('Jun 2026');
+  });
+
   it('falls back to the note when there is no spark and no goal progress', () => {
     const metric = {
       ...SEED_METRICS.debt,
