@@ -231,6 +231,8 @@ export default function MissionControlV2Page() {
           currentMonthReview: monthlyReviewData?.currentMonthReview ?? null,
           recentReviews: monthlyReviewData?.recentReviews ?? [],
           ratingsTrend: monthlyReviewData?.ratingsTrend ?? [],
+          onSubmitReview: store.submitMonthlyReview,
+          onDeleteReview: store.deleteMonthlyReview,
         }}
       />
     </div>
@@ -529,6 +531,8 @@ export default function MissionControlV2Page() {
             currentMonthReview={monthlyReviewData?.currentMonthReview ?? null}
             recentReviews={monthlyReviewData?.recentReviews ?? []}
             ratingsTrend={monthlyReviewData?.ratingsTrend ?? []}
+            onSubmitReview={store.submitMonthlyReview}
+            onDeleteReview={store.deleteMonthlyReview}
           />
         )}
 

@@ -454,6 +454,8 @@ export function useMissionStore() {
     threeToThrive: threeToThriveData,
     monthlyReviewData,
     saveThreeToThriveAnswer: dashboard.handleSaveThreeToThriveAnswer,
+    submitMonthlyReview: dashboard.handleSubmitMonthlyReview,
+    deleteMonthlyReview: dashboard.handleDeleteMonthlyReview,
     isLoading: dashboard.isLoading,
     log,
     refresh,

@@ -39,6 +39,8 @@ type Props = {
     currentMonthReview: React.ComponentProps<typeof ReviewTab>['currentMonthReview'];
     recentReviews: React.ComponentProps<typeof ReviewTab>['recentReviews'];
     ratingsTrend: React.ComponentProps<typeof ReviewTab>['ratingsTrend'];
+    onSubmitReview?: React.ComponentProps<typeof ReviewTab>['onSubmitReview'];
+    onDeleteReview?: React.ComponentProps<typeof ReviewTab>['onDeleteReview'];
   };
 };
 
@@ -114,6 +116,8 @@ export function MobileLayout({
               currentMonthReview={reviewData?.currentMonthReview ?? null}
               recentReviews={reviewData?.recentReviews ?? []}
               ratingsTrend={reviewData?.ratingsTrend ?? []}
+              onSubmitReview={reviewData?.onSubmitReview}
+              onDeleteReview={reviewData?.onDeleteReview}
             />
           </div>
         )}
