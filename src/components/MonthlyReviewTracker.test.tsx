@@ -57,6 +57,23 @@ describe('MonthlyReviewTracker', () => {
     jest.useRealTimers();
   });
 
+  it('uses dark form-control text on the light monthly review background', () => {
+    render(
+      <MonthlyReviewTracker
+        currentMonthReview={null}
+        recentReviews={[]}
+        ratingsTrend={[]}
+        onSubmitReview={jest.fn()}
+        onDeleteReview={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId('monthly-review-month-input')).toHaveClass('text-gray-900');
+    expect(screen.getByLabelText('Hours worked')).toHaveClass('text-gray-900');
+    expect(screen.getByLabelText('Temporal hours')).toHaveClass('text-gray-900');
+    expect(screen.getByLabelText('Where did my time actually go?')).toHaveClass('text-gray-900');
+  });
+
   it('restores the default previous-month review when canceling an older edit during month start', async () => {
     jest.useFakeTimers();
     jest.setSystemTime(new Date(2026, 6, 1, 9));

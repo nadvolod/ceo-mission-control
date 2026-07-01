@@ -34,6 +34,9 @@ const TABS: Array<{ id: TabId; label: string }> = [
   { id: 'trends', label: 'Trends' },
 ];
 
+const FORM_CONTROL_CLASS =
+  'border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500';
+
 // ---------------------------------------------------------------------------
 // Helper functions
 // ---------------------------------------------------------------------------
@@ -303,7 +306,7 @@ export function MonthlyReviewTracker({
                 type="month"
                 value={month}
                 onChange={e => setMonth(e.target.value)}
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className={`w-full ${FORM_CONTROL_CLASS}`}
                 required
               />
             </div>
@@ -324,7 +327,7 @@ export function MonthlyReviewTracker({
                       step={0.5}
                       value={hoursWorked}
                       onChange={e => setHoursWorked(e.target.value)}
-                      className="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className={`w-24 ${FORM_CONTROL_CLASS}`}
                       required
                     />
                   </div>
@@ -339,7 +342,7 @@ export function MonthlyReviewTracker({
                       step={0.5}
                       value={temporalHours}
                       onChange={e => setTemporalHours(e.target.value)}
-                      className="w-24 border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className={`w-24 ${FORM_CONTROL_CLASS}`}
                       required
                     />
                   </div>
@@ -353,7 +356,7 @@ export function MonthlyReviewTracker({
                     rows={2}
                     value={timeAllocation}
                     onChange={e => setTimeAllocation(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className={`w-full ${FORM_CONTROL_CLASS}`}
                   />
                 </div>
               </div>
@@ -372,7 +375,7 @@ export function MonthlyReviewTracker({
                     rows={2}
                     value={energyGivers}
                     onChange={e => setEnergyGivers(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className={`w-full ${FORM_CONTROL_CLASS}`}
                   />
                 </div>
                 <div>
@@ -384,7 +387,7 @@ export function MonthlyReviewTracker({
                     rows={2}
                     value={energyDrainers}
                     onChange={e => setEnergyDrainers(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className={`w-full ${FORM_CONTROL_CLASS}`}
                   />
                 </div>
               </div>
@@ -401,7 +404,7 @@ export function MonthlyReviewTracker({
                 value={ignoredSignals}
                 onChange={e => setIgnoredSignals(e.target.value)}
                 placeholder="Where did I ignore chronic signals?"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className={`w-full ${FORM_CONTROL_CLASS}`}
               />
             </div>
 
@@ -418,7 +421,7 @@ export function MonthlyReviewTracker({
                     rows={2}
                     value={moneySpent}
                     onChange={e => setMoneySpent(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className={`w-full ${FORM_CONTROL_CLASS}`}
                   />
                 </div>
                 <div>
@@ -430,7 +433,7 @@ export function MonthlyReviewTracker({
                     rows={2}
                     value={expenseJoyVsStress}
                     onChange={e => setExpenseJoyVsStress(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className={`w-full ${FORM_CONTROL_CLASS}`}
                   />
                 </div>
               </div>
@@ -450,7 +453,7 @@ export function MonthlyReviewTracker({
                       rows={2}
                       value={alignmentCheck}
                       onChange={e => setAlignmentCheck(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className={`w-full ${FORM_CONTROL_CLASS}`}
                     />
                   </div>
                   <div>
@@ -462,7 +465,7 @@ export function MonthlyReviewTracker({
                       rows={2}
                       value={monthLesson}
                       onChange={e => setMonthLesson(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className={`w-full ${FORM_CONTROL_CLASS}`}
                     />
                   </div>
                 </div>
@@ -498,7 +501,7 @@ export function MonthlyReviewTracker({
                       rows={2}
                       value={badHabits}
                       onChange={e => setBadHabits(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className={`w-full ${FORM_CONTROL_CLASS}`}
                     />
                   </div>
                   <div>
@@ -510,7 +513,7 @@ export function MonthlyReviewTracker({
                       rows={2}
                       value={goodPatterns}
                       onChange={e => setGoodPatterns(e.target.value)}
-                      className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                      className={`w-full ${FORM_CONTROL_CLASS}`}
                     />
                   </div>
                 </div>
@@ -558,7 +561,7 @@ export function MonthlyReviewTracker({
                     rows={2}
                     value={oneThingToFix}
                     onChange={e => setOneThingToFix(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className={`w-full ${FORM_CONTROL_CLASS}`}
                   />
                 </div>
                 <div>
@@ -570,7 +573,7 @@ export function MonthlyReviewTracker({
                     rows={2}
                     value={disciplinedVersionAction}
                     onChange={e => setDisciplinedVersionAction(e.target.value)}
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                    className={`w-full ${FORM_CONTROL_CLASS}`}
                   />
                 </div>
               </div>
