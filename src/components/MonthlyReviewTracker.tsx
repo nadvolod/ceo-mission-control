@@ -167,7 +167,7 @@ export function MonthlyReviewTracker({
 
   function handleCancelEdit() {
     setEditingReview(null);
-    populateForm(currentMonthReview);
+    populateForm(defaultReview);
   }
 
   async function handleDelete(reviewMonth: string) {
