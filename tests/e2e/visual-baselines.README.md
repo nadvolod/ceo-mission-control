@@ -13,3 +13,9 @@ visual coverage.
 
 Recommended test names include `desktop` and `iPhone` or `mobile` so CI can
 identify the paired baseline coverage.
+
+Update baselines intentionally with:
+
+```bash
+npx playwright test --update-snapshots
+```
