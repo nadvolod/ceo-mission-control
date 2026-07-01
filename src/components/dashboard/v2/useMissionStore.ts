@@ -289,6 +289,26 @@ export function useMissionStore() {
     if (monarchData) {
       base.cash.today = monarchData.cashPosition;
       base.cash.week = monarchData.cashPosition;
+      if (
+        typeof monarchData.cashMoMDelta === 'number' &&
+        typeof monarchData.cashMoMPct === 'number' &&
+        Number.isFinite(monarchData.cashMoMDelta) &&
+        Number.isFinite(monarchData.cashMoMPct)
+      ) {
+        const sign = monarchData.cashMoMDelta >= 0 ? '+' : '';
+        const pctSign = monarchData.cashMoMPct >= 0 ? '+' : '';
+        base.cash.trend = {
+          value: `${sign}${fmtMetric(monarchData.cashMoMDelta, 'money')} · ${pctSign}${fmtMetric(monarchData.cashMoMPct, 'pct')}`,
+          label: monarchData.cashMoMLabel ? `${monarchData.cashMoMLabel}` : 'last month',
+          tone:
+            monarchData.cashMoMDelta > 0
+              ? 'positive'
+              : monarchData.cashMoMDelta < 0
+              ? 'negative'
+              : 'neutral',
+        };
+        base.cash.note = 'Cash MoM';
+      }
       base.netWorth.today = monarchData.netWorth;
       base.netWorth.week = monarchData.netWorth;
       base.netWorth.note = `Assets $${(monarchData.totalAssets / 1000).toFixed(0)}K · liab $${(monarchData.totalLiabilities / 1000).toFixed(0)}K`;

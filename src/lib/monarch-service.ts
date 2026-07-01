@@ -31,7 +31,7 @@ export function getPreviousMonthRange(): { startDate: string; endDate: string; l
 export function buildSnapshot(
   accounts: MonarchAccount[],
   cashflowSummary: { sumIncome: number; sumExpense: number; savings: number; savingsRate: number },
-  previousMonthCashflow?: { sumIncome: number; sumExpense: number } | null,
+  previousMonthCashflow?: { sumIncome: number; sumExpense: number; savings?: number; savingsRate?: number } | null,
   previousMonthLabel?: string
 ): Omit<MonarchFinancialSnapshot, 'lastSynced'> {
   // Filter to visible, active accounts
@@ -65,6 +65,33 @@ export function buildSnapshot(
 
   const monthlyIncome = cashflowSummary.sumIncome;
   const monthlyExpenses = Math.abs(cashflowSummary.sumExpense);
+  const cashMoMSource = previousMonthCashflow ?? cashflowSummary;
+  const impliedCashMoMDelta = cashMoMSource.sumIncome - Math.abs(cashMoMSource.sumExpense);
+  const reportedSavings =
+    typeof cashMoMSource.savings === 'number' &&
+    (cashMoMSource.savings !== 0 || impliedCashMoMDelta === 0)
+      ? cashMoMSource.savings
+      : null;
+  const cashMoMDelta =
+    reportedSavings ?? impliedCashMoMDelta;
+  const impliedCashMoMRate =
+    cashMoMSource.sumIncome === 0 ? null : cashMoMDelta / cashMoMSource.sumIncome;
+  const reportedSavingsRate =
+    typeof cashMoMSource.savingsRate === 'number' &&
+    (cashMoMSource.savingsRate !== 0 || impliedCashMoMRate === 0)
+      ? cashMoMSource.savingsRate
+      : null;
+  const rawCashMoMRate =
+    reportedSavingsRate ?? impliedCashMoMRate;
+  const cashMoMPct =
+    rawCashMoMRate === null
+      ? null
+      : Math.abs(rawCashMoMRate) <= 1
+      ? rawCashMoMRate * 100
+      : rawCashMoMRate;
+  const cashMoMLabel = previousMonthCashflow
+    ? (previousMonthLabel && previousMonthLabel.length > 0 ? previousMonthLabel : 'previous month')
+    : 'current month';
 
   // Prefer the previous full calendar month for burn rate — it is complete data.
   // The current-month cashflow is month-to-date (MTD) and understates true monthly
@@ -88,6 +115,9 @@ export function buildSnapshot(
   return {
     accounts: visibleAccounts,
     cashPosition,
+    cashMoMDelta,
+    cashMoMPct,
+    cashMoMLabel,
     totalAssets,
     totalLiabilities,
     netWorth,

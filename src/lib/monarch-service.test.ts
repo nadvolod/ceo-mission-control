@@ -229,7 +229,7 @@ describe('buildSnapshot', () => {
 
   it('populates previous month fields from previous month cashflow', () => {
     const currentCashflow = makeCashflow({ sumIncome: 500, sumExpense: -200 });
-    const previousCashflow = { sumIncome: 8000, sumExpense: -5000 };
+    const previousCashflow = { sumIncome: 8000, sumExpense: -5000, savings: 3000, savingsRate: 0.375 };
     const result = buildSnapshot([makeAccount()], currentCashflow, previousCashflow, 'Mar 2026');
 
     expect(result.monthlyIncome).toBe(500);     // Current month-to-date
@@ -237,6 +237,52 @@ describe('buildSnapshot', () => {
     expect(result.previousMonthIncome).toBe(8000);   // Previous full month
     expect(result.previousMonthExpenses).toBe(5000);  // Math.abs(-5000)
     expect(result.previousMonthLabel).toBe('Mar 2026');
+    expect(result.cashMoMDelta).toBe(3000);
+    expect(result.cashMoMPct).toBe(37.5);
+    expect(result.cashMoMLabel).toBe('Mar 2026');
+  });
+
+  it('matches Monarch previous-month cash growth from savings and savingsRate', () => {
+    const currentCashflow = makeCashflow({ sumIncome: 500, sumExpense: -200 });
+    const previousCashflow = {
+      sumIncome: 25_851,
+      sumExpense: -6_411,
+      savings: 19_440,
+      savingsRate: 0.752,
+    };
+    const result = buildSnapshot([makeAccount()], currentCashflow, previousCashflow, 'Jun 2026');
+
+    expect(result.cashMoMDelta).toBe(19_440);
+    expect(result.cashMoMPct).toBeCloseTo(75.2);
+    expect(result.cashMoMLabel).toBe('Jun 2026');
+  });
+
+  it('derives cash growth when Monarch client defaulted missing savings fields to zero', () => {
+    const currentCashflow = makeCashflow({ sumIncome: 500, sumExpense: -200 });
+    const previousCashflow = {
+      sumIncome: 25_851,
+      sumExpense: -6_411,
+      savings: 0,
+      savingsRate: 0,
+    };
+    const result = buildSnapshot([makeAccount()], currentCashflow, previousCashflow, 'Jun 2026');
+
+    expect(result.cashMoMDelta).toBe(19_440);
+    expect(result.cashMoMPct).toBeCloseTo(75.2);
+  });
+
+  it('preserves legitimate zero cash growth when income equals expenses', () => {
+    const currentCashflow = makeCashflow({ sumIncome: 500, sumExpense: -200 });
+    const previousCashflow = {
+      sumIncome: 10_000,
+      sumExpense: -10_000,
+      savings: 0,
+      savingsRate: 0,
+    };
+    const result = buildSnapshot([makeAccount()], currentCashflow, previousCashflow, 'Jun 2026');
+
+    expect(result.cashMoMDelta).toBe(0);
+    expect(result.cashMoMPct).toBe(0);
   });
 
   it('falls back to current month when previous month cashflow is null', () => {
