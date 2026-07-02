@@ -22,10 +22,12 @@ The rules below are the authoritative local copy. Follow them exactly for every 
 10. Never skip any tests if an env variable isn't configured. Fail the tests with a clear error message that names the missing variable and how to set it.
 11. **CI must validate required env vars** — A dedicated CI job must check that all required secrets/env vars (e.g. `DATABASE_URL`, `MONARCH_TOKEN`) are configured in the repo. If any are missing, the job must fail with a clear message listing which vars are absent. This catches misconfiguration before tests silently pass with mocked data.
 12. **Playwright E2E tests are mandatory** — Every PR must maintain at least 5 Playwright E2E tests that exercise real functionality in a browser. Tests must run in CI against a local Next.js server (not production URL) so they validate the PR's code before merge. **Tests must exercise actual functionality** (click buttons → verify API effects, submit forms → verify persistence) — never write visibility-only tests that just check if an element is visible. They catch client-side JavaScript crashes, null reference errors, and rendering failures that unit tests and HTTP-based tests cannot detect. Always run Playwright on localhost in CI.
-13. Push every feature into a PR and then wait for review from Copilot or Coderabbit, implement their feedback when it makes sense.
-14. Deploy on Vercel has to be tested and working.
-15. **Always create a PR** — Never push directly to main. Every change goes through a PR that follows all the steps in this file. Only notify the human when every step is complete: CI green, bot feedback resolved, checklist checked, and PR is ready to merge.
-16. **CI-green before handoff** – After pushing a PR, monitor CI and reviewer bots (CodeRabbit, Copilot). Address all valuable feedback, re-push, and only notify the human once every check is green and bot comments are resolved. Do not hand off a red PR.
+13. **Graph UI visualization coverage is mandatory** — Any PR that creates or changes charts, graphs, sparklines, trend panels, or data-visualization primitives must include component tests for rendering/layout/empty-state behavior plus **two Playwright screenshot snapshot tests** that render the graph in a real browser on localhost: one desktop resolution and one iPhone/mobile resolution. These graph Playwright tests do not need to be functional persistence tests, but they must use `toHaveScreenshot(...)` with committed PNG baselines and cover meaningful visual states such as responsive sizing, rendered SVG/canvas geometry, no overflow/clipping, tooltip positioning, or data-driven visual state; they must not be visibility-only assertions.
+14. **Every page needs visual baselines** — Every page must have exactly paired Playwright screenshot snapshot coverage: one desktop-resolution baseline and one iPhone/mobile-resolution baseline. When a PR changes a page or introduces a user-visible feature on a page, update the correct baseline snapshot first, then check the new feature against that baseline. Page visual tests must use Playwright screenshot snapshots with committed baselines for both viewports; visibility-only smoke tests or geometry-only assertions do not count.
+15. Push every feature into a PR and then wait for review from Copilot or Coderabbit, implement their feedback when it makes sense.
+16. Deploy on Vercel has to be tested and working.
+17. **Always create a PR** — Never push directly to main. Every change goes through a PR that follows all the steps in this file. Only notify the human when every step is complete: CI green, bot feedback resolved, checklist checked, and PR is ready to merge.
+18. **CI-green before handoff** – After pushing a PR, monitor CI and reviewer bots (CodeRabbit, Copilot). Address all valuable feedback, re-push, and only notify the human once every check is green and bot comments are resolved. Do not hand off a red PR.
 
 ---
 
@@ -65,6 +67,8 @@ The rules below are the authoritative local copy. Follow them exactly for every 
 - [x] Was evidence included (screenshot, recording, or CLI output)?
 - [x] Was an architectural review completed (areas of weakness identified)?
 - [x] Were edge cases identified and tested?
+- [x] Were graph UI visualization changes covered by component tests and two Playwright visual tests (desktop + iPhone/mobile, or marked N/A)?
+- [x] Were page visual baselines updated and checked with Playwright at desktop and iPhone/mobile sizes (or marked N/A)?
 - [x] Was monitoring and logging addressed?
 ```
 

@@ -50,6 +50,36 @@ function waitForFocusHoursPost(page: Page) {
   );
 }
 
+async function mockGraphFocusHours(page: Page) {
+  const dailyTrend = Array.from({ length: 14 }, (_, i) => ({
+    date: `2026-06-${String(17 + i).padStart(2, '0')}`,
+    totalHours: i % 5 === 0 ? 0 : 1 + (i % 4) * 0.5,
+    byCategory: {
+      Temporal: i % 5 === 0 ? 0 : 0.5 + (i % 4) * 0.5,
+      Other: i % 3 === 0 ? 0.5 : 1,
+    },
+  }));
+
+  await page.route('**/api/focus-hours?**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        todaysMetrics: {
+          date: '2026-07-01',
+          totalHours: 2.5,
+          byCategory: { Temporal: 1.5, Other: 1 },
+        },
+        weeklyTotals: { Temporal: 7, Other: 6 },
+        categoryDistribution: { Temporal: 7, Other: 6 },
+        dailyTrend,
+        recentSessions: [],
+        timestamp: '2026-07-01T12:00:00.000Z',
+      }),
+    });
+  });
+}
+
 async function submitMonthlyReview(page: Page, scope: Locator, month: string, marker: string) {
   await scope.getByTestId('monthly-review-month-input').fill(month);
   await scope.locator('#mr-hours').fill('111');
@@ -216,6 +246,41 @@ test.describe('Mission Control v2', () => {
     // data source the v2 card and the old dashboard metrics read.
     const body = await readFocusHoursFromPage(page);
     expect(body.todaysMetrics?.byCategory?.Temporal ?? 0).toBeGreaterThanOrEqual(1);
+  });
+
+  test('Graph visual snapshot: desktop Trends sparkline at 1440px', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 900 });
+    await mockGraphFocusHours(page);
+    await page.goto('/dashboard');
+
+    const desktop = page.getByTestId('desktop-layout');
+    const temporalTrend = desktop.getByTestId('trend-temporal');
+    await expect(temporalTrend).toBeVisible();
+
+    const sparkline = temporalTrend.locator('svg');
+    await expect(sparkline).toBeVisible({ timeout: 5_000 });
+    await expect(temporalTrend).toHaveScreenshot('desktop-trends-temporal-sparkline.png', {
+      maxDiffPixelRatio: 0.02,
+    });
+  });
+
+  test('Graph visual snapshot: iPhone Insights sparkline card', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await mockGraphFocusHours(page);
+    await page.goto('/dashboard');
+
+    const mobile = page.getByTestId('mobile-layout');
+    await expect(mobile).toBeVisible();
+    await page.getByTestId('mobile-nav-insights').click();
+
+    const temporalCard = mobile.getByTestId('insight-card-temporal');
+    await expect(temporalCard).toBeVisible();
+
+    const sparkline = temporalCard.locator('svg');
+    await expect(sparkline).toBeVisible({ timeout: 5_000 });
+    await expect(temporalCard).toHaveScreenshot('iphone-insights-temporal-sparkline-card.png', {
+      maxDiffPixelRatio: 0.02,
+    });
   });
 
   test('Battles Won card: log a battle (name + value) → persists + shows ⚔️ Activity row', async ({ page }) => {

@@ -26,6 +26,7 @@ export default defineConfig({
   testDir: './tests/e2e',
   timeout: 30_000,
   expect: { timeout: 10_000 },
+  snapshotPathTemplate: '{testDir}/{testFilePath}-snapshots/{arg}{ext}',
   // E2E runs authenticate as one real DB-backed test user. Keep the suite
   // single-worker so specs that mutate that user's rows cannot race each other
   // or invalidate another spec's empty-state precondition.

@@ -33,7 +33,7 @@ export function TrendsPanel({ series }: { series: TrendSeries[] }) {
       style={{
         padding: 14,
         display: 'grid',
-        gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))',
         gap: 14,
       }}
       data-testid="trends-panel"
@@ -57,7 +57,10 @@ function TrendCell({ series }: { series: TrendSeries }) {
     series.deltaPct > 0 ? 'var(--color-mc-green)' : 'var(--color-mc-red)';
 
   return (
-    <div className="flex flex-col gap-1.5" data-testid={`trend-${series.label.toLowerCase()}`}>
+    <div
+      className="flex min-w-0 flex-col gap-1.5"
+      data-testid={`trend-${series.label.toLowerCase()}`}
+    >
       <div className="flex items-baseline justify-between gap-2">
         <span
           className="font-numerics uppercase"
@@ -93,7 +96,15 @@ function TrendCell({ series }: { series: TrendSeries }) {
       ) : (
         <Sparkline data={series.data} color={series.color} fill={series.color} height={36} width={260} strokeWidth={1.5} dots />
       )}
-      <span style={{ fontSize: 11, color: 'var(--color-mc-fg-dim)' }}>{series.subText}</span>
+      <span
+        style={{
+          minWidth: 0,
+          fontSize: 11,
+          color: 'var(--color-mc-fg-dim)',
+        }}
+      >
+        {series.subText}
+      </span>
     </div>
   );
 }
