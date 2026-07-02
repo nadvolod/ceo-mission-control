@@ -65,7 +65,7 @@ function ChipPill({ chip }: { chip: Chip }) {
         >
           <span
             className="font-numerics"
-            style={{ fontSize: 10, letterSpacing: '0.08em', color: 'var(--color-mc-fg-dim)' }}
+            style={{ fontSize: 10, letterSpacing: 0, color: 'var(--color-mc-fg-dim)' }}
           >
             {chip.body}
           </span>
@@ -87,7 +87,7 @@ function Pill({
     <div
       className="flex items-center gap-1.5 rounded-full"
       style={{
-        padding: '5px 11px',
+        padding: '3px 7px',
         fontSize: 11.5,
         background,
         border: `1px solid ${border}`,

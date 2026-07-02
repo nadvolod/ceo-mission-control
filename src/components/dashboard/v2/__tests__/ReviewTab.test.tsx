@@ -36,6 +36,23 @@ describe('<ReviewTab />', () => {
     expect(screen.getByText(/No monthly reviews yet/i)).toBeInTheDocument();
   });
 
+  it('renders the editable monthly review form when save handlers are available', () => {
+    render(
+      <ReviewTab
+        currentMonthReview={null}
+        recentReviews={[]}
+        ratingsTrend={[]}
+        onSubmitReview={jest.fn()}
+        onDeleteReview={jest.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Monthly Review' })).toBeInTheDocument();
+    expect(screen.getByLabelText('Month')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save Review' })).toBeInTheDocument();
+    expect(screen.queryByTestId('review-tab-empty')).not.toBeInTheDocument();
+  });
+
   it('renders current-month card with the month label and lesson when present', () => {
     render(
       <ReviewTab

@@ -456,25 +456,10 @@ describe('deriveChips', () => {
     expect(chips.find((c) => c.id === 'streak')).toBeUndefined();
   });
 
-  it('adds a positive Cash MoM chip when pct is >5', () => {
-    const chips = deriveChips({ streakDays: 0, cashMoMPct: 228 });
-    const mom = chips.find((c) => c.id === 'cashmom');
-    expect(mom).toBeDefined();
-    if (mom?.kind === 'positive') {
-      expect(mom.emphasis).toBe('+228%');
-    } else {
-      throw new Error('Expected cashmom chip to be positive');
-    }
-  });
-
-  it('uses a warning chip for negative Cash MoM', () => {
-    const chips = deriveChips({ streakDays: 0, cashMoMPct: -12 });
+  it('does not render Cash MoM as a global chip', () => {
+    const chips = deriveChips({ streakDays: 0 });
     expect(chips.find((c) => c.id === 'cashmom')).toBeUndefined();
-    const mom = chips.find((c) => c.id === 'cashmom-down');
-    expect(mom).toMatchObject({
-      kind: 'warning',
-      body: 'Cash MoM -12%',
-    });
+    expect(chips.find((c) => c.id === 'cashmom-down')).toBeUndefined();
   });
 
   it('adds a sync chip with human-readable time', () => {
@@ -482,7 +467,7 @@ describe('deriveChips', () => {
     const chips = deriveChips({ streakDays: 0, monarchSyncedAt: oneHourAgo });
     const sync = chips.find((c) => c.id === 'sync');
     expect(sync).toBeDefined();
-    expect(sync?.body).toMatch(/1h ago/);
+    expect(sync?.body).toBe('Monarch 1h ago');
   });
 
   it('omits the sync chip for invalid timestamps', () => {

@@ -47,9 +47,16 @@ function avgRating(r: MonthlyReviewRatings): string {
   return (vals.reduce((a, b) => a + b, 0) / vals.length).toFixed(1);
 }
 
-function currentMonth(): string {
-  const d = new Date();
+function formatMonth(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+export function defaultReviewMonth(now = new Date()): string {
+  const reviewMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  if (now.getDate() <= 3) {
+    reviewMonth.setMonth(reviewMonth.getMonth() - 1);
+  }
+  return formatMonth(reviewMonth);
 }
 
 function todayDate(): string {
@@ -100,37 +107,39 @@ export function MonthlyReviewTracker({
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [editingReview, setEditingReview] = useState<MonthlyReview | null>(null);
+  const defaultMonth = defaultReviewMonth();
+  const defaultReview = currentMonthReview ?? recentReviews.find(review => review.month === defaultMonth) ?? null;
 
   // ── Form state ──────────────────────────────────────────────────────────
-  const [month, setMonth] = useState(currentMonthReview?.month ?? currentMonth());
-  const [date, setDate] = useState(currentMonthReview?.date ?? todayDate());
-  const [timeAllocation, setTimeAllocation] = useState(currentMonthReview?.timeAllocation ?? '');
-  const [hoursWorked, setHoursWorked] = useState(currentMonthReview?.hoursWorked?.toString() ?? '');
-  const [temporalHours, setTemporalHours] = useState(currentMonthReview?.temporalHours?.toString() ?? '');
-  const [energyGivers, setEnergyGivers] = useState(currentMonthReview?.energyGivers ?? '');
-  const [energyDrainers, setEnergyDrainers] = useState(currentMonthReview?.energyDrainers ?? '');
-  const [ignoredSignals, setIgnoredSignals] = useState(currentMonthReview?.ignoredSignals ?? '');
-  const [moneySpent, setMoneySpent] = useState(currentMonthReview?.moneySpent ?? '');
-  const [expenseJoyVsStress, setExpenseJoyVsStress] = useState(currentMonthReview?.expenseJoyVsStress ?? '');
-  const [alignmentCheck, setAlignmentCheck] = useState(currentMonthReview?.alignmentCheck ?? '');
-  const [monthLesson, setMonthLesson] = useState(currentMonthReview?.monthLesson ?? '');
-  const [decisionSource, setDecisionSource] = useState<MonthlyReview['decisionSource']>(currentMonthReview?.decisionSource ?? 'discipline');
-  const [badHabits, setBadHabits] = useState(currentMonthReview?.badHabits ?? '');
-  const [goodPatterns, setGoodPatterns] = useState(currentMonthReview?.goodPatterns ?? '');
-  const [ratings, setRatings] = useState<MonthlyReviewRatings>(currentMonthReview?.ratings ?? emptyRatings());
-  const [oneThingToFix, setOneThingToFix] = useState(currentMonthReview?.oneThingToFix ?? '');
-  const [disciplinedVersionAction, setDisciplinedVersionAction] = useState(currentMonthReview?.disciplinedVersionAction ?? '');
+  const [month, setMonth] = useState(defaultReview?.month ?? defaultMonth);
+  const [date, setDate] = useState(defaultReview?.date ?? todayDate());
+  const [timeAllocation, setTimeAllocation] = useState(defaultReview?.timeAllocation ?? '');
+  const [hoursWorked, setHoursWorked] = useState(defaultReview?.hoursWorked?.toString() ?? '');
+  const [temporalHours, setTemporalHours] = useState(defaultReview?.temporalHours?.toString() ?? '');
+  const [energyGivers, setEnergyGivers] = useState(defaultReview?.energyGivers ?? '');
+  const [energyDrainers, setEnergyDrainers] = useState(defaultReview?.energyDrainers ?? '');
+  const [ignoredSignals, setIgnoredSignals] = useState(defaultReview?.ignoredSignals ?? '');
+  const [moneySpent, setMoneySpent] = useState(defaultReview?.moneySpent ?? '');
+  const [expenseJoyVsStress, setExpenseJoyVsStress] = useState(defaultReview?.expenseJoyVsStress ?? '');
+  const [alignmentCheck, setAlignmentCheck] = useState(defaultReview?.alignmentCheck ?? '');
+  const [monthLesson, setMonthLesson] = useState(defaultReview?.monthLesson ?? '');
+  const [decisionSource, setDecisionSource] = useState<MonthlyReview['decisionSource']>(defaultReview?.decisionSource ?? 'discipline');
+  const [badHabits, setBadHabits] = useState(defaultReview?.badHabits ?? '');
+  const [goodPatterns, setGoodPatterns] = useState(defaultReview?.goodPatterns ?? '');
+  const [ratings, setRatings] = useState<MonthlyReviewRatings>(defaultReview?.ratings ?? emptyRatings());
+  const [oneThingToFix, setOneThingToFix] = useState(defaultReview?.oneThingToFix ?? '');
+  const [disciplinedVersionAction, setDisciplinedVersionAction] = useState(defaultReview?.disciplinedVersionAction ?? '');
 
   // Sync form when currentMonthReview prop changes (e.g. after save)
   useEffect(() => {
     if (!isSubmitting) {
-      populateForm(currentMonthReview);
+      populateForm(defaultReview);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentMonthReview?.id]);
+  }, [defaultReview?.id, defaultReview?.updatedAt, defaultMonth]);
 
   function populateForm(review: MonthlyReview | null) {
-    setMonth(review?.month ?? currentMonth());
+    setMonth(review?.month ?? defaultReviewMonth());
     setDate(review?.date ?? todayDate());
     setTimeAllocation(review?.timeAllocation ?? '');
     setHoursWorked(review?.hoursWorked?.toString() ?? '');
@@ -158,7 +167,7 @@ export function MonthlyReviewTracker({
 
   function handleCancelEdit() {
     setEditingReview(null);
-    populateForm(currentMonthReview);
+    populateForm(defaultReview);
   }
 
   async function handleDelete(reviewMonth: string) {
@@ -290,6 +299,7 @@ export function MonthlyReviewTracker({
               </label>
               <input
                 id="mr-month"
+                data-testid="monthly-review-month-input"
                 type="month"
                 value={month}
                 onChange={e => setMonth(e.target.value)}
@@ -582,7 +592,7 @@ export function MonthlyReviewTracker({
                   ? 'Saving...'
                   : editingReview
                     ? 'Update Review'
-                    : currentMonthReview
+                    : defaultReview
                       ? 'Update Review'
                       : 'Save Review'}
               </button>

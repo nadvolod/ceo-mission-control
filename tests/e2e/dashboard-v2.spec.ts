@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 
 async function browserLocalDate(page: Page) {
   return page.evaluate(() => {
@@ -78,6 +78,35 @@ async function mockGraphFocusHours(page: Page) {
       }),
     });
   });
+}
+
+async function submitMonthlyReview(page: Page, scope: Locator, month: string, marker: string) {
+  await scope.getByTestId('monthly-review-month-input').fill(month);
+  await scope.locator('#mr-hours').fill('111');
+  await scope.locator('#mr-temporal').fill('22');
+  await scope.locator('#mr-time-alloc').fill(marker);
+
+  const monthlyReviewPost = page.waitForResponse((response) =>
+    response.url().includes('/api/monthly-review') &&
+    response.request().method() === 'POST' &&
+    response.status() === 200,
+  );
+  await scope.getByRole('button', { name: /Save Review|Update Review/ }).click();
+
+  const body = await (await monthlyReviewPost).json();
+  expect(body.success).toBe(true);
+  expect(body.review.month).toBe(month);
+  expect(body.review.timeAllocation).toBe(marker);
+
+  const saved = await page.evaluate(async (savedMonth) => {
+    const res = await fetch('/api/monthly-review');
+    if (!res.ok) {
+      throw new Error(`GET /api/monthly-review failed: ${res.status}`);
+    }
+    const json = await res.json();
+    return json.recentReviews.find((review: { month: string }) => review.month === savedMonth);
+  }, month);
+  expect(saved).toMatchObject({ month, timeAllocation: marker });
 }
 
 // These tests exercise the v2 dashboard (now the default at /dashboard
@@ -265,6 +294,11 @@ test.describe('Mission Control v2', () => {
     const battlePost = page.waitForRequest((req) =>
       req.url().includes('/api/battles') && req.method() === 'POST',
     );
+    const battleResponse = page.waitForResponse((res) =>
+      res.url().includes('/api/battles') &&
+      res.request().method() === 'POST' &&
+      res.status() === 200,
+    );
 
     // Click the "+ Battle" preset → enter the $ value and the battle name.
     await page.getByTestId('preset-battles-battle').click();
@@ -278,6 +312,7 @@ test.describe('Mission Control v2', () => {
     expect(body.action).toBe('addBattle');
     expect(body.value).toBe(2500);
     expect(body.name).toBe(name);
+    await battleResponse;
 
     // Server-side: the battle persisted (all-time count >= 1, value >= 2500).
     const battles = await readBattlesFromPage(page);
@@ -287,7 +322,9 @@ test.describe('Mission Control v2', () => {
     // The activity feed shows the battle row (scope to desktop tree to avoid
     // the strict-mode clash with the CSS-hidden mobile feed).
     const desktop = page.getByTestId('desktop-layout');
-    await expect(desktop.getByText(name)).toBeVisible({ timeout: 5_000 });
+    await expect(
+      desktop.locator('[data-testid^="activity-row-"]').filter({ hasText: name }).first(),
+    ).toBeVisible({ timeout: 5_000 });
   });
 
   test('Battles Won card: submit is blocked until a battle name is entered', async ({ page }) => {
@@ -408,19 +445,21 @@ test.describe('Mission Control v2', () => {
     await expect(desktop.getByTestId('insights-tab')).toHaveCount(0);
   });
 
-  test('Review tab renders monthly-review content (empty state when no data)', async ({ page }) => {
+  test('Review tab saves a monthly review when no data exists', async ({ page }) => {
     // The test user has no monthly reviews (global-setup wipes them), so the
-    // Review body should show the empty-state copy — NOT seed data and NOT
-    // a blank panel area. This is the regression test for "Review tab does
-    // nothing when clicked".
+    // Review body should expose the editor directly — NOT seed data, NOT a
+    // blank panel area, and NOT a read-only empty state.
     await page.goto('/dashboard');
     await page.getByTestId('tab-review').click();
-    // Scope to desktop: the mobile ReviewTab renders the same empty-state
-    // testid/copy (present in the DOM at desktop width), which would trip
-    // Playwright strict mode if matched unscoped.
+    // Scope to desktop: the mobile ReviewTab also exists in the DOM at
+    // desktop width, which would trip Playwright strict mode if unscoped.
     const desktop = page.getByTestId('desktop-layout');
-    await expect(desktop.getByTestId('review-tab-empty')).toBeVisible();
-    await expect(desktop.getByText(/No monthly reviews yet/i)).toBeVisible();
+    await expect(desktop.getByRole('heading', { name: 'Monthly Review' })).toBeVisible();
+    await expect(desktop.getByTestId('monthly-review-month-input')).toBeVisible();
+    await expect(desktop.getByRole('button', { name: 'Save Review' })).toBeVisible();
+    await expect(desktop.getByTestId('review-tab-empty')).toHaveCount(0);
+
+    await submitMonthlyReview(page, desktop, '2025-11', `Desktop review ${Date.now()}`);
   });
 
   test('Tasks panel was removed from the Overview body', async ({ page }) => {
@@ -642,14 +681,15 @@ test.describe('Mission Control v2 — mobile viewport', () => {
     await expect(mobile.getByTestId('insights-tab')).toBeVisible();
     await expect(mobile.getByTestId('insights-period-selector')).toBeVisible();
 
-    // Review: the test user has no monthly reviews (global-setup wipes them),
-    // so the Review body shows its empty-state — NOT the bottom-nav placeholder.
+    // Review: tapping the bottom-nav item shows the real editor — NOT the
+    // bottom-nav placeholder — and the form persists through the API.
     await page.getByTestId('mobile-nav-review').click();
     await expect(mobile.getByText(/Open the Review tab in the bottom nav/i)).toHaveCount(0);
-    // Either the populated tab or the empty-state renders depending on data.
-    const reviewTab = mobile.getByTestId('review-tab');
-    const reviewEmpty = mobile.getByTestId('review-tab-empty');
-    await expect(reviewTab.or(reviewEmpty)).toBeVisible();
+    await expect(mobile.getByTestId('review-tab')).toBeVisible();
+    await expect(mobile.getByRole('heading', { name: 'Monthly Review' })).toBeVisible();
+    await expect(mobile.getByRole('button', { name: 'Save Review' })).toBeVisible();
+
+    await submitMonthlyReview(page, mobile, '2025-10', `Mobile review ${Date.now()}`);
   });
 
   test('Call/Demo quick actions are gone; + Train logs a training session', async ({ page, request }) => {

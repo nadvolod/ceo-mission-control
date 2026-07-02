@@ -24,33 +24,34 @@ export function formatRunway(months: number | null | undefined): string {
   return `${n.toFixed(1)}mo runway`;
 }
 
-// % change in account balance over the current month — matches Monarch's
-// "1 month" view. previousCashPosition is derived as `cashPosition - currentNet`
-// (the balance at the start of the current month, assuming the only delta is
-// this month's income/expenses). Returns null when the prior balance is 0 and
-// the current month has movement, since percentage change from zero is
-// undefined.
+// Cash MoM growth percentage from Monarch cashflow data. Monarch's cashflow
+// summary reports savingsRate as a ratio in some client versions (0.752) and
+// as a percent in others (75.2), so normalize to display percent.
 export function computeCashGrowthMoM(
-  cashPosition: number,
   monthlyIncome: number,
   monthlyExpenses: number,
+  savingsRate?: number | null,
 ): number | null {
-  const currentNet = monthlyIncome - monthlyExpenses;
-  const previousCashPosition = cashPosition - currentNet;
-  if (previousCashPosition === 0) {
-    if (currentNet === 0) return 0;
-    console.warn(
-      `[dashboard-metrics] cash growth MoM is undefined: previousCashPosition=0, currentNet=${currentNet}. Rendering as "—".`,
-    );
+  if (typeof savingsRate === 'number' && Number.isFinite(savingsRate)) {
+    return Math.abs(savingsRate) <= 1 ? savingsRate * 100 : savingsRate;
+  }
+  if (monthlyIncome === 0) {
+    if (monthlyExpenses === 0) return 0;
+    console.warn('[dashboard-metrics] cash growth MoM is undefined: monthlyIncome=0 with non-zero expenses.');
     return null;
   }
-  return (currentNet / Math.abs(previousCashPosition)) * 100;
+  return ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100;
 }
 
-// Dollar change in cash position over the current month. Equal to
-// monthlyIncome − monthlyExpenses by construction (see computeCashGrowthMoM).
-export function computeCashMoMDelta(monthlyIncome: number, monthlyExpenses: number): number {
-  return monthlyIncome - monthlyExpenses;
+// Dollar cash growth from Monarch cashflow data.
+export function computeCashMoMDelta(
+  monthlyIncome: number,
+  monthlyExpenses: number,
+  savings?: number | null,
+): number {
+  return typeof savings === 'number' && Number.isFinite(savings)
+    ? savings
+    : monthlyIncome - monthlyExpenses;
 }
 
 // Total focused work for the week = every focus-session category (Temporal,

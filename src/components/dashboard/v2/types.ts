@@ -27,6 +27,11 @@ export type MetricSnapshot = {
   fmt: MetricFmt;
   spark?: number[];
   note?: string;
+  trend?: {
+    label: string;
+    value: string;
+    tone: 'positive' | 'negative' | 'neutral';
+  };
   color: string;
   // Optional badge icon shown in the card eyebrow (e.g. ⚔️ for battles).
   icon?: MetricIcon;

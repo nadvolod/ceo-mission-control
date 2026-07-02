@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { Check, Pencil, Swords } from 'lucide-react';
+import { ArrowDown, ArrowUp, Check, Pencil, Swords } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { AmountEditor } from './AmountEditor';
 import { InlineHoursEditor } from './InlineHoursEditor';
@@ -103,6 +103,10 @@ export function MetricCard({ metric, big = false, onLog, onUpdateGoal }: MetricC
   const week = metric.week;
   const goal = metric.goal;
   const Icon = metric.icon ? METRIC_ICONS[metric.icon] : null;
+  const TrendIcon =
+    metric.trend?.tone === 'positive' ? ArrowUp :
+    metric.trend?.tone === 'negative' ? ArrowDown :
+    null;
   const goalPct = goal != null && week != null ? clamp(week / goal, 0, 1) : null;
   const ahead = goal != null && week != null && week >= goal;
   const presets = PRESETS[metric.id] ?? [];
@@ -340,6 +344,27 @@ export function MetricCard({ metric, big = false, onLog, onUpdateGoal }: MetricC
       >
         <span>{subLine}</span>
       </div>
+
+      {metric.trend && (
+        <div
+          className="relative flex items-center gap-1 font-numerics"
+          style={{
+            minHeight: 17,
+            fontSize: 10.5,
+            color:
+              metric.trend.tone === 'positive'
+                ? 'var(--color-mc-green)'
+                : metric.trend.tone === 'negative'
+                ? 'var(--color-mc-red)'
+                : 'var(--color-mc-fg-muted)',
+          }}
+          data-testid={`metric-card-${metric.id}-trend`}
+        >
+          {TrendIcon && <TrendIcon size={11} aria-hidden />}
+          <span>{metric.trend.value}</span>
+          <span style={{ color: 'var(--color-mc-fg-muted)' }}>{metric.trend.label}</span>
+        </div>
+      )}
 
       <div className="relative mt-auto" style={{ height: 32 }}>
         {/* Default footer */}
