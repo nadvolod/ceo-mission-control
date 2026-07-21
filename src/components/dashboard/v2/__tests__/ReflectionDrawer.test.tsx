@@ -72,43 +72,51 @@ describe('ReflectionDrawer', () => {
     const onSave = jest.fn(async () => {});
     const onOpenChange = jest.fn();
 
-    const { rerender } = render(
-      <ReflectionDrawer
-        open
-        onOpenChange={onOpenChange}
-        data={data()}
-        onSave={onSave}
-      />,
-    );
+    // Stub rAF to run synchronously so the rehydration effect's outcome is
+    // deterministic instead of depending on real elapsed time (avoids flakes
+    // under CI scheduling variance).
+    const originalRAF = global.requestAnimationFrame;
+    global.requestAnimationFrame = ((cb: FrameRequestCallback) => {
+      cb(0);
+      return 0;
+    }) as typeof global.requestAnimationFrame;
 
-    const input = screen.getByTestId('reflection-input-0');
-    const paddedValue = '  hello world  ';
-    fireEvent.change(input, { target: { value: paddedValue } });
-    await waitFor(() => expect(input).toHaveValue(paddedValue));
+    try {
+      const { rerender } = render(
+        <ReflectionDrawer
+          open
+          onOpenChange={onOpenChange}
+          data={data()}
+          onSave={onSave}
+        />,
+      );
 
-    // Simulate the autosave completing and the parent's threeToThriveData
-    // state updating with the server-trimmed answer (three-to-thrive.ts
-    // trims on save) — this is what useDashboardData.handleSaveThreeToThriveAnswer
-    // does on every successful save while the drawer is still open.
-    rerender(
-      <ReflectionDrawer
-        open
-        onOpenChange={onOpenChange}
-        data={dataWithAnswer(QUESTIONS[0], paddedValue.trim())}
-        onSave={onSave}
-      />,
-    );
+      const input = screen.getByTestId('reflection-input-0');
+      const paddedValue = '  hello world  ';
+      fireEvent.change(input, { target: { value: paddedValue } });
+      expect(input).toHaveValue(paddedValue);
 
-    // Give the rehydration effect's requestAnimationFrame a real chance to
-    // run before asserting — otherwise a passing assertion could just mean
-    // the effect hasn't fired yet, not that it's guarded correctly.
-    await act(async () => {
-      await new Promise((resolve) => setTimeout(resolve, 50));
-    });
+      // Simulate the autosave completing and the parent's threeToThriveData
+      // state updating with the server-trimmed answer (three-to-thrive.ts
+      // trims on save) — this is what useDashboardData.handleSaveThreeToThriveAnswer
+      // does on every successful save while the drawer is still open.
+      act(() => {
+        rerender(
+          <ReflectionDrawer
+            open
+            onOpenChange={onOpenChange}
+            data={dataWithAnswer(QUESTIONS[0], paddedValue.trim())}
+            onSave={onSave}
+          />,
+        );
+      });
 
-    // The user's in-progress typing (with its spaces) must survive the
-    // parent re-render — it must NOT snap back to the trimmed server value.
-    expect(input).toHaveValue(paddedValue);
+      // The user's in-progress typing (with its spaces) must survive the
+      // parent re-render — it must NOT snap back to the trimmed server value.
+      expect(input).toHaveValue(paddedValue);
+    } finally {
+      global.requestAnimationFrame = originalRAF;
+    }
   });
 
   it('does not send an overlapping save request while an earlier save for the same question is still in flight', async () => {
