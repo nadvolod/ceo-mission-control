@@ -691,7 +691,7 @@ test.describe('Card inline amount editors — layout robustness at desktop width
   // slack a wider viewport happens to leave).
   test.use({ viewport: { width: 1024, height: 900 } });
 
-  test('Battles Won: the battle-name note input has a real, usable width instead of being squeezed to a sliver', async ({ page }) => {
+  test('Battles Won: the battle-name note input has a real, usable width and the typed name actually persists', async ({ page }) => {
     await page.goto('/dashboard');
     const card = page.getByTestId('metric-card-battles');
     await card.hover();
@@ -710,9 +710,24 @@ test.describe('Card inline amount editors — layout robustness at desktop width
     const longName = `Negotiated the Q3 renewal ${Date.now()}`;
     await noteInput.fill(longName);
     await expect(noteInput).toHaveValue(longName);
+
+    // Complete the flow — a wide-enough input that never gets submitted
+    // proves nothing about real usability. Submit and verify the server
+    // actually persisted the typed name.
+    const battlePost = page.waitForRequest((req) =>
+      req.url().includes('/api/battles') && req.method() === 'POST',
+    );
+    await page.getByTestId('battles-amount-input').fill('750');
+    await page.keyboard.press('Enter');
+    const body = (await battlePost).postDataJSON();
+    expect(body.name).toBe(longName);
+    expect(body.value).toBe(750);
+
+    const battles = await readBattlesFromPage(page);
+    expect(battles.allTimeTotals?.count ?? 0).toBeGreaterThanOrEqual(1);
   });
 
-  test('Battles Won: the card grows taller to fit a wrapped amount editor instead of clipping it', async ({ page }) => {
+  test('Battles Won: the card grows taller to fit a wrapped amount editor, and the submitted entry persists', async ({ page }) => {
     await page.goto('/dashboard');
     const card = page.getByTestId('metric-card-battles');
     const restingBox = await card.boundingBox();
@@ -738,9 +753,22 @@ test.describe('Card inline amount editors — layout robustness at desktop width
     const noteBox = await page.getByTestId('battles-amount-note').boundingBox();
     expect(noteBox).not.toBeNull();
     expect(noteBox!.y + noteBox!.height).toBeLessThanOrEqual(editingCardBox!.y + editingCardBox!.height + 1);
+
+    // Complete the flow through the now-wrapped, now-usable fields and
+    // confirm the server actually recorded it.
+    const name = `Wrapped-row entry ${Date.now()}`;
+    const battlePost = page.waitForRequest((req) =>
+      req.url().includes('/api/battles') && req.method() === 'POST',
+    );
+    await page.getByTestId('battles-amount-input').fill('300');
+    await page.getByTestId('battles-amount-note').fill(name);
+    await page.keyboard.press('Enter');
+    const body = (await battlePost).postDataJSON();
+    expect(body.name).toBe(name);
+    expect(body.value).toBe(300);
   });
 
-  test('Money Moved: the "Cut" category note input has a real, usable width instead of being squeezed to a sliver', async ({ page }) => {
+  test('Money Moved: the "Cut" category note input has a real, usable width and the typed description actually persists', async ({ page }) => {
     await page.goto('/dashboard');
     const card = page.getByTestId('metric-card-moneyMoved');
     await card.hover();
@@ -755,18 +783,47 @@ test.describe('Card inline amount editors — layout robustness at desktop width
     const longNote = `Paid off the statement in full ${Date.now()}`;
     await noteInput.fill(longNote);
     await expect(noteInput).toHaveValue(longNote);
+
+    const financialPost = page.waitForRequest((req) =>
+      req.url().includes('/api/financial') && req.method() === 'POST',
+    );
+    await page.getByTestId('moneyMoved-amount-input').fill('60');
+    await page.keyboard.press('Enter');
+    const body = (await financialPost).postDataJSON();
+    expect(body.category).toBe('cut');
+    expect(body.amount).toBe(60);
+    expect(body.description).toBe(longNote);
+
+    // Server-side confirmation, not just the request body: the note shows
+    // up in the desktop activity feed once the entry round-trips.
+    const desktop = page.getByTestId('desktop-layout');
+    await expect(desktop.getByText(longNote)).toBeVisible({ timeout: 5_000 });
   });
 
-  test('Money Moved: the "Generated" category note input has a real, usable width instead of being squeezed to a sliver', async ({ page }) => {
+  test('Money Moved: the "Generated" category note input has a real, usable width and the typed description actually persists', async ({ page }) => {
     await page.goto('/dashboard');
     const card = page.getByTestId('metric-card-moneyMoved');
     await card.hover();
     await page.getByTestId('preset-moneyMoved-generated').click();
     await expect(page.getByTestId('moneyMoved-amount-editor')).toBeVisible();
 
-    const noteBox = await page.getByTestId('moneyMoved-amount-note').boundingBox();
+    const noteInput = page.getByTestId('moneyMoved-amount-note');
+    const noteBox = await noteInput.boundingBox();
     expect(noteBox).not.toBeNull();
     expect(noteBox!.width).toBeGreaterThanOrEqual(80);
+
+    const longNote = `Client retainer wire ${Date.now()}`;
+    await noteInput.fill(longNote);
+
+    const financialPost = page.waitForRequest((req) =>
+      req.url().includes('/api/financial') && req.method() === 'POST',
+    );
+    await page.getByTestId('moneyMoved-amount-input').fill('900');
+    await page.keyboard.press('Enter');
+    const body = (await financialPost).postDataJSON();
+    expect(body.category).toBe('generated');
+    expect(body.amount).toBe(900);
+    expect(body.description).toBe(longNote);
   });
 });
 
