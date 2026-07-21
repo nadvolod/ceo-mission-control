@@ -97,7 +97,11 @@ export function AmountEditor({
   return (
     <div
       className="flex items-center gap-1"
-      style={{ width: '100%' }}
+      // Narrow columns (e.g. a 6-up desktop grid) don't have room for a
+      // label + amount + note + two buttons on one line. Wrapping lets the
+      // note input (with its own minWidth below) drop to its own row
+      // instead of being squeezed to a sliver by the fixed-width siblings.
+      style={{ width: '100%', flexWrap: 'wrap', rowGap: 6 }}
       data-testid={`${idPrefix}-editor`}
     >
       <span
@@ -110,6 +114,7 @@ export function AmountEditor({
           color: accent,
           border: `1px solid ${accent}66`,
           whiteSpace: 'nowrap',
+          flexShrink: 0,
         }}
       >
         {label}
@@ -134,9 +139,13 @@ export function AmountEditor({
         className="font-numerics rounded-md"
         style={{
           // The amount input is narrower when a note input shares the row,
-          // wider when it's the only one.
-          flex: withNote ? '0 0 90px' : 1,
-          minWidth: 0,
+          // wider when it's the only one. It can shrink a bit on tight
+          // columns (flex-shrink 1) but never below a usable width for
+          // typing a dollar amount (minWidth 56) — flexWrap on the parent
+          // is what actually relieves the squeeze, by letting the note
+          // input wrap to its own row instead.
+          flex: withNote ? '0 1 72px' : 1,
+          minWidth: withNote ? 56 : 0,
           padding: '6px 8px',
           fontSize: 12,
           background: 'rgba(0,0,0,0.25)',
@@ -166,8 +175,12 @@ export function AmountEditor({
           className="rounded-md"
           maxLength={120}
           style={{
-            flex: 1,
-            minWidth: 0,
+            // flex-basis 100px + minWidth 100px: on a tight column this
+            // won't fit next to the label/amount/buttons and will wrap
+            // (flexWrap set on the parent) onto its own full-width row
+            // instead of being crushed down toward 0.
+            flex: '1 1 100px',
+            minWidth: 100,
             padding: '6px 8px',
             fontSize: 12,
             fontFamily: 'inherit',
@@ -187,6 +200,7 @@ export function AmountEditor({
         style={{
           width: 24,
           height: 24,
+          flexShrink: 0,
           background: disabled ? `${accent}22` : accent,
           color: disabled ? accent : '#fff',
           border: `1px solid ${accent}`,
@@ -204,6 +218,7 @@ export function AmountEditor({
         style={{
           width: 24,
           height: 24,
+          flexShrink: 0,
           background: 'transparent',
           color: 'var(--color-mc-fg-dim)',
           border: '1px solid rgba(255,255,255,0.16)',

@@ -366,7 +366,13 @@ export function MetricCard({ metric, big = false, onLog, onUpdateGoal }: MetricC
         </div>
       )}
 
-      <div className="relative mt-auto" style={{ height: 32 }}>
+      {/* The footer is a fixed 32px overlay slot for the default/preset
+          rows, but grows to fit its content while an amount is being
+          entered — on a narrow desktop grid column, the AmountEditor's
+          note input can wrap onto its own row (see AmountEditor.tsx), and
+          without `height: auto` here that second row would be clipped by
+          the card's `overflow-hidden` instead of growing the card. */}
+      <div className="relative mt-auto" style={{ height: isEditing ? 'auto' : 32, minHeight: 32 }}>
         {/* Default footer */}
         <div
           className="absolute inset-0"
@@ -458,7 +464,11 @@ export function MetricCard({ metric, big = false, onLog, onUpdateGoal }: MetricC
             For money, an additional note input lets the user describe the
             entry ("Benepass") rather than the auto "via Mission Control". */}
         {isEditing && onLog && editingLabel && (
-          <div className="absolute inset-0">
+          // Not absolutely positioned (unlike the default/preset rows
+          // above): its natural height — one row, or two if the note
+          // input wraps — is what makes the `height: isEditing ? 'auto'`
+          // parent (and therefore the card) actually grow.
+          <div className="relative">
             <AmountEditor
               label={editingLabel}
               accent={accent}
