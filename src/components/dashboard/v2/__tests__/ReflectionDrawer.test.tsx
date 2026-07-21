@@ -165,4 +165,40 @@ describe('ReflectionDrawer', () => {
       jest.useRealTimers();
     }
   });
+
+  it('does not clobber a keystroke typed immediately after opening, before the initial hydration frame fires', async () => {
+    const onSave = jest.fn(async () => {});
+    const onOpenChange = jest.fn();
+
+    // A leftover answer from a previous session/day — this is what the
+    // rehydration effect will try to hydrate `drafts` with once its
+    // requestAnimationFrame callback fires.
+    const staleAnswer = 'stale leftover answer';
+
+    render(
+      <ReflectionDrawer
+        open
+        onOpenChange={onOpenChange}
+        data={dataWithAnswer(QUESTIONS[0], staleAnswer)}
+        onSave={onSave}
+      />,
+    );
+
+    const input = screen.getByTestId('reflection-input-0');
+    // Type synchronously, in the same tick as mount — before the effect's
+    // requestAnimationFrame callback has had a chance to run. This is the
+    // exact race a fast typist (or a Playwright `.fill()` right after
+    // opening the drawer) hits in the real browser.
+    fireEvent.change(input, { target: { value: 'fresh typed value' } });
+
+    // Now let the real requestAnimationFrame callback actually fire.
+    await waitFor(() => expect(input).toHaveValue('fresh typed value'), { timeout: 2000 });
+
+    // Give it extra time to make sure a delayed hydration doesn't sneak in
+    // afterwards either.
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+    });
+    expect(input).toHaveValue('fresh typed value');
+  });
 });

@@ -57,6 +57,11 @@ export function ReflectionDrawer({ open, onOpenChange, data, onSave }: Reflectio
     // Defer via rAF so the setState is treated as an external-event callback,
     // not a synchronous effect-body setter (React 19 lint rule).
     const id = requestAnimationFrame(() => {
+      // Re-check here, not just at effect-run time above: the user can type
+      // (setting hasLocalEditsRef) in the gap between this effect scheduling
+      // the frame and the frame actually firing. Without this recheck, that
+      // keystroke is silently clobbered by the stale server snapshot.
+      if (hasLocalEditsRef.current) return;
       const next: Record<string, string> = {};
       questions.forEach((q) => {
         next[q] = initialAnswers.get(q) ?? '';
