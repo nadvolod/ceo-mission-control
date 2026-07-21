@@ -366,6 +366,75 @@ test.describe('Mission Control v2', () => {
     );
   });
 
+  test('reflection autosave does not strip typed spaces while the drawer stays open', async ({ page }) => {
+    await page.goto('/dashboard');
+    await page.getByTestId('open-reflection').click();
+    await expect(page.getByTestId('reflection-drawer')).toBeVisible();
+
+    const inner = `reflection-space-${Date.now()}`;
+    const padded = `   ${inner}   `;
+    const input = page.getByTestId('reflection-input-0');
+    await input.fill(padded);
+
+    await expect.poll(async () => {
+      const body = await readThreeToThriveFromPage(page);
+      return body.todaysEntry?.answers?.some(
+        (a: { answer: string }) => a.answer.includes(inner),
+      ) ?? false;
+    }).toBe(true);
+
+    await expect(input).toHaveValue(padded);
+  });
+
+  test('reflection autosave serializes slow saves so later typing is not lost', async ({ page }) => {
+    let firstSaveSeen = false;
+    let secondSaveSeen = false;
+    let releaseFirst!: () => void;
+    const firstSaveHold = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+
+    const first = `reflection-slow-1-${Date.now()}`;
+    const second = `${first}-latest`;
+
+    await page.route('**/api/three-to-thrive', async (route) => {
+      const req = route.request();
+      if (req.method() !== 'POST') return route.continue();
+      const body = JSON.parse(req.postData() || '{}');
+      if (body.answer === first && !firstSaveSeen) {
+        firstSaveSeen = true;
+        await firstSaveHold;
+      } else if (body.answer === second) {
+        secondSaveSeen = true;
+      }
+      return route.continue();
+    });
+
+    await page.goto('/dashboard');
+    await page.getByTestId('open-reflection').click();
+    const input = page.getByTestId('reflection-input-0');
+
+    await input.fill(first);
+    await page.waitForTimeout(800);
+    expect(firstSaveSeen).toBe(true);
+
+    await input.fill(second);
+    await page.waitForTimeout(800);
+    expect(secondSaveSeen).toBe(false);
+
+    releaseFirst();
+
+    await expect.poll(() => secondSaveSeen).toBe(true);
+    await expect.poll(async () => {
+      const body = await readThreeToThriveFromPage(page);
+      const question = body.todaysEntry?.questions?.[0];
+      const saved = body.todaysEntry?.answers?.find(
+        (a: { question: string; answer: string }) => a.question === question,
+      )?.answer;
+      return saved ?? null;
+    }).toContain(second);
+  });
+
   test('parity: /dashboard shows the same temporal hours as /api/focus-hours returns', async ({ page }) => {
     await page.goto('/dashboard');
     // Read through the same browser session that renders the card. This keeps
