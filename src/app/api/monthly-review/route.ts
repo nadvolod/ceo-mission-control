@@ -45,7 +45,6 @@ export async function POST(request: NextRequest) {
           temporalHours: data.temporalHours,
           energyGivers: data.energyGivers || '',
           energyDrainers: data.energyDrainers || '',
-          ignoredSignals: data.ignoredSignals || '',
           moneySpent: data.moneySpent || '',
           expenseJoyVsStress: data.expenseJoyVsStress || '',
           alignmentCheck: data.alignmentCheck || '',

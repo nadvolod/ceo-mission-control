@@ -128,7 +128,6 @@ function buildMonthlyReviews(): MonthlyReviewData {
       temporalHours: 22,
       energyGivers: ENERGY_GIVERS.slice(0, 3).join('\n'),
       energyDrainers: ENERGY_DRAINERS.slice(0, 2).join('\n'),
-      ignoredSignals: 'Skipped lifting two weeks running',
       moneySpent: 'Travel, software, coaching',
       expenseJoyVsStress: 'Coaching is joy. Travel is mixed.',
       alignmentCheck: 'Mostly disciplined. Slipped on Friday admin block twice.',

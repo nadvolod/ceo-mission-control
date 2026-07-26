@@ -14,7 +14,6 @@ function buildReview(overrides: Partial<MonthlyReview>): MonthlyReview {
     temporalHours: 40,
     energyGivers: 'June energy',
     energyDrainers: 'June drains',
-    ignoredSignals: 'June signals',
     moneySpent: 'June money',
     expenseJoyVsStress: 'June joy',
     alignmentCheck: 'June alignment',

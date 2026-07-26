@@ -6,17 +6,13 @@ name: Update visual baselines
 # on the same ubuntu-latest image the `playwright` CI job runs on — never on a
 # maintainer's macOS/Windows machine. This workflow does that.
 #
-# It runs in one pass:
-#   1. GENERATE — run the target spec with --update-snapshots and upload the
-#      regenerated PNGs as the `visual-baselines` artifact (commit these into
-#      the branch).
-#   2. PROVE-BUG — restore the pre-fix source from origin/main, rebuild, and run
-#      the spec against the freshly generated baselines WITHOUT updating them.
-#      The visual acceptance test MUST fail (red-before); the job passes only if
-#      the bug reproduced, and the diff images upload as `prove-bug-diffs`.
+# It builds the app from the CURRENT branch source, runs the target spec with
+# --update-snapshots, and uploads the regenerated PNGs as the `visual-baselines`
+# artifact. Download that artifact and commit the PNGs into your branch so the
+# required `playwright` CI job compares against a matching baseline.
 #
-# Dispatch manually from the default branch (Actions tab → Run workflow), then
-# download the `visual-baselines` artifact and commit the regenerated PNGs.
+# Dispatch manually (Actions tab → Run workflow), pick your feature branch as the
+# ref, then download the `visual-baselines` artifact and commit the PNGs.
 on:
   workflow_dispatch:
     inputs:
@@ -56,7 +52,7 @@ jobs:
           echo "✅ All required secrets are configured."
 
   visual-baselines:
-    name: Generate baselines + prove red-before
+    name: Generate baselines from current branch
     runs-on: ubuntu-latest
     needs: preflight
     steps:
@@ -71,7 +67,7 @@ jobs:
 
       - run: npm ci
 
-      - name: Build app (fixed source)
+      - name: Build app
         run: npm run build
         env:
           NODE_ENV: production
@@ -96,7 +92,7 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
-      - name: Generate baselines (fixed source, --update-snapshots)
+      - name: Generate baselines (--update-snapshots)
         run: npx playwright test auth.setup "$SPEC" --update-snapshots
         env:
           PLAYWRIGHT_TARGET: local
@@ -110,53 +106,4 @@ jobs:
         with:
           name: visual-baselines
           path: tests/e2e/**/*-snapshots/**
-          retention-days: 7
-
-      - name: Restore pre-fix CSS from origin/main
-        # Revert ONLY globals.css (drops the `.mc-light-surface` dark-text
-        # override). Keep the component's `mc-light-surface` class so the test's
-        # locator still resolves and the failure is a real color/screenshot
-        # mismatch (near-white text) — not a "selector not found" error.
-        run: |
-          git checkout origin/main -- src/app/globals.css
-          echo "Restored buggy CSS; freshly generated baselines + card class kept."
-
-      - name: Rebuild with buggy source
-        run: npm run build
-        env:
-          NODE_ENV: production
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-
-      - name: Prove bug reproduces (visual test MUST fail)
-        # A nonzero exit alone is not proof — an auth/migration/server error
-        # would falsely read as "reproduced". Require the specific BUG-80
-        # dark-ink assertion failure in the captured output.
-        run: |
-          output="$(mktemp)"
-          set +e
-          npx playwright test auth.setup "$SPEC" 2>&1 | tee "$output"
-          status=${PIPESTATUS[0]}
-          set -e
-          if [ "$status" -eq 0 ]; then
-            echo "::error::Bug NOT reproduced — visual acceptance test passed against pre-fix source."
-            exit 1
-          fi
-          if ! grep -Fq "input text color should be readable dark ink" "$output"; then
-            echo "::error::Visual test failed for an unexpected reason; BUG-80 was not proven."
-            exit 1
-          fi
-          echo "✅ Red-before confirmed: expected dark-ink assertion failed on pre-fix source."
-        env:
-          PLAYWRIGHT_TARGET: local
-          CI: true
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          IRON_SESSION_PASSWORD: ${{ secrets.IRON_SESSION_PASSWORD }}
-          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
-
-      - name: Upload red-before diff images
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: prove-bug-diffs
-          path: test-results/
           retention-days: 7

@@ -118,7 +118,6 @@ export function MonthlyReviewTracker({
   const [temporalHours, setTemporalHours] = useState(defaultReview?.temporalHours?.toString() ?? '');
   const [energyGivers, setEnergyGivers] = useState(defaultReview?.energyGivers ?? '');
   const [energyDrainers, setEnergyDrainers] = useState(defaultReview?.energyDrainers ?? '');
-  const [ignoredSignals, setIgnoredSignals] = useState(defaultReview?.ignoredSignals ?? '');
   const [moneySpent, setMoneySpent] = useState(defaultReview?.moneySpent ?? '');
   const [expenseJoyVsStress, setExpenseJoyVsStress] = useState(defaultReview?.expenseJoyVsStress ?? '');
   const [alignmentCheck, setAlignmentCheck] = useState(defaultReview?.alignmentCheck ?? '');
@@ -146,7 +145,6 @@ export function MonthlyReviewTracker({
     setTemporalHours(review?.temporalHours?.toString() ?? '');
     setEnergyGivers(review?.energyGivers ?? '');
     setEnergyDrainers(review?.energyDrainers ?? '');
-    setIgnoredSignals(review?.ignoredSignals ?? '');
     setMoneySpent(review?.moneySpent ?? '');
     setExpenseJoyVsStress(review?.expenseJoyVsStress ?? '');
     setAlignmentCheck(review?.alignmentCheck ?? '');
@@ -196,7 +194,6 @@ export function MonthlyReviewTracker({
         temporalHours: th,
         energyGivers,
         energyDrainers,
-        ignoredSignals,
         moneySpent,
         expenseJoyVsStress,
         alignmentCheck,
@@ -389,21 +386,6 @@ export function MonthlyReviewTracker({
                 </div>
               </div>
             </fieldset>
-
-            {/* Health signals */}
-            <div>
-              <label htmlFor="mr-signals" className="block text-sm font-medium text-gray-700 mb-1">
-                Health Signals Ignored
-              </label>
-              <textarea
-                id="mr-signals"
-                rows={2}
-                value={ignoredSignals}
-                onChange={e => setIgnoredSignals(e.target.value)}
-                placeholder="Where did I ignore chronic signals?"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              />
-            </div>
 
             {/* Money section */}
             <fieldset className="border border-gray-200 rounded-lg p-4">
@@ -656,7 +638,6 @@ export function MonthlyReviewTracker({
                           <DetailField label="Time Allocation" value={review.timeAllocation} />
                           <DetailField label="Energy Givers" value={review.energyGivers} />
                           <DetailField label="Energy Drainers" value={review.energyDrainers} />
-                          <DetailField label="Ignored Signals" value={review.ignoredSignals} />
                           <DetailField label="Money Spent" value={review.moneySpent} />
                           <DetailField label="Joy vs Stress" value={review.expenseJoyVsStress} />
                           <DetailField label="Alignment Check" value={review.alignmentCheck} />

@@ -35,7 +35,6 @@ function makeValidReview(overrides: Partial<MonthlyReview> = {}): Omit<MonthlyRe
     temporalHours: 40,
     energyGivers: 'vibe coding, working out',
     energyDrainers: 'procrastination',
-    ignoredSignals: 'sleep schedule slipping',
     moneySpent: '$7k rent, $1k groceries',
     expenseJoyVsStress: 'Passive income: joy. Rent: stress.',
     alignmentCheck: 'Mostly aligned with long-term goals',

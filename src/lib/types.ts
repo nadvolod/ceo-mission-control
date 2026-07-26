@@ -331,8 +331,6 @@ export interface MonthlyReview {
   // Energy
   energyGivers: string;            // "What gave me energy?"
   energyDrainers: string;          // "What drained me?"
-  // Health signals
-  ignoredSignals: string;          // "Where did I ignore chronic signals?"
   // Money
   moneySpent: string;              // "Where did my money go?" (free-text breakdown)
   expenseJoyVsStress: string;      // "Which expenses brought joy vs stress?"

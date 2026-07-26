@@ -552,7 +552,6 @@ test.describe('Dashboard page rendering', () => {
         temporalHours: 35,
         energyGivers: 'Playwright tests passing',
         energyDrainers: 'Flaky selectors',
-        ignoredSignals: 'Sleep',
         moneySpent: '$100 on tests',
         expenseJoyVsStress: 'Joy: passing tests. Stress: none.',
         alignmentCheck: 'Aligned with testing goals',

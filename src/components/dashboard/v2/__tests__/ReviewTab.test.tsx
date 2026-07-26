@@ -12,7 +12,6 @@ function makeReview(overrides: Partial<MonthlyReview> = {}): MonthlyReview {
     temporalHours: 80,
     energyGivers: '',
     energyDrainers: '',
-    ignoredSignals: '',
     moneySpent: '',
     expenseJoyVsStress: '',
     alignmentCheck: '',
