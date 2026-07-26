@@ -15,8 +15,8 @@ name: Update visual baselines
 #      The visual acceptance test MUST fail (red-before); the job passes only if
 #      the bug reproduced, and the diff images upload as `prove-bug-diffs`.
 #
-# The push trigger below is a one-time bootstrap for the BUG-80 branch and is
-# removed before merge, leaving a reusable workflow_dispatch tool.
+# Dispatch manually from the default branch (Actions tab → Run workflow), then
+# download the `visual-baselines` artifact and commit the regenerated PNGs.
 on:
   workflow_dispatch:
     inputs:
@@ -24,9 +24,6 @@ on:
         description: 'Spec file filter passed to `playwright test`'
         required: true
         default: 'monthly-review-visual'
-  push:
-    branches:
-      - 'fix/bug-80-monthly-review-text-color'
 
 env:
   SPEC: ${{ github.event.inputs.spec || 'monthly-review-visual' }}
