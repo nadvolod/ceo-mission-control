@@ -1,0 +1,122 @@
+name: Update visual baselines
+
+# On-demand utility for Playwright visual (toHaveScreenshot) baselines.
+#
+# Baselines are pixel-sensitive to the OS font rendering, so they MUST be
+# generated on the same ubuntu-latest image the `playwright` CI job runs on —
+# never on a maintainer's macOS/Windows machine. This workflow does that.
+#
+# Modes (workflow_dispatch input `mode`):
+#   generate  — run the target spec with --update-snapshots and upload the
+#               regenerated PNGs as an artifact to commit into the branch.
+#   prove-bug — restore the pre-fix source from origin/main and run the spec
+#               WITHOUT updating snapshots; the visual acceptance test must FAIL
+#               (red-before). The job passes only if the bug reproduced, and the
+#               diff images are uploaded as evidence.
+on:
+  workflow_dispatch:
+    inputs:
+      spec:
+        description: 'Spec file filter passed to `playwright test`'
+        required: true
+        default: 'monthly-review-visual'
+      mode:
+        description: 'generate (update baselines) or prove-bug (expect red-before)'
+        required: true
+        default: 'generate'
+        type: choice
+        options:
+          - generate
+          - prove-bug
+
+jobs:
+  visual-baselines:
+    name: Visual baselines (${{ inputs.mode }})
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Restore pre-fix source (prove-bug only)
+        if: ${{ inputs.mode == 'prove-bug' }}
+        run: |
+          git fetch origin main --depth=1
+          git checkout origin/main -- \
+            src/app/globals.css \
+            src/components/MonthlyReviewTracker.tsx
+          echo "Restored buggy source from origin/main; new test + baselines kept."
+
+      - name: Build app
+        run: npm run build
+        env:
+          NODE_ENV: production
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Run database migrations
+        run: npm run db:migrate
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ADMIN_INITIAL_PASSWORD: ${{ secrets.ADMIN_INITIAL_PASSWORD }}
+          DEMO_USER_PASSWORD: ${{ secrets.DEMO_USER_PASSWORD }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
+      - name: Reseed user passwords from env
+        run: npm run db:reseed-users
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          ADMIN_INITIAL_PASSWORD: ${{ secrets.ADMIN_INITIAL_PASSWORD }}
+          DEMO_USER_PASSWORD: ${{ secrets.DEMO_USER_PASSWORD }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
+      - name: Install Playwright browsers
+        run: npx playwright install chromium --with-deps
+
+      - name: Generate baselines
+        if: ${{ inputs.mode == 'generate' }}
+        run: npx playwright test auth.setup "${{ inputs.spec }}" --update-snapshots
+        env:
+          PLAYWRIGHT_TARGET: local
+          CI: true
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          IRON_SESSION_PASSWORD: ${{ secrets.IRON_SESSION_PASSWORD }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
+      - name: Upload regenerated baselines
+        if: ${{ inputs.mode == 'generate' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: visual-baselines
+          path: tests/e2e/**/*-snapshots/**
+          retention-days: 7
+
+      - name: Prove bug reproduces (expect visual test to FAIL)
+        if: ${{ inputs.mode == 'prove-bug' }}
+        run: |
+          if npx playwright test auth.setup "${{ inputs.spec }}"; then
+            echo "::error::Bug NOT reproduced — visual acceptance test passed against pre-fix source."
+            exit 1
+          else
+            echo "✅ Red-before confirmed: visual acceptance test failed against pre-fix source."
+          fi
+        env:
+          PLAYWRIGHT_TARGET: local
+          CI: true
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          IRON_SESSION_PASSWORD: ${{ secrets.IRON_SESSION_PASSWORD }}
+          TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
+
+      - name: Upload failure diff images (prove-bug)
+        if: ${{ inputs.mode == 'prove-bug' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: prove-bug-diffs
+          path: test-results/
+          retention-days: 7
