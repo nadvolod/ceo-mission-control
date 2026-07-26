@@ -245,7 +245,7 @@ export function MonthlyReviewTracker({
 
   // ── Render ──────────────────────────────────────────────────────────────
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
+    <div className="mc-light-surface bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
       {/* Header */}
       <div className="bg-gradient-to-r from-indigo-50 to-purple-50 px-6 py-4 border-b border-gray-200">
         <div className="flex items-center justify-between">

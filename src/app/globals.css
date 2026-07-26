@@ -169,3 +169,12 @@ html {
 .mc-root textarea {
   color: var(--color-mc-ink);
 }
+
+/* Light-themed surfaces inside the dark v2 dashboard (e.g. the Monthly Review
+   white card) keep dark text so it's readable on their light background.
+   Specificity (0,2,1) beats the `.mc-root input` rule above (0,1,1). */
+.mc-root .mc-light-surface input,
+.mc-root .mc-light-surface select,
+.mc-root .mc-light-surface textarea {
+  color: #171717;
+}
