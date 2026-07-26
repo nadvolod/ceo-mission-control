@@ -2,17 +2,21 @@ name: Update visual baselines
 
 # On-demand utility for Playwright visual (toHaveScreenshot) baselines.
 #
-# Baselines are pixel-sensitive to the OS font rendering, so they MUST be
-# generated on the same ubuntu-latest image the `playwright` CI job runs on —
-# never on a maintainer's macOS/Windows machine. This workflow does that.
+# Baselines are pixel-sensitive to OS font rendering, so they MUST be generated
+# on the same ubuntu-latest image the `playwright` CI job runs on — never on a
+# maintainer's macOS/Windows machine. This workflow does that.
 #
-# Modes (workflow_dispatch input `mode`):
-#   generate  — run the target spec with --update-snapshots and upload the
-#               regenerated PNGs as an artifact to commit into the branch.
-#   prove-bug — restore the pre-fix source from origin/main and run the spec
-#               WITHOUT updating snapshots; the visual acceptance test must FAIL
-#               (red-before). The job passes only if the bug reproduced, and the
-#               diff images are uploaded as evidence.
+# It runs in one pass:
+#   1. GENERATE — run the target spec with --update-snapshots and upload the
+#      regenerated PNGs as the `visual-baselines` artifact (commit these into
+#      the branch).
+#   2. PROVE-BUG — restore the pre-fix source from origin/main, rebuild, and run
+#      the spec against the freshly generated baselines WITHOUT updating them.
+#      The visual acceptance test MUST fail (red-before); the job passes only if
+#      the bug reproduced, and the diff images upload as `prove-bug-diffs`.
+#
+# The push trigger below is a one-time bootstrap for the BUG-80 branch and is
+# removed before merge, leaving a reusable workflow_dispatch tool.
 on:
   workflow_dispatch:
     inputs:
@@ -20,18 +24,16 @@ on:
         description: 'Spec file filter passed to `playwright test`'
         required: true
         default: 'monthly-review-visual'
-      mode:
-        description: 'generate (update baselines) or prove-bug (expect red-before)'
-        required: true
-        default: 'generate'
-        type: choice
-        options:
-          - generate
-          - prove-bug
+  push:
+    branches:
+      - 'fix/bug-80-monthly-review-text-color'
+
+env:
+  SPEC: ${{ github.event.inputs.spec || 'monthly-review-visual' }}
 
 jobs:
   visual-baselines:
-    name: Visual baselines (${{ inputs.mode }})
+    name: Generate baselines + prove red-before
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -45,16 +47,7 @@ jobs:
 
       - run: npm ci
 
-      - name: Restore pre-fix source (prove-bug only)
-        if: ${{ inputs.mode == 'prove-bug' }}
-        run: |
-          git fetch origin main --depth=1
-          git checkout origin/main -- \
-            src/app/globals.css \
-            src/components/MonthlyReviewTracker.tsx
-          echo "Restored buggy source from origin/main; new test + baselines kept."
-
-      - name: Build app
+      - name: Build app (fixed source)
         run: npm run build
         env:
           NODE_ENV: production
@@ -79,9 +72,8 @@ jobs:
       - name: Install Playwright browsers
         run: npx playwright install chromium --with-deps
 
-      - name: Generate baselines
-        if: ${{ inputs.mode == 'generate' }}
-        run: npx playwright test auth.setup "${{ inputs.spec }}" --update-snapshots
+      - name: Generate baselines (fixed source, --update-snapshots)
+        run: npx playwright test auth.setup "$SPEC" --update-snapshots
         env:
           PLAYWRIGHT_TARGET: local
           CI: true
@@ -90,17 +82,30 @@ jobs:
           TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
 
       - name: Upload regenerated baselines
-        if: ${{ inputs.mode == 'generate' }}
         uses: actions/upload-artifact@v4
         with:
           name: visual-baselines
           path: tests/e2e/**/*-snapshots/**
           retention-days: 7
 
-      - name: Prove bug reproduces (expect visual test to FAIL)
-        if: ${{ inputs.mode == 'prove-bug' }}
+      - name: Restore pre-fix CSS from origin/main
+        # Revert ONLY globals.css (drops the `.mc-light-surface` dark-text
+        # override). Keep the component's `mc-light-surface` class so the test's
+        # locator still resolves and the failure is a real color/screenshot
+        # mismatch (near-white text) — not a "selector not found" error.
         run: |
-          if npx playwright test auth.setup "${{ inputs.spec }}"; then
+          git checkout origin/main -- src/app/globals.css
+          echo "Restored buggy CSS; freshly generated baselines + card class kept."
+
+      - name: Rebuild with buggy source
+        run: npm run build
+        env:
+          NODE_ENV: production
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Prove bug reproduces (visual test MUST fail)
+        run: |
+          if npx playwright test auth.setup "$SPEC"; then
             echo "::error::Bug NOT reproduced — visual acceptance test passed against pre-fix source."
             exit 1
           else
@@ -113,8 +118,8 @@ jobs:
           IRON_SESSION_PASSWORD: ${{ secrets.IRON_SESSION_PASSWORD }}
           TEST_USER_PASSWORD: ${{ secrets.TEST_USER_PASSWORD }}
 
-      - name: Upload failure diff images (prove-bug)
-        if: ${{ inputs.mode == 'prove-bug' }}
+      - name: Upload red-before diff images
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: prove-bug-diffs
