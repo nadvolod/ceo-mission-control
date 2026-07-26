@@ -337,7 +337,6 @@ export interface MonthlyReview {
   // Alignment & discipline
   alignmentCheck: string;          // "Did I align with long-term discipline or impulse?"
   monthLesson: string;             // "What lesson does this month teach?"
-  decisionSource: 'discipline' | 'emotion' | 'mixed';
   badHabits: string;               // "What bad habits tried to return?"
   goodPatterns: string;            // "What good pattern held?"
   // Self-ratings (1-10)

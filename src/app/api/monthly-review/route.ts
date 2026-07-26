@@ -49,7 +49,6 @@ export async function POST(request: NextRequest) {
           expenseJoyVsStress: data.expenseJoyVsStress || '',
           alignmentCheck: data.alignmentCheck || '',
           monthLesson: data.monthLesson || '',
-          decisionSource: data.decisionSource || 'mixed',
           badHabits: data.badHabits || '',
           goodPatterns: data.goodPatterns || '',
           ratings: data.ratings,

@@ -16,7 +16,6 @@ function makeReview(overrides: Partial<MonthlyReview> = {}): MonthlyReview {
     expenseJoyVsStress: '',
     alignmentCheck: '',
     monthLesson: 'Ship the deck on Mondays, polish on Tuesdays.',
-    decisionSource: 'discipline',
     badHabits: '',
     goodPatterns: '',
     ratings: { discipline: 7, focus: 6, nutrition: 5, fitness: 8, sleep: 7 },

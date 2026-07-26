@@ -18,7 +18,6 @@ function buildReview(overrides: Partial<MonthlyReview>): MonthlyReview {
     expenseJoyVsStress: 'June joy',
     alignmentCheck: 'June alignment',
     monthLesson: 'June lesson',
-    decisionSource: 'discipline',
     badHabits: 'June bad habits',
     goodPatterns: 'June good patterns',
     ratings: {

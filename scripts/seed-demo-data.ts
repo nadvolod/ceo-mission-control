@@ -132,7 +132,6 @@ function buildMonthlyReviews(): MonthlyReviewData {
       expenseJoyVsStress: 'Coaching is joy. Travel is mixed.',
       alignmentCheck: 'Mostly disciplined. Slipped on Friday admin block twice.',
       monthLesson: 'Lock pipeline block before strategy time.',
-      decisionSource: 'discipline',
       badHabits: 'Doomscroll after 9pm.',
       goodPatterns: 'Morning gym → strategy block.',
       ratings: { discipline: 8 - m, focus: 7, nutrition: 7, fitness: 6 + m, sleep: 7 },

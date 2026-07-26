@@ -39,7 +39,6 @@ function makeValidReview(overrides: Partial<MonthlyReview> = {}): Omit<MonthlyRe
     expenseJoyVsStress: 'Passive income: joy. Rent: stress.',
     alignmentCheck: 'Mostly aligned with long-term goals',
     monthLesson: 'Consistency beats intensity',
-    decisionSource: 'discipline' as const,
     badHabits: 'Procrastination, late nights',
     goodPatterns: 'Focused work blocks held',
     ratings: {
@@ -156,13 +155,6 @@ describe('MonthlyReviewTracker', () => {
     await expect(
       tracker.submitReview(makeValidReview({ month: '2026-13' }))
     ).rejects.toThrow('month must be a valid YYYY-MM string');
-  });
-
-  test('validates decisionSource enum', async () => {
-    const tracker = await MonthlyReviewTracker.create(UNIT_TEST_OWNER_ID);
-    await expect(
-      tracker.submitReview(makeValidReview({ decisionSource: 'chaos' as any }))
-    ).rejects.toThrow('decisionSource must be one of: discipline, emotion, mixed');
   });
 
   test('deletes a review by month', async () => {

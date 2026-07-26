@@ -20,12 +20,6 @@ const RATING_KEYS: Array<{ key: keyof MonthlyReviewRatings; label: string; color
   { key: 'sleep', label: 'Sleep', color: '#6366f1' },
 ];
 
-const DECISION_OPTIONS: Array<{ value: MonthlyReview['decisionSource']; label: string; colors: string }> = [
-  { value: 'discipline', label: 'Discipline', colors: 'bg-green-100 text-green-800 border-green-300 ring-green-500' },
-  { value: 'emotion', label: 'Emotion', colors: 'bg-red-100 text-red-800 border-red-300 ring-red-500' },
-  { value: 'mixed', label: 'Mixed', colors: 'bg-amber-100 text-amber-800 border-amber-300 ring-amber-500' },
-];
-
 type TabId = 'new' | 'history' | 'trends';
 
 const TABS: Array<{ id: TabId; label: string }> = [
@@ -71,14 +65,6 @@ function formatMonthLabel(m: string): string {
   return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 }
 
-function decisionBadge(src: MonthlyReview['decisionSource']): { label: string; className: string } {
-  switch (src) {
-    case 'discipline': return { label: 'Discipline', className: 'bg-green-100 text-green-800' };
-    case 'emotion': return { label: 'Emotion', className: 'bg-red-100 text-red-800' };
-    case 'mixed': return { label: 'Mixed', className: 'bg-amber-100 text-amber-800' };
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -122,7 +108,6 @@ export function MonthlyReviewTracker({
   const [expenseJoyVsStress, setExpenseJoyVsStress] = useState(defaultReview?.expenseJoyVsStress ?? '');
   const [alignmentCheck, setAlignmentCheck] = useState(defaultReview?.alignmentCheck ?? '');
   const [monthLesson, setMonthLesson] = useState(defaultReview?.monthLesson ?? '');
-  const [decisionSource, setDecisionSource] = useState<MonthlyReview['decisionSource']>(defaultReview?.decisionSource ?? 'discipline');
   const [badHabits, setBadHabits] = useState(defaultReview?.badHabits ?? '');
   const [goodPatterns, setGoodPatterns] = useState(defaultReview?.goodPatterns ?? '');
   const [ratings, setRatings] = useState<MonthlyReviewRatings>(defaultReview?.ratings ?? emptyRatings());
@@ -149,7 +134,6 @@ export function MonthlyReviewTracker({
     setExpenseJoyVsStress(review?.expenseJoyVsStress ?? '');
     setAlignmentCheck(review?.alignmentCheck ?? '');
     setMonthLesson(review?.monthLesson ?? '');
-    setDecisionSource(review?.decisionSource ?? 'discipline');
     setBadHabits(review?.badHabits ?? '');
     setGoodPatterns(review?.goodPatterns ?? '');
     setRatings(review?.ratings ?? emptyRatings());
@@ -198,7 +182,6 @@ export function MonthlyReviewTracker({
         expenseJoyVsStress,
         alignmentCheck,
         monthLesson,
-        decisionSource,
         badHabits,
         goodPatterns,
         ratings,
@@ -449,27 +432,6 @@ export function MonthlyReviewTracker({
                   </div>
                 </div>
 
-                {/* Decision source toggle */}
-                <div>
-                  <span className="block text-xs text-gray-500 mb-2">Primary decision driver this month</span>
-                  <div className="flex gap-2">
-                    {DECISION_OPTIONS.map(opt => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setDecisionSource(opt.value)}
-                        className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-all ${
-                          decisionSource === opt.value
-                            ? `${opt.colors} ring-2`
-                            : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div>
                     <label htmlFor="mr-bad" className="block text-xs text-gray-500 mb-1">
@@ -599,7 +561,6 @@ export function MonthlyReviewTracker({
             ) : (
               recentReviews.map(review => {
                 const isExpanded = expandedId === review.id;
-                const badge = decisionBadge(review.decisionSource);
                 return (
                   <div
                     key={review.id}
@@ -617,9 +578,6 @@ export function MonthlyReviewTracker({
                         </span>
                         <span className="text-xs text-gray-500">{review.hoursWorked}h worked</span>
                         <span className="text-xs text-gray-500">{review.temporalHours}h temporal</span>
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badge.className}`}>
-                          {badge.label}
-                        </span>
                         <span className="text-xs text-indigo-600 font-medium">
                           avg {avgRating(review.ratings)}
                         </span>
