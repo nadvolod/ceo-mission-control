@@ -331,22 +331,19 @@ export interface MonthlyReview {
   // Energy
   energyGivers: string;            // "What gave me energy?"
   energyDrainers: string;          // "What drained me?"
-  // Health signals
-  ignoredSignals: string;          // "Where did I ignore chronic signals?"
   // Money
   moneySpent: string;              // "Where did my money go?" (free-text breakdown)
   expenseJoyVsStress: string;      // "Which expenses brought joy vs stress?"
   // Alignment & discipline
   alignmentCheck: string;          // "Did I align with long-term discipline or impulse?"
   monthLesson: string;             // "What lesson does this month teach?"
-  decisionSource: 'discipline' | 'emotion' | 'mixed';
   badHabits: string;               // "What bad habits tried to return?"
   goodPatterns: string;            // "What good pattern held?"
   // Self-ratings (1-10)
   ratings: MonthlyReviewRatings;
   // Forward commitments
   oneThingToFix: string;           // "If I fix only ONE thing next month..."
-  disciplinedVersionAction: string; // "What would a disciplined version of me do?"
+  disciplinedVersionAction: string; // "What kind of man am I becoming?"
   // Metadata
   createdAt: string;               // ISO datetime
   updatedAt: string;               // ISO datetime

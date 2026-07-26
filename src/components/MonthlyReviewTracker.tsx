@@ -20,12 +20,6 @@ const RATING_KEYS: Array<{ key: keyof MonthlyReviewRatings; label: string; color
   { key: 'sleep', label: 'Sleep', color: '#6366f1' },
 ];
 
-const DECISION_OPTIONS: Array<{ value: MonthlyReview['decisionSource']; label: string; colors: string }> = [
-  { value: 'discipline', label: 'Discipline', colors: 'bg-green-100 text-green-800 border-green-300 ring-green-500' },
-  { value: 'emotion', label: 'Emotion', colors: 'bg-red-100 text-red-800 border-red-300 ring-red-500' },
-  { value: 'mixed', label: 'Mixed', colors: 'bg-amber-100 text-amber-800 border-amber-300 ring-amber-500' },
-];
-
 type TabId = 'new' | 'history' | 'trends';
 
 const TABS: Array<{ id: TabId; label: string }> = [
@@ -71,14 +65,6 @@ function formatMonthLabel(m: string): string {
   return d.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 }
 
-function decisionBadge(src: MonthlyReview['decisionSource']): { label: string; className: string } {
-  switch (src) {
-    case 'discipline': return { label: 'Discipline', className: 'bg-green-100 text-green-800' };
-    case 'emotion': return { label: 'Emotion', className: 'bg-red-100 text-red-800' };
-    case 'mixed': return { label: 'Mixed', className: 'bg-amber-100 text-amber-800' };
-  }
-}
-
 // ---------------------------------------------------------------------------
 // Props
 // ---------------------------------------------------------------------------
@@ -118,12 +104,10 @@ export function MonthlyReviewTracker({
   const [temporalHours, setTemporalHours] = useState(defaultReview?.temporalHours?.toString() ?? '');
   const [energyGivers, setEnergyGivers] = useState(defaultReview?.energyGivers ?? '');
   const [energyDrainers, setEnergyDrainers] = useState(defaultReview?.energyDrainers ?? '');
-  const [ignoredSignals, setIgnoredSignals] = useState(defaultReview?.ignoredSignals ?? '');
   const [moneySpent, setMoneySpent] = useState(defaultReview?.moneySpent ?? '');
   const [expenseJoyVsStress, setExpenseJoyVsStress] = useState(defaultReview?.expenseJoyVsStress ?? '');
   const [alignmentCheck, setAlignmentCheck] = useState(defaultReview?.alignmentCheck ?? '');
   const [monthLesson, setMonthLesson] = useState(defaultReview?.monthLesson ?? '');
-  const [decisionSource, setDecisionSource] = useState<MonthlyReview['decisionSource']>(defaultReview?.decisionSource ?? 'discipline');
   const [badHabits, setBadHabits] = useState(defaultReview?.badHabits ?? '');
   const [goodPatterns, setGoodPatterns] = useState(defaultReview?.goodPatterns ?? '');
   const [ratings, setRatings] = useState<MonthlyReviewRatings>(defaultReview?.ratings ?? emptyRatings());
@@ -146,12 +130,10 @@ export function MonthlyReviewTracker({
     setTemporalHours(review?.temporalHours?.toString() ?? '');
     setEnergyGivers(review?.energyGivers ?? '');
     setEnergyDrainers(review?.energyDrainers ?? '');
-    setIgnoredSignals(review?.ignoredSignals ?? '');
     setMoneySpent(review?.moneySpent ?? '');
     setExpenseJoyVsStress(review?.expenseJoyVsStress ?? '');
     setAlignmentCheck(review?.alignmentCheck ?? '');
     setMonthLesson(review?.monthLesson ?? '');
-    setDecisionSource(review?.decisionSource ?? 'discipline');
     setBadHabits(review?.badHabits ?? '');
     setGoodPatterns(review?.goodPatterns ?? '');
     setRatings(review?.ratings ?? emptyRatings());
@@ -196,12 +178,10 @@ export function MonthlyReviewTracker({
         temporalHours: th,
         energyGivers,
         energyDrainers,
-        ignoredSignals,
         moneySpent,
         expenseJoyVsStress,
         alignmentCheck,
         monthLesson,
-        decisionSource,
         badHabits,
         goodPatterns,
         ratings,
@@ -390,21 +370,6 @@ export function MonthlyReviewTracker({
               </div>
             </fieldset>
 
-            {/* Health signals */}
-            <div>
-              <label htmlFor="mr-signals" className="block text-sm font-medium text-gray-700 mb-1">
-                Health Signals Ignored
-              </label>
-              <textarea
-                id="mr-signals"
-                rows={2}
-                value={ignoredSignals}
-                onChange={e => setIgnoredSignals(e.target.value)}
-                placeholder="Where did I ignore chronic signals?"
-                className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              />
-            </div>
-
             {/* Money section */}
             <fieldset className="border border-gray-200 rounded-lg p-4">
               <legend className="text-sm font-semibold text-gray-700 px-2">Money</legend>
@@ -464,27 +429,6 @@ export function MonthlyReviewTracker({
                       onChange={e => setMonthLesson(e.target.value)}
                       className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
                     />
-                  </div>
-                </div>
-
-                {/* Decision source toggle */}
-                <div>
-                  <span className="block text-xs text-gray-500 mb-2">Primary decision driver this month</span>
-                  <div className="flex gap-2">
-                    {DECISION_OPTIONS.map(opt => (
-                      <button
-                        key={opt.value}
-                        type="button"
-                        onClick={() => setDecisionSource(opt.value)}
-                        className={`flex-1 px-3 py-2 text-sm font-medium rounded-lg border transition-all ${
-                          decisionSource === opt.value
-                            ? `${opt.colors} ring-2`
-                            : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'
-                        }`}
-                      >
-                        {opt.label}
-                      </button>
-                    ))}
                   </div>
                 </div>
 
@@ -563,7 +507,7 @@ export function MonthlyReviewTracker({
                 </div>
                 <div>
                   <label htmlFor="mr-disciplined" className="block text-xs text-gray-500 mb-1">
-                    What would a disciplined version of me do?
+                    What kind of man am I becoming?
                   </label>
                   <textarea
                     id="mr-disciplined"
@@ -617,7 +561,6 @@ export function MonthlyReviewTracker({
             ) : (
               recentReviews.map(review => {
                 const isExpanded = expandedId === review.id;
-                const badge = decisionBadge(review.decisionSource);
                 return (
                   <div
                     key={review.id}
@@ -635,9 +578,6 @@ export function MonthlyReviewTracker({
                         </span>
                         <span className="text-xs text-gray-500">{review.hoursWorked}h worked</span>
                         <span className="text-xs text-gray-500">{review.temporalHours}h temporal</span>
-                        <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${badge.className}`}>
-                          {badge.label}
-                        </span>
                         <span className="text-xs text-indigo-600 font-medium">
                           avg {avgRating(review.ratings)}
                         </span>
@@ -656,7 +596,6 @@ export function MonthlyReviewTracker({
                           <DetailField label="Time Allocation" value={review.timeAllocation} />
                           <DetailField label="Energy Givers" value={review.energyGivers} />
                           <DetailField label="Energy Drainers" value={review.energyDrainers} />
-                          <DetailField label="Ignored Signals" value={review.ignoredSignals} />
                           <DetailField label="Money Spent" value={review.moneySpent} />
                           <DetailField label="Joy vs Stress" value={review.expenseJoyVsStress} />
                           <DetailField label="Alignment Check" value={review.alignmentCheck} />

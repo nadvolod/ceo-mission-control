@@ -7,8 +7,6 @@ const RATING_KEYS: (keyof MonthlyReviewRatings)[] = [
   'discipline', 'focus', 'nutrition', 'fitness', 'sleep',
 ];
 
-const VALID_DECISION_SOURCES = ['discipline', 'emotion', 'mixed'] as const;
-
 function defaultData(): MonthlyReviewData {
   return { reviews: [], lastUpdated: new Date().toISOString() };
 }
@@ -55,11 +53,6 @@ export class MonthlyReviewTracker {
     }
     if (typeof input.temporalHours !== 'number' || !isFinite(input.temporalHours) || input.temporalHours < 0) {
       throw new Error('temporalHours must be a non-negative number');
-    }
-
-    // Validate decisionSource
-    if (!VALID_DECISION_SOURCES.includes(input.decisionSource as typeof VALID_DECISION_SOURCES[number])) {
-      throw new Error('decisionSource must be one of: discipline, emotion, mixed');
     }
 
     // Validate ratings
