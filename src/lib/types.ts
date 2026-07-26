@@ -343,7 +343,7 @@ export interface MonthlyReview {
   ratings: MonthlyReviewRatings;
   // Forward commitments
   oneThingToFix: string;           // "If I fix only ONE thing next month..."
-  disciplinedVersionAction: string; // "What would a disciplined version of me do?"
+  disciplinedVersionAction: string; // "What kind of man am I becoming?"
   // Metadata
   createdAt: string;               // ISO datetime
   updatedAt: string;               // ISO datetime

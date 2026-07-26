@@ -507,7 +507,7 @@ export function MonthlyReviewTracker({
                 </div>
                 <div>
                   <label htmlFor="mr-disciplined" className="block text-xs text-gray-500 mb-1">
-                    What would a disciplined version of me do?
+                    What kind of man am I becoming?
                   </label>
                   <textarea
                     id="mr-disciplined"
