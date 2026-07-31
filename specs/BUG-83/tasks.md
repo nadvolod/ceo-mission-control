@@ -28,9 +28,9 @@ authentication, environment, server, or unrelated failures.
 
 ## Phase 3: Minimal fix
 
-- [ ] Add the scoped mobile 16px form rule to `src/app/globals.css`.
-- [ ] Add `mc-root` to command palette `Dialog.Content`.
-- [ ] Confirm no viewport zoom restrictions or unrelated component changes were introduced.
+- [x] Add the scoped mobile 16px form rule to `src/app/globals.css`.
+- [x] Add `mc-root` to command palette `Dialog.Content`.
+- [x] Confirm no viewport zoom restrictions or unrelated component changes were introduced.
 - [ ] Re-run PW-1 and PW-2 and capture green output.
 
 ## Phase 4: Visual evidence

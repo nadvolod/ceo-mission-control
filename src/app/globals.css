@@ -178,3 +178,14 @@ html {
 .mc-root .mc-light-surface textarea {
   color: #171717;
 }
+
+/* iOS Safari zooms a focused form control when its text is smaller than 16px.
+   Keep this scoped to the current dashboard, including its `.mc-root` portals.
+   `!important` is required because several controls set fontSize inline. */
+@media (max-width: 767px) {
+  .mc-root input,
+  .mc-root select,
+  .mc-root textarea {
+    font-size: 16px !important;
+  }
+}
