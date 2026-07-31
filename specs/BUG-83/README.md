@@ -2,7 +2,7 @@
 
 **Issue:** [#83 — Screen is cut when entering information on mobile for the Daily Log](https://github.com/nadvolod/ceo-mission-control/issues/83)
 
-**Status:** Draft — awaiting specification approval
+**Status:** Approved — implementation in progress
 
 **Target:** Current `/dashboard` experience
 

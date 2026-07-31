@@ -8,9 +8,9 @@ Tasks are ordered. Do not begin a phase until its gate is satisfied.
 - [x] Create the five-file `specs/BUG-83/` package.
 - [x] Record scoped requirements, minimal design, test plan, risks, and delivery gates.
 - [x] Validate and commit the draft specification separately from tests and production code.
-- [ ] Review the specification package with the user.
-- [ ] Mark the specification approved in `README.md`.
-- [ ] Commit the specification approval status before starting implementation.
+- [x] Review the specification package with the user.
+- [x] Mark the specification approved in `README.md`.
+- [x] Commit the specification approval status before starting implementation.
 
 **Gate:** Production code and regression tests must not change until the user
 approves the specification package.
