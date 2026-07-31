@@ -44,20 +44,20 @@ authentication, environment, server, or unrelated failures.
 
 ## Phase 5: Full verification
 
-- [ ] Run lint.
-- [ ] Run TypeScript checking.
-- [ ] Run unit tests.
-- [ ] Run real-database integration tests.
-- [ ] Measure coverage and confirm it is maintained.
-- [ ] Run the production build.
-- [ ] Run the complete Playwright suite against localhost.
-- [ ] Review the diff for architecture, accessibility, logging, monitoring, and edge-case weaknesses.
+- [x] Run lint.
+- [x] Run TypeScript checking.
+- [x] Run unit tests.
+- [x] Run real-database integration tests.
+- [x] Measure coverage and confirm it is maintained.
+- [x] Run the production build.
+- [x] Run the complete Playwright suite against localhost.
+- [x] Review the diff for architecture, accessibility, logging, monitoring, and edge-case weaknesses.
 
 ## Phase 6: PR and deployment
 
-- [ ] Open a PR with `Fixes #83` and the exact checked `AGENTS.md` checklist.
+- [x] Open a PR with `Fixes #83` and the exact checked `AGENTS.md` checklist.
 - [ ] Include behavior-first changes, happy/failure flows, screenshots, commands, results, coverage, and architectural review.
-- [ ] Confirm all required environment-variable checks pass.
+- [x] Confirm all required environment-variable checks pass.
 - [ ] Confirm CI is green.
 - [ ] Confirm the Vercel preview builds and passes the targeted mobile regression.
 - [ ] Review CodeRabbit and Copilot feedback and implement valuable changes.

@@ -2,7 +2,7 @@
 
 **Issue:** [#83 — Screen is cut when entering information on mobile for the Daily Log](https://github.com/nadvolod/ceo-mission-control/issues/83)
 
-**Status:** Approved — implementation in progress
+**Status:** Implemented — CI verified; Vercel preview verification blocked by missing runtime configuration
 
 **Target:** Current `/dashboard` experience
 
@@ -38,9 +38,17 @@ form behavior remain unchanged. Browser pinch zoom remains enabled.
 | Portal handling | Mark the command palette root with `mc-root` | Radix portals render outside the dashboard DOM tree and otherwise miss the scoped rule. |
 | Visual proof | Paired desktop and iPhone Playwright snapshots | Required by `AGENTS.md` and protects both responsive states. |
 
+## Verification evidence
+
+- Red-before CI: [run 30648412642](https://github.com/nadvolod/ceo-mission-control/actions/runs/30648412642/job/91215988443?pr=84) failed only the new regression, reporting `morning-log-note` at 13px while 89 browser tests passed.
+- Ubuntu baseline generation: [run 30649146614](https://github.com/nadvolod/ceo-mission-control/actions/runs/30649146614) passed PW-1, PW-2, PW-3, and Monthly Review baseline generation.
+- Green CI: [run 30649524496](https://github.com/nadvolod/ceo-mission-control/actions/runs/30649524496/job/91219540591?pr=84) passed 91 Playwright tests, including all three BUG-83 cases.
+- Coverage remained at 50.09% statements/lines, 79.8% branches, and 67.51% functions; the production patch adds no executable JavaScript logic.
+- The Vercel preview is built and `READY`, but its live `/dashboard` request currently fails before application rendering because the Vercel Preview environment has no `IRON_SESSION_PASSWORD`. Runtime log: `iron-session: Bad usage. Missing password.`
+
 ## Traceability
 
-| Requirement | Planned proof |
+| Requirement | Verified proof |
 | --- | --- |
 | REQ-1, REQ-2 | PW-1 computed-style regression across dashboard form surfaces |
 | REQ-3 | PW-2 focused Morning Log containment and typing flow |
@@ -49,5 +57,6 @@ form behavior remain unchanged. Browser pinch zoom remains enabled.
 | REQ-6 | Existing functional Playwright suite, unit/integration suite, and build |
 | REQ-7 | Source-scope inspection plus unaffected page tests |
 
-The production change must not begin until this specification package is
-approved.
+The specification was approved before the regression test and production
+changes were committed. Final delivery remains gated on working Vercel Preview
+runtime configuration and reviewer-bot completion.
