@@ -31,16 +31,16 @@ authentication, environment, server, or unrelated failures.
 - [x] Add the scoped mobile 16px form rule to `src/app/globals.css`.
 - [x] Add `mc-root` to command palette `Dialog.Content`.
 - [x] Confirm no viewport zoom restrictions or unrelated component changes were introduced.
-- [ ] Re-run PW-1 and PW-2 and capture green output.
+- [x] Re-run PW-1 and PW-2 and capture green output.
 
 ## Phase 4: Visual evidence
 
-- [ ] Add desktop and iPhone `toHaveScreenshot` assertions for focused Morning Log.
-- [ ] Push the branch so the Ubuntu baseline workflow can run.
-- [ ] Generate and download the new Morning Log PNG baselines from `ubuntu-latest`.
-- [ ] Regenerate the Monthly Review iPhone baseline.
-- [ ] Confirm the Monthly Review desktop baseline has no intentional change.
-- [ ] Commit all required PNG baselines.
+- [x] Add desktop and iPhone `toHaveScreenshot` assertions for focused Morning Log.
+- [x] Push the branch so the Ubuntu baseline workflow can run.
+- [x] Generate and download the new Morning Log PNG baselines from `ubuntu-latest`.
+- [x] Regenerate the Monthly Review iPhone baseline.
+- [x] Confirm the Monthly Review desktop baseline has no intentional change.
+- [x] Commit all required PNG baselines.
 
 ## Phase 5: Full verification
 
