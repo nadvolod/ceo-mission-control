@@ -17,11 +17,11 @@ approves the specification package.
 
 ## Phase 2: Red-before regression
 
-- [ ] Add `tests/e2e/mobile-form-zoom-visual.spec.ts`.
-- [ ] Add PW-1 computed-font checks for each approved dashboard form surface.
-- [ ] Add PW-2 focused Morning Log containment assertions.
-- [ ] Run the targeted non-visual regression against the pre-fix code.
-- [ ] Capture CLI output proving failure specifically because a covered control computes below 16px.
+- [x] Add `tests/e2e/mobile-form-zoom-visual.spec.ts`.
+- [x] Add PW-1 computed-font checks for each approved dashboard form surface.
+- [x] Add PW-2 focused Morning Log containment assertions.
+- [x] Run the targeted non-visual regression against the pre-fix code.
+- [x] Capture CI output proving failure specifically because a covered control computes below 16px.
 
 **Gate:** The test must reproduce BUG-83 for the expected reason, not because of
 authentication, environment, server, or unrelated failures.
