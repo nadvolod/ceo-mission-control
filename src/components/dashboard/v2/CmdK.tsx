@@ -92,7 +92,7 @@ export function CmdK({ open, onOpenChange, onLog, onOpenReflection, onOpenMornin
           style={{ background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(6px)' }}
         />
         <Dialog.Content
-          className="fixed left-1/2 z-50 -translate-x-1/2 overflow-hidden"
+          className="mc-root fixed left-1/2 z-50 -translate-x-1/2 overflow-hidden"
           style={{
             top: 80,
             width: 'min(560px, 92vw)',
