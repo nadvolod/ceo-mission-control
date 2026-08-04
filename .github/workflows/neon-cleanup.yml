@@ -1,0 +1,62 @@
+name: Cleanup Neon preview branch
+
+# The Vercel managed Neon integration creates a preview/<git-branch> database
+# branch on every preview deployment, but it only deletes that branch when the
+# last Vercel deployment for the git branch ages out. Vercel retains preview
+# deployments for 6 months by default, so merged and abandoned PRs left their
+# databases behind. 50 dead preview branches had accumulated in the
+# mission-control Neon project by August 2026, some dating to March. Delete the
+# branch as soon as the PR closes, merged or not.
+#
+# Runs after the PR is already closed, so a failure here never blocks a merge.
+# It does fail loudly on a real API error, because a silent no op would let the
+# branches pile up again without anyone noticing.
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  delete-preview-branch:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Delete the Neon preview branch for this PR
+        env:
+          # neonctl reads the key from NEON_API_KEY by default.
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          # The project id is not a secret. Accept it as either a repo variable
+          # or a secret so both configurations work.
+          NEON_PROJECT_ID: ${{ vars.NEON_PROJECT_ID || secrets.NEON_PROJECT_ID }}
+          # Passed through the environment rather than interpolated into the
+          # script, so a hostile branch name cannot inject shell commands.
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          set -euo pipefail
+
+          # Required config check, per the AGENTS.md rule that CI must fail with
+          # a clear message naming any missing variable rather than no op.
+          if [ -z "${NEON_API_KEY:-}" ] || [ -z "${NEON_PROJECT_ID:-}" ]; then
+            echo "Missing configuration. Set the NEON_API_KEY and NEON_PROJECT_ID secrets on this repository. Expected project id for mission-control: spring-violet-91572329." >&2
+            exit 1
+          fi
+
+          # Log which Neon project is being targeted. The project id comes from
+          # a secret whose value cannot be reviewed in the PR, so print the
+          # resolved project name to make a misconfigured id obvious in the log.
+          project=$(npx --yes neonctl@latest projects get "$NEON_PROJECT_ID" --output json | jq -r '.name')
+          echo "Target Neon project: $project ($NEON_PROJECT_ID)"
+
+          branch="preview/${HEAD_REF}"
+
+          # List first rather than probing the single branch. A failed probe
+          # cannot tell "branch is absent" apart from "the API key is wrong",
+          # and treating an auth error as nothing to do is how the branches
+          # piled up unnoticed in the first place. This call fails the job on
+          # any API error, so only a genuinely absent branch is a no op.
+          branches=$(npx --yes neonctl@latest branches list --project-id "$NEON_PROJECT_ID" --output json)
+
+          if echo "$branches" | jq -e --arg b "$branch" 'any(.[]; .name == $b)' >/dev/null; then
+            npx --yes neonctl@latest branches delete "$branch" --project-id "$NEON_PROJECT_ID"
+            echo "Deleted Neon branch $branch"
+          else
+            echo "No Neon branch named $branch, nothing to delete"
+          fi
